@@ -1,0 +1,9 @@
+font:
+  normal:
+    family: MesloLGS NF
+  size: 18
+
+key_bindings:
+  - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
+
+alt_send_esc: false
