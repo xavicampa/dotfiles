@@ -4,8 +4,12 @@ Plug 'hashivim/vim-terraform'
 Plug 'rhadley-recurly/vim-terragrunt'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
+Plug 'preservim/nerdtree'
+Plug 'Xuyuanp/nerdtree-git-plugin'
+Plug 'ryanoasis/vim-devicons'
 call plug#end()
 
+let mapleader = ","
 syntax on
 set number
 filetype plugin indent on
@@ -26,3 +30,9 @@ let g:terraform_fmt_on_save=1
 
 " too low vim version - warning remove
 let g:coc_disable_startup_warning = 1
+
+" NERDtree settings
+nnoremap <leader>n :NERDTreeFocus<CR>
+nnoremap <C-n> :NERDTree<CR>
+nnoremap <C-t> :NERDTreeToggle<CR>
+nnoremap <C-f> :NERDTreeFind<CR>
