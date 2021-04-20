@@ -7,6 +7,7 @@ Plug 'vim-airline/vim-airline-themes'
 Plug 'preservim/nerdtree'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'ryanoasis/vim-devicons'
+Plug 'tpope/vim-fugitive'
 call plug#end()
 
 let mapleader = ","
