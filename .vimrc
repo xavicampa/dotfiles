@@ -6,4 +6,4 @@ set noswapfile
 set hlsearch
 set ignorecase
 set incsearch
-
+nnoremap <C-t> :NERDTreeToggle<CR>
