@@ -4,9 +4,9 @@ window:
 font:
   normal:
     family: MesloLGS NF
-  size: 16
+  size: 12
 
-key_bindings:
-  - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
+#key_bindings:
+#  - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
 
 alt_send_esc: false
