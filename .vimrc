@@ -16,6 +16,8 @@ Plug 'sheerun/vim-polyglot'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'valloric/MatchTagAlways'
+Plug 'jiangmiao/auto-pairs'
 call plug#end()
 
 inoremap jk <ESC>
