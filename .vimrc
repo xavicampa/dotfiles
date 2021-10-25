@@ -7,3 +7,4 @@ set hlsearch
 set ignorecase
 set incsearch
 nnoremap <C-t> :NERDTreeToggle<CR>
+filetype indent plugin on
