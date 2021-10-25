@@ -8,3 +8,4 @@ set ignorecase
 set incsearch
 nnoremap <C-t> :NERDTreeToggle<CR>
 filetype indent plugin on
+let g:airline_powerline_fonts = 1
