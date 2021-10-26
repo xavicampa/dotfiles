@@ -10,3 +10,7 @@
 3. Check out:
 
 ```dotfiles checkout```
+
+4. Hide untracked files:
+
+```dotfiles config --local status.showUntrackedFiles no```
