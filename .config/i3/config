@@ -54,6 +54,7 @@ bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ to
 bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
 exec --no-startup-id pactl set-default-sink alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1
 exec --no-startup-id pactl set-default-source alsa_input.usb-046d_C922_Pro_Stream_Webcam_B72BB7BF-02.analog-stereo
+exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " 291 1
 
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
