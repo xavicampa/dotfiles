@@ -29,7 +29,7 @@ set incsearch
 nnoremap <C-t> :NERDTreeToggle<CR>
 let g:airline_powerline_fonts = 1
 colorscheme dracula
-let g:coc_global_extensions=[ 'coc-cfn-lint' ]
+let g:coc_global_extensions=[ 'coc-cfn-lint', 'coc-omnisharp' ]
 let g:NERDTreeGitStatusIndicatorMapCustom = {
                 \ 'Modified'  :'✹',
                 \ 'Staged'    :'✚',
