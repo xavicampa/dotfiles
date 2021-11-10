@@ -28,6 +28,8 @@ set ignorecase
 set incsearch
 nnoremap <C-t> :NERDTreeToggle<CR>
 let g:airline_powerline_fonts = 1
+let g:airline#extensions#tabline#enabled = 1
+let g:airline#extensions#tabline#buffer_nr_show = 1
 colorscheme dracula
 let g:coc_global_extensions=[ 'coc-cfn-lint', 'coc-omnisharp' ]
 let g:NERDTreeGitStatusIndicatorMapCustom = {
