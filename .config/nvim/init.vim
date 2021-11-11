@@ -22,6 +22,7 @@ inoremap jk <ESC>
 let mapleader = "æ"
 syntax on
 set number
+set relativenumber
 set noswapfile
 set hlsearch
 set ignorecase
