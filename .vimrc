@@ -16,11 +16,10 @@ Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 "Plug 'prabirshrestha/asyncomplete.vim'
 Plug 'preservim/nerdtree'
-"Plug 'neovim/nvim-lspconfig'
 Plug 'sheerun/vim-polyglot'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
-Plug 'dracula/vim', { 'as': 'dracula'  }
+Plug 'morhetz/gruvbox'
 Plug 'neoclide/coc.nvim', { 'branch': 'release' }
 Plug 'valloric/MatchTagAlways'
 Plug 'jiangmiao/auto-pairs'
@@ -42,7 +41,8 @@ nnoremap <C-t> :NERDTreeToggle<CR>
 let g:airline_powerline_fonts = 1
 let g:airline#extensions#tabline#enabled = 1
 let g:airline#extensions#tabline#buffer_nr_show = 1
-colorscheme dracula
+colorscheme gruvbox
+set background=dark
 let g:coc_global_extensions=[ 'coc-cfn-lint' ]
 let g:NERDTreeGitStatusIndicatorMapCustom = {
                 \ 'Modified'  :'✹',
