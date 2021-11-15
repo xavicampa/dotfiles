@@ -14,7 +14,6 @@ Plug 'OmniSharp/omnisharp-vim'
 Plug 'dense-analysis/ale'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
-"Plug 'prabirshrestha/asyncomplete.vim'
 Plug 'preservim/nerdtree'
 Plug 'sheerun/vim-polyglot'
 Plug 'vim-airline/vim-airline'
@@ -40,5 +39,3 @@ set ignorecase
 set incsearch
 colorscheme gruvbox
 set background=dark
-"let g:asyncomplete_auto_popup = 1
-"let g:asyncomplete_auto_completeopt = 0

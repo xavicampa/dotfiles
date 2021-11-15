@@ -11,3 +11,4 @@ let g:NERDTreeGitStatusIndicatorMapCustom = {
                 \ 'Unknown'   :'?',
                 \ }
 nnoremap <C-t> :NERDTreeToggle<CR>
+let g:NERDTreeQuitOnOpen=1
