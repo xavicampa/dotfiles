@@ -40,6 +40,9 @@ set ignorecase
 set incsearch
 colorscheme gruvbox
 set background=dark
+set wildmenu
+set wildmode=longest:full,full
+set mouse=a
 
 inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
 inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
