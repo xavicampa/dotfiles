@@ -1,5 +1,5 @@
 window:
-  decorations: none  
+  decorations: none
   padding:
     x: 8
     y: 8
@@ -7,7 +7,7 @@ window:
 font:
   normal:
     family: MesloLGS NF
-  size: 16
+  size: 10
 
 key_bindings:
   - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
