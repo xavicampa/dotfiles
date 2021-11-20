@@ -59,6 +59,10 @@ exec --no-startup-id pactl set-default-source alsa_input.usb-046d_C922_Pro_Strea
 exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Natural Scrolling Enabled" 1
 exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Profile Enabled" 0, 0
 
+# Use ddcutil to control display brightness via F1 and F2
+bindcode 68 exec --no-startup-id ddcutil setvcp 10 + 25
+bindcode 67 exec --no-startup-id ddcutil setvcp 10 - 25
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
