@@ -25,7 +25,6 @@ Plug 'jiangmiao/auto-pairs'
 Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'ryanoasis/vim-devicons'
-Plug 'nathanaelkane/vim-indent-guides'
 call plug#end()
 
 set encoding=utf-8
@@ -43,6 +42,10 @@ set background=dark
 set wildmenu
 set wildmode=longest:full,full
 set mouse=a
+set list lcs=tab:\|\ 
+set tabstop=4
+set autoindent
+set smartindent
 
 inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
 inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
