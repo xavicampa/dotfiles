@@ -1,15 +1,20 @@
-window:
-  decorations: none
-  padding:
-    x: 8
-    y: 8
+#window:
+#  decorations: none
+#  padding:
+#    x: 8
+#    y: 8
 
 font:
   normal:
     family: MesloLGS NF
-  size: 10
+  size: 9
 
-key_bindings:
-  - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
+  #key_bindings:
+  #  - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
 
 alt_send_esc: false
+
+shell:
+  program: tmux
+  args:
+    - -u
