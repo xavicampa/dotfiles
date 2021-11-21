@@ -41,7 +41,7 @@ colorscheme gruvbox
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
-set mouse=a
+"set mouse=a
 set list lcs=tab:\|\ 
 set tabstop=4
 set autoindent
