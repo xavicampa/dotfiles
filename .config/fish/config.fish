@@ -1,5 +1,5 @@
 alias dotfiles="/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME"
-if test -f /usr/bin/exa
+if which -s exa
     alias l='exa'
     alias la='exa -a'
     alias ll='exa -lah'
