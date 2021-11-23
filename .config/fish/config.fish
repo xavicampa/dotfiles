@@ -11,9 +11,13 @@ if status --is-login
     set -gx PATH $PATH ~/.dotnet/tools
     set -gx PATH $PATH ~/.cargo/bin
     set -U fish_greeting
-    set -Ux FZF_DEFAULT_COMMAND 'fdfind --type f'
     set -Ux EDITOR vim
     set -Ux VISUAL $EDITOR
+    if which -s fdfind
+        set -Ux FZF_DEFAULT_COMMAND 'fdfind --type f'
+    else if which -s fd
+        set -Ux FZF_DEFAULT_COMMAND 'fd --type f'
+    end
 end
 
 # keep at the end
