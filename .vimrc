@@ -47,5 +47,7 @@ set tabstop=4
 set autoindent
 set smartindent
 
+hi! Normal ctermbg=NONE guibg=NONE
+
 inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
 inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
