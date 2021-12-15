@@ -18,7 +18,7 @@ Plug 'preservim/nerdtree'
 Plug 'sheerun/vim-polyglot'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
-Plug 'morhetz/gruvbox'
+Plug 'gruvbox-community/gruvbox'
 Plug 'neoclide/coc.nvim', { 'branch': 'release' }
 Plug 'valloric/MatchTagAlways'
 Plug 'jiangmiao/auto-pairs'
@@ -29,14 +29,17 @@ call plug#end()
 
 set encoding=utf-8
 inoremap jk <ESC>
-let mapleader = "æ"
+let mapleader = " "
 syntax on
 set number
 set relativenumber
 set noswapfile
-set hlsearch
+set nohlsearch
+set nowrap
 set ignorecase
 set incsearch
+set scrolloff=8
+set colorcolumn=80
 colorscheme gruvbox
 set background=dark
 set wildmenu
