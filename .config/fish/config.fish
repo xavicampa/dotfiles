@@ -1,5 +1,5 @@
 alias dotfiles="/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME"
-if which -s exa
+if which exa>/dev/null
     alias l='exa'
     alias la='exa -a'
     alias ll='exa -lah'
@@ -13,9 +13,9 @@ if status --is-login
     set -U fish_greeting
     set -Ux EDITOR vim
     set -Ux VISUAL $EDITOR
-    if which -s fdfind
+    if which fdfind>/dev/null
         set -Ux FZF_DEFAULT_COMMAND 'fdfind --type f'
-    else if which -s fd
+    else if which fd>/dev/null
         set -Ux FZF_DEFAULT_COMMAND 'fd --type f'
     end
 end
