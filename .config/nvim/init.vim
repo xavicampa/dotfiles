@@ -11,7 +11,7 @@ autocmd VimEnter * if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
 \| endif
 
 call plug#begin(stdpath('data') . '/plugged')
-Plug 'OmniSharp/omnisharp-vim'
+"Plug 'OmniSharp/omnisharp-vim'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'preservim/nerdtree'
@@ -20,7 +20,7 @@ Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'gruvbox-community/gruvbox'
 Plug 'valloric/MatchTagAlways'
-Plug 'jiangmiao/auto-pairs'
+"Plug 'jiangmiao/auto-pairs'
 Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'ryanoasis/vim-devicons'
@@ -53,7 +53,3 @@ set autoindent
 set smartindent
 
 hi! Normal ctermbg=NONE guibg=NONE
-
-inoremap <expr> <C-j> pumvisible() ? "\<C-n>" : "\<C-j>"
-inoremap <expr> <C-k> pumvisible() ? "\<C-p>" : "\<C-k>"
-set completeopt-=preview
