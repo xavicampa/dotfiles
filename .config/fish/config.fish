@@ -6,6 +6,10 @@ if which exa>/dev/null
     alias ls='exa --color=auto'
 end
 
+if test -f /home/javi/nvim.appimage
+    alias vim='/home/javi/nvim.appimage'
+end
+
 if status --is-login
     set -gx PATH $PATH ~/.local/bin
     set -gx PATH $PATH ~/.dotnet/tools
