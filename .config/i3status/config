@@ -3,10 +3,8 @@ general {
         interval = 1
 }
 
-order += "cpu_usage"
-order += "memory"
-order += "ethernet _first_"
 order += "volume master"
+order += "ethernet _first_"
 order += "tztime local"
 
 ethernet _first_{
@@ -16,16 +14,6 @@ ethernet _first_{
 
 tztime local {
         format = "%Y-%m-%d %H:%M:%S"
-}
-
-cpu_usage {
-        format = "%usage"
-}
-
-memory {
-        format = "%used/%total"
-        threshold_degraded = "10%"
-        format_degraded = "MEMORY: %free"
 }
 
 volume master {
