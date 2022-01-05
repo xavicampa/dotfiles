@@ -49,14 +49,14 @@ for _, lsp in ipairs(servers) do
   }
 end
 
-local pid = vim.fn.getpid()
-local omnisharp_bin = "/home/javi/omnisharp/run"
-require'lspconfig'.omnisharp.setup{
-  cmd = { omnisharp_bin, "--languageserver" , "--hostPID", tostring(pid) },
-  -- Replace <YOUR_LSP_SERVER> with each lsp server you've enabled.
-  capabilities = capabilities,
-  on_attach = on_attach,
-  flags = {
-    debounce_text_changes = 150,
-  }
-}
+--local pid = vim.fn.getpid()
+--local omnisharp_bin = "/home/javi/omnisharp/run"
+--require'lspconfig'.omnisharp.setup{
+--  cmd = { omnisharp_bin, "--languageserver" , "--hostPID", tostring(pid) },
+--  -- Replace <YOUR_LSP_SERVER> with each lsp server you've enabled.
+--  capabilities = capabilities,
+--  on_attach = on_attach,
+--  flags = {
+--    debounce_text_changes = 150,
+--  }
+--}

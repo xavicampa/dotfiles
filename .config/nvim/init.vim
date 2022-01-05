@@ -15,7 +15,7 @@ call plug#begin(stdpath('data') . '/plugged')
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'preservim/nerdtree'
-Plug 'sheerun/vim-polyglot'
+"Plug 'sheerun/vim-polyglot'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'gruvbox-community/gruvbox'
@@ -27,28 +27,38 @@ Plug 'ryanoasis/vim-devicons'
 Plug 'neovim/nvim-lspconfig'
 Plug 'hrsh7th/nvim-cmp'
 Plug 'hrsh7th/cmp-nvim-lsp'
+Plug 'L3MON4D3/LuaSnip'
+Plug 'saadparwaiz1/cmp_luasnip'
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'pedrohdz/vim-yaml-folds'
+Plug 'Yggdroot/indentLine'
+"Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}  " We recommend updating the parsers on update
 call plug#end()
 
 set encoding=utf-8
 inoremap jk <ESC>
 let mapleader = " "
-syntax on
+"syntax on
 set number
 set relativenumber
 set noswapfile
-set nohlsearch
+set hlsearch
 set nowrap
 set ignorecase
 set incsearch
 set scrolloff=8
-set colorcolumn=80
+"set colorcolumn=80
 colorscheme gruvbox
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
 "set mouse=a
 set list lcs=tab:\|\ 
+let g:indentLine_char_list = ['|', '¦', '┆', '┊']
 set tabstop=4
+set softtabstop=-1
+set shiftwidth=0
+set expandtab
 set autoindent
 set smartindent
 
