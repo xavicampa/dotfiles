@@ -85,6 +85,8 @@ floating_modifier $mod
 
 # start a terminal
 bindsym $mod+Return exec alacritty
+bindsym $mod+shift+Return exec alacritty --class "floating_alacritty" -o "window.dimensions.columns=80" -o "window.dimensions.lines=25"
+for_window [class="Alacritty" instance="floating_alacritty"] floating toggle, border normal
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -138,7 +140,7 @@ bindsym $mod+e layout toggle split
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle, border normal
-bindsym $mod+Control+space floating disable, border none
+bindsym $mod+Control+space floating disable, border pixel 1
 
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
@@ -187,8 +189,8 @@ bindsym Ctrl+Shift+$mod+9 move container to workspace number $ws9
 bindsym Ctrl+Shift+$mod+0 move container to workspace number $ws10
 
 # move focused workspace to screen
-#bindsym Ctrl+$mod+h move workspace to output left
-#bindsym Ctrl+$mod+l move workspace to output right
+bindsym Ctrl+$mod+h move workspace to output left
+bindsym Ctrl+$mod+l move workspace to output right
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
