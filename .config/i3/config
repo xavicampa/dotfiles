@@ -17,7 +17,7 @@ set $mod Mod1
 font pango:MesloLGS NF 10
 
 # window title bars and border
-default_border normal 1
+default_border pixel 1
 #default_floating_border pixel 1
 #client.focused          #4c7899 #285577 #ffffff #2e9ef4   #ff9900
 
@@ -137,7 +137,8 @@ bindsym $mod+w layout tabbed
 bindsym $mod+e layout toggle split
 
 # toggle tiling / floating
-bindsym $mod+Shift+space floating toggle
+bindsym $mod+Shift+space floating toggle, border normal
+bindsym $mod+Control+space floating disable, border none
 
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
