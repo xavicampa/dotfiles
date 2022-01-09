@@ -8,14 +8,4 @@ window:
 font:
   normal:
     family: MesloLGS Nerd Font
-  size: 12
-
-key_bindings:
-  - { key: Return, mods: Command, action: ToggleSimpleFullscreen }
-
-alt_send_esc: false
-
-#shell:
-#  program: tmux
-#  args:
-#    - -u
+  size: 9
