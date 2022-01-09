@@ -11,6 +11,9 @@
 
 set $mod Mod1
 
+# displays
+exec --no-startup-id $HOME/.screenlayout/dual.sh
+
 # fonts
 exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
 exec --no-startup-id xset fp rehash
@@ -33,7 +36,7 @@ default_border pixel 2
 #exec --no-startup-id $HOME/.config/polybar/launch_polybar.sh
 
 # compositor
-exec --no-startup-id /usr/local/bin/picom -b --experimental-backends
+exec --no-startup-id /usr/bin/picom -b --experimental-backends
 
 # background
 #exec --no-startup-id xsetroot -solid "#AAAAAA"
@@ -50,13 +53,11 @@ exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/background.png"
 # screen before suspend. Use loginctl lock-session to lock your screen.
 exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock --nofork --image "$HOME/.config/i3/lock.png"
 
-#set $mode_system System (l) lock, (e) logout, (s) suspend, (h) hibernate, (r) reboot, (CTRL+s) shutdown
-set $mode_system System (l) lock, (s) suspend, (h) hibernate, (r) reboot, (Ctrl+s) shutdown
-
+# system mode
+set $mode_system System (l) lock, (s) suspend, (r) reboot, (Ctrl+s) shutdown
 mode "$mode_system" {
     bindsym l exec --no-startup-id loginctl lock-session, mode "default"
     bindsym s exec --no-startup-id loginctl lock-session && systemctl suspend, mode "default"
-    bindsym h exec --no-startup-id loginctl lock-session && systemctl hibernate, mode "default"
     bindsym r exec --no-startup-id systemctl reboot, mode "default"
     bindsym Ctrl+s exec --no-startup-id systemctl poweroff -i, mode "default"
 
@@ -64,8 +65,20 @@ mode "$mode_system" {
     bindsym Return mode "default"
     bindsym Escape mode "default"
 }
-
 bindsym $mod+BackSpace mode "$mode_system"
+
+# displays mode
+set $mode_displays Single display 27 (1), dual displays (2), single display 32 (3)
+mode "$mode_displays" {
+    bindsym 1 exec --no-startup-id $HOME/.screenlayout/single-27.sh, mode "default"
+    bindsym 2 exec --no-startup-id $HOME/.screenlayout/dual.sh, mode "default"
+    bindsym 3 exec --no-startup-id $HOME/.screenlayout/single-32.sh, mode "default"
+
+    # back to normal: Enter or Escape
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+bindsym $mod+p mode "$mode_displays"
 
 # NetworkManager is the most popular way to manage wireless networks on Linux,
 # and nm-applet is a desktop environment-independent system tray GUI for it.
@@ -79,6 +92,7 @@ bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ to
 bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
 exec --no-startup-id pactl set-default-sink alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1
 exec --no-startup-id pactl set-default-source alsa_input.usb-046d_C922_Pro_Stream_Webcam_B72BB7BF-02.analog-stereo
+exec --no-startup-id pasystray
 
 # Adjust mouse scrolling and accel
 exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Natural Scrolling Enabled" 1
