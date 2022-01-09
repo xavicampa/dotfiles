@@ -11,25 +11,33 @@
 
 set $mod Mod1
 
+# fonts
+exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
+exec --no-startup-id xset fp rehash
+
+# gaps
+gaps inner 24
+gaps top 16 
+
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
 #font pango:monospace 8
-font pango:MesloLGS NF 10
+font pango:MesloLGS Nerd Font 8
 
 # window title bars and border
-default_border pixel 1
+default_border pixel 2
 #default_floating_border pixel 1
 #client.focused          #4c7899 #285577 #ffffff #2e9ef4   #ff9900
 
-# screens
-#exec --no-startup-id /usr/bin/xrandr --output DP-1 --auto --right-of HDMI-0
+#polybar
+exec --no-startup-id $HOME/.config/polybar/launch_polybar.sh
 
 # compositor
-exec --no-startup-id /usr/local/bin/picom -b
+exec --no-startup-id /usr/local/bin/picom -b --experimental-backends
 
 # background
-#exec --no-startup-id xsetroot -solid "#000000"
-exec --no-startup-id /usr/bin/feh --bg-scale "/home/javi/Downloads/background Pattern Light Texture Wallpaper Background 4K Ultra HD.jpg"
+#exec --no-startup-id xsetroot -solid "#AAAAAA"
+exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/background.png"
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
 # text rendering and scalability on retina/hidpi displays (thanks to pango).
@@ -40,7 +48,7 @@ exec --no-startup-id /usr/bin/feh --bg-scale "/home/javi/Downloads/background Pa
 
 # xss-lock grabs a logind suspend inhibit lock and will use i3lock to lock the
 # screen before suspend. Use loginctl lock-session to lock your screen.
-exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock --nofork --image $HOME/.config/i3/lock.png
+exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock --nofork --image "$HOME/.config/i3/lock.png"
 
 #set $mode_system System (l) lock, (e) logout, (s) suspend, (h) hibernate, (r) reboot, (CTRL+s) shutdown
 set $mode_system System (l) lock, (s) suspend, (h) hibernate, (r) reboot, (Ctrl+s) shutdown
@@ -240,6 +248,6 @@ bindsym $mod+m focus floating; mode "move"
 
 # Start i3bar to display a workspace bar (plus the system information i3status
 # finds out, if available)
-bar {
-        status_command i3status
-}
+#bar {
+#        status_command i3status
+#}
