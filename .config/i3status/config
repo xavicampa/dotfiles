@@ -13,7 +13,7 @@ ethernet _first_{
 }
 
 tztime local {
-        format = "%Y-%m-%d %H:%M:%S"
+        format = "%d-%m-%Y %H:%M:%S"
 }
 
 volume master {

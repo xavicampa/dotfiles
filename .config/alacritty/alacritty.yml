@@ -3,9 +3,9 @@ window:
   padding:
     x: 4
     y: 4
-  opacity: 0.9
+  opacity: 0.85
 
 font:
   normal:
-    family: MesloLGS Nerd Font
+    family: Hack Nerd Font
   size: 9

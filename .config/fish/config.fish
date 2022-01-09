@@ -6,13 +6,13 @@ if which exa>/dev/null
     alias ls='exa --color=auto'
 end
 
-if test -f /home/javi/nvim.appimage
-    alias vim='/home/javi/nvim.appimage'
-end
-
-if which nvim>/dev/null
-    alias vim='/opt/homebrew/bin/nvim'
-end
+#if test -f /home/javi/nvim.appimage
+#    alias vim='/home/javi/nvim.appimage'
+#end
+#
+#if which nvim>/dev/null
+#    alias vim='/opt/homebrew/bin/nvim'
+#end
 
 if status --is-login
     set -gx PATH $PATH ~/.local/bin
