@@ -16,8 +16,8 @@ exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
 exec --no-startup-id xset fp rehash
 
 # gaps
-gaps inner 24
-gaps top 16 
+gaps inner 20
+gaps top 8 
 
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
