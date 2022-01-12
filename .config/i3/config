@@ -28,7 +28,7 @@ gaps inner 20
 font pango:Terminus 10
 
 # window title bars and border
-default_border pixel 2
+default_border pixel 3
 #default_floating_border pixel 1
 #client.focused          #4c7899 #285577 #ffffff #2e9ef4   #ff9900
 
@@ -102,6 +102,9 @@ exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel S
 bindcode 68 exec --no-startup-id ddcutil setvcp 10 + 25 --display 1 && ddcutil setvcp 10 + 25 --display 2
 bindcode 67 exec --no-startup-id ddcutil setvcp 10 - 25 --display 1 && ddcutil setvcp 10 - 25 --display 2
 
+# rojimoji
+bindsym $mod+shift+e exec --no-startup-id rofimoji
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
@@ -162,7 +165,7 @@ bindsym $mod+e layout toggle split
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle, border normal
-bindsym $mod+Control+space floating disable, border pixel 1
+bindsym $mod+Control+space floating disable, border pixel 3
 
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
