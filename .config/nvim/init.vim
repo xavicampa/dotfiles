@@ -33,6 +33,7 @@ Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'pedrohdz/vim-yaml-folds'
 Plug 'Yggdroot/indentLine'
 "Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}  " We recommend updating the parsers on update
+Plug 'easymotion/vim-easymotion'
 call plug#end()
 
 set encoding=utf-8
@@ -43,7 +44,7 @@ set number
 set relativenumber
 set noswapfile
 set hlsearch
-set nowrap
+"set nowrap
 set ignorecase
 set incsearch
 set scrolloff=8
