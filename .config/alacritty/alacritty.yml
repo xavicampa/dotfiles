@@ -7,5 +7,5 @@ window:
 background_opacity: 0.90
 font:
   normal:
-    family: Hack Nerd Font
+    family: Hack Nerd Font Mono
   size: 10
