@@ -1,8 +1,18 @@
+# Override default layout for space 2 only
+yabai -m config --space 1 layout float
+
 yabai -m config layout                       bsp
 yabai -m config top_padding                  06
 yabai -m config bottom_padding               06
 yabai -m config left_padding                 06
 yabai -m config right_padding                06
 yabai -m config window_gap                   06
-yabai -m config --space 4 layout float
-yabai -m config --space 8 layout float
+
+# float system preferences
+yabai -m rule --add app="^System Preferences$" manage=off
+yabai -m rule --add app="^Finder$" manage=off
+yabai -m rule --add app="^Appgate SDP$" manage=off
+yabai -m rule --add app="^1Password 7$" manage=off
+yabai -m rule --add app="^Messages$" manage=off
+yabai -m rule --add app="^FaceTime$" manage=off
+yabai -m rule --add app="^MonitorControl$" manage=off
