@@ -26,12 +26,9 @@ Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'ryanoasis/vim-devicons'
 Plug 'pedrohdz/vim-yaml-folds'
-Plug 'Yggdroot/indentLine'
-"Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}  " We recommend updating the parsers on update
-"Plug 'easymotion/vim-easymotion'
+Plug 'lukas-reineke/indent-blankline.nvim'
 call plug#end()
 
-filetype plugin on
 set encoding=utf-8
 inoremap jk <ESC>
 let mapleader = " "
@@ -50,8 +47,6 @@ set background=dark
 set wildmenu
 set wildmode=longest:full,full
 set mouse=v
-set list lcs=tab:\|\ 
-let g:indentLine_char_list = ['|', '¦', '┆', '┊']
 set tabstop=4
 set softtabstop=-1
 set shiftwidth=0
@@ -60,3 +55,8 @@ set autoindent
 set smartindent
 
 hi! Normal ctermbg=NONE guibg=NONE
+
+nmap <silent> <C-k> :lprevious<CR>
+nmap <silent> <C-j> :lnext<CR>
+nmap <silent> <C-p> :cprevious<CR>
+nmap <silent> <C-n> :cnext<CR>

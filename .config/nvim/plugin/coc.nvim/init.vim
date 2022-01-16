@@ -1,4 +1,4 @@
-let g:coc_global_extensions=['coc-cfn-lint']
+" let g:coc_global_extensions=['coc-cfn-lint']
 
 " Use tab for trigger completion with characters ahead and navigate.
 " Use command ':verbose imap <tab>' to make sure tab is not mapped by other plugin.
@@ -18,15 +18,4 @@ inoremap <silent><expr> <c-space> coc#refresh()
 
 " Use <cr> to confirm completion, `<C-g>u` means break undo chain at current position.
 " Coc only does snippet and additional edit on confirm.
-" inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
-
-" Use `:Format` to format current buffer
-" command! -nargs=0 Format :call CocAction('format')
-" 
-" nmap <silent> <C-e> <Plug>(coc-diagnostic-next)
-" nmap <silent> gd <Plug>(coc-definition)
-" nmap <silent> gy <Plug>(coc-type-definition)
-" nmap <silent> gi <Plug>(coc-implementation)
-" nmap <silent> gr <Plug>(coc-references)
-" nmap <leader>ca <Plug>(coc-codeaction)
-" nmap <leader>rn <Plug>(coc-rename)
+inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
