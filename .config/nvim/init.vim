@@ -11,35 +11,31 @@ autocmd VimEnter * if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
 \| endif
 
 call plug#begin(stdpath('data') . '/plugged')
-"Plug 'OmniSharp/omnisharp-vim'
+"Plug 'dense-analysis/ale'
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'OmniSharp/omnisharp-vim'
+Plug 'nickspoons/vim-sharpenup'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'preservim/nerdtree'
-"Plug 'sheerun/vim-polyglot'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'gruvbox-community/gruvbox'
 Plug 'valloric/MatchTagAlways'
-"Plug 'jiangmiao/auto-pairs'
 Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'ryanoasis/vim-devicons'
-Plug 'neovim/nvim-lspconfig'
-Plug 'hrsh7th/nvim-cmp'
-Plug 'hrsh7th/cmp-nvim-lsp'
-Plug 'L3MON4D3/LuaSnip'
-Plug 'saadparwaiz1/cmp_luasnip'
-Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'pedrohdz/vim-yaml-folds'
 Plug 'Yggdroot/indentLine'
 "Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}  " We recommend updating the parsers on update
-Plug 'easymotion/vim-easymotion'
+"Plug 'easymotion/vim-easymotion'
 call plug#end()
 
+filetype plugin on
 set encoding=utf-8
 inoremap jk <ESC>
 let mapleader = " "
-"syntax on
+syntax on
 set number
 set relativenumber
 set noswapfile
@@ -48,12 +44,12 @@ set hlsearch
 set ignorecase
 set incsearch
 set scrolloff=8
-"set colorcolumn=80
+set colorcolumn=80
 colorscheme gruvbox
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
-"set mouse=a
+set mouse=v
 set list lcs=tab:\|\ 
 let g:indentLine_char_list = ['|', '¦', '┆', '┊']
 set tabstop=4
