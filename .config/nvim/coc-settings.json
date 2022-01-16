@@ -1,4 +1,5 @@
 {
-		"signature.preferShownAbove": false,
-        "yaml.validate": false
+    "coc.preferences.diagnostic.displayByAle": true,
+    "signature.preferShownAbove": false,
+    "yaml.validate": false
 }
