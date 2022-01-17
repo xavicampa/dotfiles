@@ -27,6 +27,8 @@ Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'ryanoasis/vim-devicons'
 Plug 'pedrohdz/vim-yaml-folds'
 Plug 'lukas-reineke/indent-blankline.nvim'
+Plug 'nvim-lua/plenary.nvim'
+Plug 'lewis6991/gitsigns.nvim'
 call plug#end()
 
 set encoding=utf-8
