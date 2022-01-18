@@ -22,9 +22,9 @@ if status --is-login
     set -U fish_greeting
     set -Ux EDITOR nvim
     set -Ux VISUAL $EDITOR
-    if which fdfind>/dev/null
+    if which fdfind >/dev/null 2>/dev/null
         set -Ux FZF_DEFAULT_COMMAND 'fdfind --type f'
-    else if which fd>/dev/null
+    else if which fd>/dev/null 2>/dev/null
         set -Ux FZF_DEFAULT_COMMAND 'fd --type f'
     end
 end
