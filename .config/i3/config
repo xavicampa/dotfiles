@@ -118,7 +118,7 @@ bindsym $mod+Shift+q kill
 
 # start dmenu (a program launcher)
 #bindsym $mod+d exec dmenu_run
-bindsym $mod+d exec rofi -show drun
+bindsym $mod+space exec rofi -show drun
 
 # start applications
 bindsym $mod+shift+s exec --no-startup-id flameshot gui
@@ -168,7 +168,7 @@ bindsym $mod+Shift+space floating toggle, border normal
 bindsym $mod+Control+space floating disable, border pixel 3
 
 # change focus between tiling / floating windows
-bindsym $mod+space focus mode_toggle
+# bindsym $mod+space focus mode_toggle
 
 # focus the parent container
 bindsym $mod+a focus parent
