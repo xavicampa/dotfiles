@@ -19,7 +19,7 @@ exec --no-startup-id $HOME/.screenlayout/single-27.sh
 #exec --no-startup-id xset fp rehash
 
 # gaps
-gaps inner 20
+# gaps inner 20
 
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
@@ -27,7 +27,7 @@ gaps inner 20
 font pango:Terminus 10
 
 # window title bars and border
-default_border pixel 3
+default_border pixel 2
 #default_floating_border pixel 1
 #client.focused          #4c7899 #285577 #ffffff #2e9ef4   #ff9900
 
@@ -167,7 +167,7 @@ bindsym $mod+e layout toggle split
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle, border normal
-bindsym $mod+Control+space floating disable, border pixel 3
+bindsym $mod+Control+space floating disable, border pixel 2
 
 # change focus between tiling / floating windows
 # bindsym $mod+space focus mode_toggle

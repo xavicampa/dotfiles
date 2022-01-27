@@ -1,22 +1,10 @@
 general {
         colors = true
-        interval = 1
+        interval = 10
 }
 
-order += "volume master"
-order += "ethernet _first_"
 order += "tztime local"
 
-ethernet _first_{
-        format_up = "%ip"
-        format_down = "down"
-}
-
 tztime local {
-        format = "%d-%m-%Y %H:%M:%S"
-}
-
-volume master {
-        format = "Vol: %volume"
-        format_muted = ""
+        format = "%d-%m-%Y %H:%M "
 }
