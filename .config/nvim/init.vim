@@ -30,6 +30,7 @@ Plug 'lukas-reineke/indent-blankline.nvim'
 Plug 'nvim-lua/plenary.nvim'
 Plug 'lewis6991/gitsigns.nvim'
 Plug 'wfxr/minimap.vim'
+Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 call plug#end()
 
 set encoding=utf-8
@@ -40,11 +41,11 @@ set number
 set relativenumber
 set noswapfile
 set hlsearch
-"set nowrap
+set nowrap
 set ignorecase
 set incsearch
 set scrolloff=8
-set colorcolumn=80
+"set colorcolumn=80
 colorscheme gruvbox
 set background=dark
 set wildmenu
