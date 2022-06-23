@@ -18,8 +18,11 @@ exec --no-startup-id $HOME/.screenlayout/single-27.sh
 #exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
 #exec --no-startup-id xset fp rehash
 
+# autotiling
+exec autotiling
+
 # gaps
-# gaps inner 20
+gaps inner 8
 
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
@@ -35,7 +38,7 @@ default_border pixel 2
 #exec --no-startup-id $HOME/.config/polybar/launch_polybar.sh
 
 # compositor
-exec --no-startup-id /usr/bin/picom -b --experimental-backends
+# exec --no-startup-id /usr/bin/picom -b --experimental-backends
 
 # background
 #exec --no-startup-id xsetroot -solid "#AAAAAA"
@@ -96,7 +99,7 @@ exec --no-startup-id pasystray
 # Adjust mouse scrolling and speed
 exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Natural Scrolling Enabled" 1
 exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Profile Enabled" 0, 0
-exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Speed" -0.5 
+exec --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Speed" -0.5
 
 # Use ddcutil to control display brightness via F1-F4
 bindcode 70 exec --no-startup-id ddcutil setvcp 10 + 25 --display 2
