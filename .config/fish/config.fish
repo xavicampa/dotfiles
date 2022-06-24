@@ -14,10 +14,17 @@ if which nvim>/dev/null
     alias vim=(which nvim)
 end
 
+# Go
+set -g GOPATH $HOME/go
+set -gx PATH $GOPATH/bin $PATH
+
+# python
+set -gx PATH $PATH ~/.local/bin
+
 if status --is-login
-    set -gx PATH $PATH ~/.local/bin
     set -gx PATH $PATH ~/.dotnet/tools
     set -gx PATH $PATH ~/.cargo/bin
+    contains ~/go/bin $fish_user_paths; or set -Ua fish_user_paths ~/go/bin
     set -gx PATH $PATH /Users/javi/Library/Python/3.8/bin
     set -U fish_greeting
     set -Ux EDITOR nvim
