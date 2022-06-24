@@ -41,6 +41,7 @@ Plug 'pedrohdz/vim-yaml-folds'
 Plug 'lukas-reineke/indent-blankline.nvim'
 Plug 'nvim-lua/plenary.nvim'
 Plug 'lewis6991/gitsigns.nvim'
+Plug 'jose-elias-alvarez/null-ls.nvim'
 "Plug 'wfxr/minimap.vim'
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 "Plug 'github/copilot.vim'
