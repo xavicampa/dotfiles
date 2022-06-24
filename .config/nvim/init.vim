@@ -48,7 +48,7 @@ call plug#end()
 
 set encoding=utf-8
 inoremap jk <ESC>
-let mapleader = " "
+let mapleader = ","
 syntax on
 set number
 set relativenumber
