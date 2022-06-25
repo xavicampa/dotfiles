@@ -1,3 +1,5 @@
+local pid = vim.fn.getpid()
+
 -- Mappings.
 -- See `:help vim.diagnostic.*` for documentation on any of the below functions
 local opts = { noremap=true, silent=true }
@@ -48,6 +50,11 @@ require('lspconfig')['pylsp'].setup{
     flags = lsp_flags,
 }
 require('lspconfig')['gopls'].setup{
+    on_attach = on_attach,
+    flags = lsp_flags,
+}
+require('lspconfig')['omnisharp'].setup{
+    cmd = { "/home/javi/omnisharp/OmniSharp", "--languageserver" , "--hostPID", tostring(pid) };
     on_attach = on_attach,
     flags = lsp_flags,
 }
