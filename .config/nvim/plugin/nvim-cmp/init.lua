@@ -28,6 +28,7 @@ cmp.setup {
         ["<c-space>"] = cmp.mapping.complete(),
     },
     sources = {
+        { name = "ultisnips" },
         { name = "nvim_lsp_signature_help" },
         { name = "nvim_lua" },
         { name = "nvim_lsp" },
