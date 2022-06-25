@@ -5,5 +5,5 @@ window:
 font:
   normal:
     family: MesloLGS Nerd Font
-  size: 14
+  size: 12
 alt_send_esc: false
