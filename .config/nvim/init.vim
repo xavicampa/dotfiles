@@ -11,10 +11,6 @@ autocmd VimEnter * if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
 \| endif
 
 call plug#begin(stdpath('data') . '/plugged')
-"Plug 'dense-analysis/ale'
-"Plug 'neoclide/coc.nvim', {'branch': 'release'}
-"Plug 'OmniSharp/omnisharp-vim'
-"Plug 'nickspoons/vim-sharpenup'
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'neovim/nvim-lspconfig'
 Plug 'SirVer/ultisnips'
@@ -27,13 +23,11 @@ Plug 'hrsh7th/cmp-path'
 Plug 'hrsh7th/cmp-nvim-lua'
 Plug 'hrsh7th/cmp-nvim-lsp'
 Plug 'hrsh7th/cmp-nvim-lsp-signature-help'
-Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
-Plug 'junegunn/fzf.vim'
 Plug 'preservim/nerdtree'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'gruvbox-community/gruvbox'
-Plug 'valloric/MatchTagAlways'
+"Plug 'valloric/MatchTagAlways'
 Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'kyazdani42/nvim-web-devicons'
@@ -43,11 +37,10 @@ Plug 'ryanoasis/vim-devicons'
 Plug 'pedrohdz/vim-yaml-folds'
 Plug 'lukas-reineke/indent-blankline.nvim'
 Plug 'nvim-lua/plenary.nvim'
+Plug 'nvim-telescope/telescope.nvim'
 Plug 'lewis6991/gitsigns.nvim'
 Plug 'jose-elias-alvarez/null-ls.nvim'
-"Plug 'wfxr/minimap.vim'
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
-"Plug 'github/copilot.vim'
 call plug#end()
 
 set encoding=utf-8
@@ -76,11 +69,6 @@ set autoindent
 set smartindent
 
 hi! Normal ctermbg=NONE guibg=NONE
-
-"nmap <silent> <C-k> :lprevious<CR>
-"nmap <silent> <C-j> :lnext<CR>
-"nmap <silent> <C-p> :cprevious<CR>
-"nmap <silent> <C-n> :cnext<CR>
 
 " folding
 set foldmethod=expr
