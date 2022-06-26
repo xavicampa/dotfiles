@@ -4,6 +4,6 @@ window:
     y: 4
 font:
   normal:
-    family: MesloLGS Nerd Font
-  size: 12
+    family: JetBrains Mono
+  size: 11
 alt_send_esc: false

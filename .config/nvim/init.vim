@@ -56,8 +56,10 @@ set ignorecase
 set incsearch
 set scrolloff=8
 "set colorcolumn=80
+set termguicolors
+let g:gruvbox_italic=1
 colorscheme gruvbox
-"set background=dark
+set background=dark
 set wildmenu
 set wildmode=longest:full,full
 set mouse=v
