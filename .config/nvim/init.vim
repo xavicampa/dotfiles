@@ -24,9 +24,13 @@ Plug 'hrsh7th/cmp-nvim-lua'
 Plug 'hrsh7th/cmp-nvim-lsp'
 Plug 'hrsh7th/cmp-nvim-lsp-signature-help'
 Plug 'preservim/nerdtree'
-Plug 'vim-airline/vim-airline'
-Plug 'vim-airline/vim-airline-themes'
-Plug 'gruvbox-community/gruvbox'
+Plug 'kdheepak/tabline.nvim'
+Plug 'nvim-lualine/lualine.nvim'
+Plug 'kyazdani42/nvim-web-devicons'
+"Plug 'vim-airline/vim-airline'
+"Plug 'vim-airline/vim-airline-themes'
+"Plug 'gruvbox-community/gruvbox'
+Plug 'sainnhe/gruvbox-material'
 "Plug 'valloric/MatchTagAlways'
 Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
@@ -58,7 +62,7 @@ set scrolloff=8
 "set colorcolumn=80
 set termguicolors
 let g:gruvbox_italic=1
-colorscheme gruvbox
+colorscheme gruvbox-material
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
@@ -70,7 +74,7 @@ set expandtab
 set autoindent
 set smartindent
 
-hi! Normal ctermbg=NONE guibg=NONE
+"hi! Normal ctermbg=NONE guibg=NONE
 
 " folding
 set foldmethod=expr
