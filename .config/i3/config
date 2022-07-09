@@ -19,7 +19,7 @@ exec --no-startup-id $HOME/.screenlayout/single-27.sh
 #exec --no-startup-id xset fp rehash
 
 # autotiling
-exec autotiling
+exec_always --no-startup-id autotiling
 
 # gaps
 gaps inner 8
@@ -112,15 +112,15 @@ bindcode 68 exec --no-startup-id ddcutil setvcp 10 + 25 --display 1
 bindcode 67 exec --no-startup-id ddcutil setvcp 10 - 25 --display 1
 
 # rojimoji
-bindsym $mod+shift+e exec --no-startup-id rofimoji
+bindsym $mod+control+space exec --no-startup-id rofimoji
 
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
 # start a terminal
 bindsym $mod+Return exec alacritty
-bindsym $mod+shift+Return exec alacritty --class "floating_alacritty" -o "window.dimensions.columns=80" -o "window.dimensions.lines=25"
-for_window [class="Alacritty" instance="floating_alacritty"] floating toggle, border normal
+# bindsym $mod+shift+Return exec alacritty --class "floating_alacritty" -o "window.dimensions.columns=80" -o "window.dimensions.lines=25"
+# for_window [class="Alacritty" instance="floating_alacritty"] floating toggle, border normal
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -130,7 +130,8 @@ bindsym $mod+Shift+q kill
 bindsym $mod+space exec rofi -show drun
 
 # start applications
-bindsym $mod+shift+s exec --no-startup-id flameshot gui
+bindsym $mod+shift+3 exec --no-startup-id flameshot full
+bindsym $mod+shift+4 exec --no-startup-id flameshot gui
 
 # There also is the (new) i3-dmenu-desktop which only displays applications
 # shipping a .desktop file. It is a wrapper around dmenu, so you need that
@@ -174,7 +175,7 @@ bindsym $mod+e layout toggle split
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle, border normal
-bindsym $mod+Control+space floating disable, border pixel 2
+bindsym $mod+Control+Shift+space floating disable, border pixel 2
 
 # change focus between tiling / floating windows
 # bindsym $mod+space focus mode_toggle
