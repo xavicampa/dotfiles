@@ -12,7 +12,7 @@
 set $mod Mod1
 
 # displays
-exec --no-startup-id $HOME/.screenlayout/single-27.sh
+# exec --no-startup-id $HOME/.screenlayout/single-27.sh
 
 # fonts
 #exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
@@ -22,7 +22,7 @@ exec --no-startup-id $HOME/.screenlayout/single-27.sh
 exec_always --no-startup-id autotiling
 
 # gaps
-gaps inner 8
+gaps inner 24
 
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
@@ -45,8 +45,8 @@ default_border pixel 2
 exec --no-startup-id xmodmap ~/.config/i3/vim_xmodmap
 
 # background
-#exec --no-startup-id xsetroot -solid "#AAAAAA"
-exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/background.png"
+exec --no-startup-id xsetroot -solid "#AAAAAA"
+#exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/background.png"
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
 # text rendering and scalability on retina/hidpi displays (thanks to pango).
@@ -57,13 +57,14 @@ exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/background.png"
 
 # xss-lock grabs a logind suspend inhibit lock and will use i3lock to lock the
 # screen before suspend. Use loginctl lock-session to lock your screen.
-exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock --nofork --image "$HOME/.config/i3/lock.png"
+# exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock --nofork --image "$HOME/.config/i3/lock.png"
 
 # system mode
-set $mode_system System (l) log out, (s) suspend, (r) reboot, (Ctrl+s) shutdown
+set $mode_system (l) log out, (s) suspend, (r) reboot, (Ctrl+s) shutdown
 mode "$mode_system" {
     bindsym l exec --no-startup-id i3-msg exit, mode "default"
-    bindsym s exec --no-startup-id loginctl lock-session && systemctl suspend, mode "default"
+    # bindsym s exec --no-startup-id loginctl lock-session && systemctl suspend, mode "default"
+    bindsym s exec --no-startup-id systemctl suspend, mode "default"
     bindsym r exec --no-startup-id systemctl reboot, mode "default"
     bindsym Ctrl+s exec --no-startup-id systemctl poweroff -i, mode "default"
 
@@ -285,3 +286,9 @@ bar {
             #statusline #00000000
         }
 }
+
+# Make the currently focused window a scratchpad
+bindsym $mod+Shift+minus move scratchpad
+
+# Show the first scratchpad window
+bindsym $mod+minus scratchpad show
