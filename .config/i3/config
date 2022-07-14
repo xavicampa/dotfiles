@@ -22,7 +22,7 @@ set $mod Mod1
 exec_always --no-startup-id autotiling
 
 # gaps
-gaps inner 24
+gaps inner 16
 
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
@@ -45,7 +45,7 @@ default_border pixel 2
 exec --no-startup-id xmodmap ~/.config/i3/vim_xmodmap
 
 # background
-exec --no-startup-id xsetroot -solid "#AAAAAA"
+exec --no-startup-id xsetroot -solid "black"
 #exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/background.png"
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
