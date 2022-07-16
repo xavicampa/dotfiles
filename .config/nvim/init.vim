@@ -48,6 +48,7 @@ Plug 'lewis6991/gitsigns.nvim'
 Plug 'jose-elias-alvarez/null-ls.nvim'
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'phaazon/hop.nvim'
+Plug 'glepnir/lspsaga.nvim', { 'branch': 'main' }
 call plug#end()
 
 set encoding=utf-8
@@ -86,3 +87,5 @@ set foldexpr=nvim_treesitter#foldexpr()
 " autocompletion options
 " Set completeopt to have a better completion experience
 set completeopt=menu,menuone,noselect
+
+set clipboard=unnamed,unnamedplus
