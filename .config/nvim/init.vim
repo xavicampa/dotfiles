@@ -27,13 +27,12 @@ Plug 'preservim/nerdtree'
 "Plug 'kdheepak/tabline.nvim'
 Plug 'akinsho/bufferline.nvim'
 Plug 'nvim-lualine/lualine.nvim'
-Plug 'kyazdani42/nvim-web-devicons'
 "Plug 'vim-airline/vim-airline'
 "Plug 'vim-airline/vim-airline-themes'
 "Plug 'gruvbox-community/gruvbox'
 Plug 'sainnhe/gruvbox-material'
 "Plug 'valloric/MatchTagAlways'
-Plug 'tpope/vim-fugitive'
+"Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
 Plug 'kyazdani42/nvim-web-devicons'
@@ -47,8 +46,9 @@ Plug 'nvim-telescope/telescope.nvim'
 Plug 'lewis6991/gitsigns.nvim'
 Plug 'jose-elias-alvarez/null-ls.nvim'
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
-Plug 'phaazon/hop.nvim'
-Plug 'glepnir/lspsaga.nvim', { 'branch': 'main' }
+"Plug 'phaazon/hop.nvim'
+"Plug 'glepnir/lspsaga.nvim', { 'branch': 'main' }
+Plug 'kdheepak/lazygit.nvim'
 call plug#end()
 
 set encoding=utf-8
@@ -70,7 +70,7 @@ colorscheme gruvbox-material
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
-set mouse=v
+"set mouse=v
 set tabstop=4
 set softtabstop=-1
 set shiftwidth=0
@@ -89,3 +89,4 @@ set foldexpr=nvim_treesitter#foldexpr()
 set completeopt=menu,menuone,noselect
 
 set clipboard=unnamed,unnamedplus
+set guifont=JetBrains\ Mono
