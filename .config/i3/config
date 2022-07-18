@@ -75,12 +75,11 @@ mode "$mode_system" {
 bindsym $mod+BackSpace mode "$mode_system"
 
 # displays mode
-set $mode_displays Single 27 (1), dual - 27 primary (2), dual - 32 primary (3), single 32 (4)
+set $mode_displays DP-0 (1), dual (2), HDMI-0 (3)
 mode "$mode_displays" {
-    bindsym 1 exec --no-startup-id $HOME/.screenlayout/single-27.sh, mode "default"
-    bindsym 2 exec --no-startup-id $HOME/.screenlayout/dual-27-primary.sh, mode "default"
-    bindsym 3 exec --no-startup-id $HOME/.screenlayout/dual-32-primary.sh, mode "default"
-    bindsym 4 exec --no-startup-id $HOME/.screenlayout/single-32.sh, mode "default"
+    bindsym 1 exec --no-startup-id $HOME/.screenlayout/DP-0.sh, mode "default"
+    bindsym 2 exec --no-startup-id $HOME/.screenlayout/dual.sh, mode "default"
+    bindsym 3 exec --no-startup-id $HOME/.screenlayout/HDMI-0.sh, mode "default"
 
     # back to normal: Enter or Escape
     bindsym Return mode "default"
