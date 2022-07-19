@@ -4,6 +4,12 @@ lspkind.init()
 
 local cmp = require "cmp"
 cmp.setup {
+    snippet = {
+        expand = function(args)
+           -- require('luasnip').lsp_expand(args.body)
+           vim.fn["UltiSnips#Anon"](args.body)
+        end,
+    },
     mapping = {
         ["<C-n>"] = function(fallback)
             if cmp.visible() then
