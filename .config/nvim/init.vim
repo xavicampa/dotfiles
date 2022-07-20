@@ -46,7 +46,7 @@ Plug 'nvim-telescope/telescope.nvim'
 Plug 'lewis6991/gitsigns.nvim'
 Plug 'jose-elias-alvarez/null-ls.nvim'
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
-"Plug 'phaazon/hop.nvim'
+Plug 'phaazon/hop.nvim'
 "Plug 'glepnir/lspsaga.nvim', { 'branch': 'main' }
 Plug 'kdheepak/lazygit.nvim'
 call plug#end()
@@ -90,3 +90,8 @@ set completeopt=menu,menuone,noselect
 
 set clipboard=unnamed,unnamedplus
 set guifont=JetBrains\ Mono
+
+
+if !empty(glob('.venv'))
+  let g:python3_host_prog=".venv/bin/python"
+endif
