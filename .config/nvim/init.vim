@@ -92,6 +92,6 @@ set clipboard=unnamed,unnamedplus
 set guifont=JetBrains\ Mono
 
 
-if !empty(glob('.venv'))
-  let g:python3_host_prog=".venv/bin/python"
-endif
+" if !empty(glob('.venv'))
+"   let g:python3_host_prog=".venv/bin/python"
+" endif
