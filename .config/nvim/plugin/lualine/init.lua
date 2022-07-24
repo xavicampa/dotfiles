@@ -28,7 +28,31 @@ local function mixed_indent()
 end
 
 require('lualine').setup {
-    options = { theme = 'gruvbox' },
+    -- options = { theme = 'gruvbox' },
+    options = { theme = 'tokyonight' },
+    -- tabline = {
+    --     lualine_a = {
+    --         {
+    --             'buffers',
+    --             mode = 4,
+    --             -- buffers_color = {
+    --             --     active = 'lualine_{section}_normal',
+    --             --     inactive = 'lualine_{section}_inactive',
+    --             -- },
+    --         }
+    --     },
+    --     lualine_z = {
+    --         {
+    --             'tabs',
+    --             mode = 2,
+    --             colored = true,
+    --             -- tabs_color = {
+    --             --     active = 'lualine_{section}_normal',
+    --             --     inactive = 'lualine_{section}_inactive',
+    --             -- },
+    --         }
+    --     }
+    -- },
     sections = {
         unpack(require('lualine').get_config().sections),
         lualine_z = {

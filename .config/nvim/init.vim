@@ -24,13 +24,16 @@ Plug 'hrsh7th/cmp-nvim-lua'
 Plug 'hrsh7th/cmp-nvim-lsp'
 Plug 'hrsh7th/cmp-nvim-lsp-signature-help'
 Plug 'preservim/nerdtree'
-"Plug 'kdheepak/tabline.nvim'
-Plug 'akinsho/bufferline.nvim'
+Plug 'kdheepak/tabline.nvim'
+"Plug 'akinsho/bufferline.nvim'
 Plug 'nvim-lualine/lualine.nvim'
 "Plug 'vim-airline/vim-airline'
 "Plug 'vim-airline/vim-airline-themes'
 "Plug 'gruvbox-community/gruvbox'
-Plug 'sainnhe/gruvbox-material'
+Plug 'folke/tokyonight.nvim', { 'branch': 'main' }
+"Plug 'rose-pine/neovim'
+"Plug 'catppuccin/nvim', {'as': 'catppuccin'}
+"Plug 'sainnhe/gruvbox-material'
 "Plug 'valloric/MatchTagAlways'
 Plug 'tpope/vim-fugitive'
 Plug 'Xuyuanp/nerdtree-git-plugin'
@@ -49,6 +52,7 @@ Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'phaazon/hop.nvim'
 "Plug 'glepnir/lspsaga.nvim', { 'branch': 'main' }
 Plug 'kdheepak/lazygit.nvim'
+Plug 'rafi/vim-venom', { 'for': 'python' }
 call plug#end()
 
 set encoding=utf-8
@@ -66,7 +70,8 @@ set scrolloff=8
 "set colorcolumn=80
 set termguicolors
 let g:gruvbox_italic=1
-colorscheme gruvbox-material
+"colorscheme gruvbox-material
+colorscheme tokyonight
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
