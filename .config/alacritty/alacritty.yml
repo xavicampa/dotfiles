@@ -2,6 +2,13 @@ window:
   dynamic_padding: true
 font:
   normal:
-    family: MesloLGS Nerd Font
+    family: JetBrainsMono Nerd Font
+    style: Regular
+  italic:
+    family: JetBrainsMono Nerd Font
+    style: Italic
+  bold:
+    family: JetBrainsMono Nerd Font
+    style: Bold
   size: 14
 alt_send_esc: false
