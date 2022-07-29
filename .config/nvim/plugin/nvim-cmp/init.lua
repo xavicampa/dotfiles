@@ -4,25 +4,29 @@ lspkind.init()
 
 local cmp = require "cmp"
 cmp.setup {
+    window = {
+        completion = cmp.config.window.bordered(),
+        documentation = cmp.config.window.bordered(),
+    },
     snippet = {
         expand = function(args)
-           -- require('luasnip').lsp_expand(args.body)
-           vim.fn["UltiSnips#Anon"](args.body)
+            -- require('luasnip').lsp_expand(args.body)
+            vim.fn["UltiSnips#Anon"](args.body)
         end,
     },
     mapping = {
         ["<C-n>"] = function(fallback)
             if cmp.visible() then
-              cmp.select_next_item()
+                cmp.select_next_item()
             else
-              fallback()
+                fallback()
             end
         end,
         ["<C-p>"] = function(fallback)
             if cmp.visible() then
-              cmp.select_prev_item()
+                cmp.select_prev_item()
             else
-              fallback()
+                fallback()
             end
         end,
         ["<C-d>"] = cmp.mapping.scroll_docs(-4),

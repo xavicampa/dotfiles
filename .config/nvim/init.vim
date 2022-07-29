@@ -52,7 +52,7 @@ Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'phaazon/hop.nvim'
 "Plug 'glepnir/lspsaga.nvim', { 'branch': 'main' }
 Plug 'kdheepak/lazygit.nvim'
-Plug 'rafi/vim-venom', { 'for': 'python' }
+Plug 'rafi/vim-venom'
 call plug#end()
 
 set encoding=utf-8
