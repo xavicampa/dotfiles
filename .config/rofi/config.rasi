@@ -5,6 +5,7 @@ configuration {
 /*	columns: 1;*/
 /*	font: "mono 12";*/
 /*	font: "mono 12";*/
+font: "JetBrainsMono Nerd Font 20";
 /*	bw: 1;*/
 /*	location: 0;*/
 /*	padding: 5;*/
@@ -46,7 +47,7 @@ configuration {
 /*	hide-scrollbar: false;*/
 /*	fullscreen: false;*/
 /*	fake-transparency: false;*/
-	dpi: 163;
+	dpi: 122;
 /*	threads: 0;*/
 /*	scrollbar-width: 8;*/
 /*	scroll-method: 0;*/
