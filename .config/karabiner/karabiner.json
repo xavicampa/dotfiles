@@ -149,7 +149,7 @@
                     "identifiers": {
                         "is_keyboard": true,
                         "is_pointing_device": false,
-                        "product_id": 25345,
+                        "product_id": 25361,
                         "vendor_id": 12851
                     },
                     "ignore": false,
@@ -160,14 +160,7 @@
                                 "key_code": "left_command"
                             },
                             "to": [
-                                {
-                                    "key_code": "left_option"
-                                }
-                            ]
-                        },
-                        {
-                            "from": {
-                                "key_code": "left_option"
+                                { "key_code": "left_option" } ] }, { "from": { "key_code": "left_option"
                             },
                             "to": [
                                 {
@@ -237,8 +230,8 @@
                     "identifiers": {
                         "is_keyboard": true,
                         "is_pointing_device": false,
-                        "product_id": 6967,
-                        "vendor_id": 6940
+                        "product_id": 25361,
+                        "vendor_id": 12851
                     },
                     "ignore": false,
                     "manipulate_caps_lock_led": true,
