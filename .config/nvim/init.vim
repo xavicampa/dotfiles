@@ -83,7 +83,7 @@ set expandtab
 set autoindent
 set smartindent
 
-"hi! Normal ctermbg=NONE guibg=NONE
+hi! Normal ctermbg=NONE guibg=NONE
 
 " folding
 set foldmethod=expr
@@ -94,7 +94,7 @@ set foldexpr=nvim_treesitter#foldexpr()
 set completeopt=menu,menuone,noselect
 
 set clipboard=unnamed,unnamedplus
-set guifont=JetBrains\ Mono
+set guifont=JetBrainsMono\ Nerd\ Font
 
 
 " if !empty(glob('.venv'))
