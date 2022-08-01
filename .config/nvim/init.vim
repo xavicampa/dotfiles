@@ -71,6 +71,7 @@ set scrolloff=8
 set termguicolors
 let g:gruvbox_italic=1
 "colorscheme gruvbox-material
+let g:tokyonight_transparent=1
 colorscheme tokyonight
 set background=dark
 set wildmenu
@@ -83,7 +84,7 @@ set expandtab
 set autoindent
 set smartindent
 
-hi! Normal ctermbg=NONE guibg=NONE
+" hi Normal ctermbg=NONE guibg=NONE
 
 " folding
 set foldmethod=expr
