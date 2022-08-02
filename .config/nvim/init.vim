@@ -67,16 +67,16 @@ set nowrap
 set ignorecase
 set incsearch
 set scrolloff=8
-"set colorcolumn=80
+set colorcolumn=80
 set termguicolors
-let g:gruvbox_italic=1
+"let g:gruvbox_italic=1
 "colorscheme gruvbox-material
-let g:tokyonight_transparent=1
+"let g:tokyonight_transparent=1
+"let g:tokyonight_style='day'
 colorscheme tokyonight
 set background=dark
 set wildmenu
 set wildmode=longest:full,full
-"set mouse=v
 set tabstop=4
 set softtabstop=-1
 set shiftwidth=0
@@ -84,6 +84,13 @@ set expandtab
 set autoindent
 set smartindent
 
+" mouse
+set mouse=a
+
+" clipboard
+set clipboard=unnamed,unnamedplus
+
+" transparent background
 " hi Normal ctermbg=NONE guibg=NONE
 
 " folding
@@ -91,13 +98,10 @@ set foldmethod=expr
 set foldexpr=nvim_treesitter#foldexpr()
 
 " autocompletion options
-" Set completeopt to have a better completion experience
 set completeopt=menu,menuone,noselect
 
-set clipboard=unnamed,unnamedplus
-set guifont=JetBrainsMono\ Nerd\ Font
-
-
-" if !empty(glob('.venv'))
-"   let g:python3_host_prog=".venv/bin/python"
-" endif
+if exists("g:neovide")
+    " Put anything you want to happen only in Neovide here
+    set guifont=JetBrainsMono\ Nerd\ Font
+    " let g:neovide_transparency=0.70
+endif
