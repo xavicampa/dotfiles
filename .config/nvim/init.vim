@@ -24,9 +24,9 @@ Plug 'hrsh7th/cmp-nvim-lua'
 Plug 'hrsh7th/cmp-nvim-lsp'
 Plug 'hrsh7th/cmp-nvim-lsp-signature-help'
 Plug 'preservim/nerdtree'
-Plug 'kdheepak/tabline.nvim'
+"Plug 'kdheepak/tabline.nvim'
 "Plug 'akinsho/bufferline.nvim'
-Plug 'nvim-lualine/lualine.nvim'
+"Plug 'nvim-lualine/lualine.nvim'
 "Plug 'vim-airline/vim-airline'
 "Plug 'vim-airline/vim-airline-themes'
 "Plug 'gruvbox-community/gruvbox'
@@ -35,7 +35,8 @@ Plug 'folke/tokyonight.nvim', { 'branch': 'main' }
 "Plug 'catppuccin/nvim', {'as': 'catppuccin'}
 "Plug 'sainnhe/gruvbox-material'
 "Plug 'valloric/MatchTagAlways'
-Plug 'tpope/vim-fugitive'
+"Plug 'tpope/vim-fugitive'
+Plug 'itchyny/lightline.vim'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
 Plug 'kyazdani42/nvim-web-devicons'
@@ -67,12 +68,14 @@ set nowrap
 set ignorecase
 set incsearch
 set scrolloff=8
-set colorcolumn=80
+"set colorcolumn=80
 set termguicolors
 "let g:gruvbox_italic=1
 "colorscheme gruvbox-material
 "let g:tokyonight_transparent=1
-"let g:tokyonight_style='day'
+let g:tokyonight_style='storm'
+let g:lightline = {'colorscheme': 'tokyonight'}
+set noshowmode
 colorscheme tokyonight
 set background=dark
 set wildmenu
