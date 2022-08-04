@@ -1,6 +1,6 @@
 window:
   dynamic_padding: true
-  opacity: 0.90
+  opacity: 0.75
 font:
   normal:
     family: JetBrainsMono Nerd Font
@@ -11,5 +11,5 @@ font:
   bold:
     family: JetBrainsMono Nerd Font
     style: Bold
-  size: 14
+  size: 12
 alt_send_esc: false
