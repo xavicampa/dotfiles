@@ -4,3 +4,4 @@
 # pactl set-card-profile alsa_card.pci-0000_01_00.1 output:hdmi-stereo-extra1
 # nvidia-settings --assign CurrentMetaMode="$(nvidia-settings -q CurrentMetaMode -t|tr '\n' ' '|sed -e 's/.*:: \(.*\)/\1\n/g' -e 's/}/, ForceCompositionPipeline = On}/g')"
 nvidia-settings --assign CurrentMetaMode="DPY-1: 3840x2160_60_0 @3840x2160 +3840+0 {ViewPortIn=3840x2160, ViewPortOut=3840x2160+0+0, ForceCompositionPipeline=On, ForceCompositionPipeline = On}, DPY-0: 3840x2160_60_0 @3840x2160 +0+0 {ViewPortIn=3840x2160, ViewPortOut=3840x2160+0+0, ForceCompositionPipeline=On, ForceCompositionPipeline = On}"
+feh --bg-fill $HOME/.config/i3/tokyonight.jpg
