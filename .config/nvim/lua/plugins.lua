@@ -20,18 +20,25 @@ return require('packer').startup(function(use)
     use 'hrsh7th/cmp-nvim-lua'
     use 'hrsh7th/cmp-nvim-lsp'
     use 'hrsh7th/cmp-nvim-lsp-signature-help'
-    use 'preservim/nerdtree'
+    use {
+        'preservim/nerdtree',
+        requires = { { 'ryanoasis/vim-devicons' } },
+    }
     use 'itchyny/lightline.vim'
-    use 'Xuyuanp/nerdtree-git-plugin'
+    use {
+        'Xuyuanp/nerdtree-git-plugin',
+        requires = { { 'preservim/nerdtree' } },
+    }
     use 'tiagofumo/vim-nerdtree-syntax-highlight'
-    use 'kyazdani42/nvim-web-devicons'
     use 'folke/lsp-colors.nvim'
-    use 'folke/trouble.nvim'
-    use 'ryanoasis/vim-devicons'
+    use {
+        'folke/trouble.nvim',
+        requires = { { 'kyazdani42/nvim-web-devicons' } },
+    }
     use 'pedrohdz/vim-yaml-folds'
-    use 'nvim-lua/plenary.nvim'
     use {
         'nvim-telescope/telescope.nvim',
+        requires = { { 'nvim-lua/plenary.nvim' } },
         config = function()
             vim.api.nvim_set_keymap("n", "<leader>ff", ":Telescope find_files<CR>", { noremap = true })
             vim.api.nvim_set_keymap("n", "<leader>fg", ":Telescope live_grep<CR>", { noremap = true })
@@ -39,7 +46,12 @@ return require('packer').startup(function(use)
             vim.api.nvim_set_keymap("n", "<leader>fh", ":Telescope help_tags<CR>", { noremap = true })
         end
     }
-    use 'lewis6991/gitsigns.nvim'
+    use {
+        'lewis6991/gitsigns.nvim',
+        config = function()
+            require('gitsigns').setup()
+        end
+    }
     use {
         'jose-elias-alvarez/null-ls.nvim',
         config = function()
@@ -51,7 +63,10 @@ return require('packer').startup(function(use)
         end
     }
     use 'iamcco/markdown-preview.nvim'
-    use 'phaazon/hop.nvim'
+    use {
+        'phaazon/hop.nvim',
+        branch = 'v2'
+    }
     use {
         'kdheepak/lazygit.nvim',
         config = function()
