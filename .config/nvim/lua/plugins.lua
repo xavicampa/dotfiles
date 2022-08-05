@@ -70,6 +70,7 @@ return require('packer').startup(function(use)
     use {
         'kdheepak/lazygit.nvim',
         config = function()
+            vim.g.lazygit_floating_window_scaling_factor = 0.8
             vim.api.nvim_set_keymap("n", "<leader>gg", ":LazyGit<CR>", { noremap = true })
         end
     }
