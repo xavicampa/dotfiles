@@ -37,4 +37,4 @@ if status --is-login
 end
 
 # keep at the end
-starship init fish | source
+# starship init fish | source
