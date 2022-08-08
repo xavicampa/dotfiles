@@ -14,6 +14,7 @@
   
   boot.kernelModules = [ "i2c-dev" ];
   hardware.i2c.enable = true;
+  hardware.bluetooth.enable = true;
 
   networking.hostName = "homepc"; # Define your hostname.
   # Pick only one of the below networking options.
@@ -58,12 +59,15 @@
   # Enable sound.
   sound.enable = true;
   hardware.pulseaudio.enable = true;
+  services.blueman.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.javi = {
+    shell = pkgs.fish;
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
+      fish
       google-chrome
       alacritty
       neovim
@@ -86,6 +90,19 @@
       rofimoji
       flameshot
       tmux
+      neofetch
+      bottom
+      exa
+      ripgrep
+      autotiling
+      lazygit
+      _1password
+      _1password-gui
+      tree-sitter
+      nodejs
+      python310Packages.cfn-lint
+      fd
+      xclip
     ];
   };
 
@@ -97,6 +114,18 @@
     vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
   ];
+
+  environment.variables.EDITOR = "nvim";
+  nixpkgs.overlays = [
+    (self: super: {
+      neovim = super.neovim.override {
+        viAlias = true;
+        vimAlias = true;
+      };
+    })
+  ];
+
+  environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
