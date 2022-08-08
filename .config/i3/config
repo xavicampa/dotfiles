@@ -12,7 +12,7 @@
 set $mod Mod1
 
 # displays
-# exec --no-startup-id $HOME/.screenlayout/single-27.sh
+exec --no-startup-id $HOME/.screenlayout/DP-0.sh
 
 # fonts
 #exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
@@ -39,7 +39,7 @@ default_border pixel 2
 #exec --no-startup-id $HOME/.config/polybar/launch_polybar.sh
 
 # compositor
-exec --no-startup-id /usr/bin/picom -b --experimental-backends
+exec --no-startup-id picom -b --experimental-backends
 
 # keyboard
 # exec --no-startup-id setxkbmap -option caps:ctrl_modifier
@@ -47,7 +47,7 @@ exec --no-startup-id xmodmap ~/.config/i3/vim_xmodmap
 
 # background
 #exec_always --no-startup-id xsetroot -solid "black"
-exec --no-startup-id /usr/bin/feh --bg-fill "$HOME/.config/i3/tokyonight.jpg"
+#exec --no-startup-id feh --bg-fill "$HOME/.config/i3/tokyonight.jpg"
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
 # text rendering and scalability on retina/hidpi displays (thanks to pango).

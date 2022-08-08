@@ -1,4 +1,4 @@
-alias dotfiles="/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME"
+alias dotfiles="git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME"
 if which exa>/dev/null
     alias l='exa'
     alias la='exa -a'
