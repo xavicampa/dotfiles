@@ -5,8 +5,8 @@
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      /home/javi/.config/nixos/homepc/javi.nix
     ];
-
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
@@ -24,89 +24,22 @@
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
 
-  # Select internationalisation properties.
-  i18n.defaultLocale = "nb_NO.UTF-8";
-
   # Enable the X11 windowing system.
   services.xserver = {
     enable = true;
-    # desktopManager = {
-    #   xterm.enable = true;
-    # };
     displayManager = {
       defaultSession = "none+i3";
-    };
-    windowManager.i3 = {
-      enable = true;
-      extraPackages = with pkgs; [
-        dmenu
-        i3status
-        i3lock
-        i3blocks
-      ];
     };
     videoDrivers = [ "nvidia" ];
     libinput = {
     	enable = true;
     };
-    layout = "no";
   };
-
-  fonts.fonts = with pkgs; [
-    nerdfonts
-  ];
 
   # Enable sound.
   sound.enable = true;
   hardware.pulseaudio.enable = true;
   services.blueman.enable = true;
-
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.javi = {
-    shell = pkgs.fish;
-    isNormalUser = true;
-    extraGroups = [ "wheel" "i2c" ]; # Enable ‘sudo’ for the user.
-    packages = with pkgs; [
-      fish
-      google-chrome
-      alacritty
-      neovim
-      git
-      nerdfonts
-      gcc
-      rofi
-      linuxPackages.nvidia_x11
-      bottom
-      btop
-      xorg.xmodmap
-      xorg.xinput
-      pamixer
-      blueman
-      pasystray
-      dunst
-      picom
-      feh
-      ddcutil
-      rofimoji
-      flameshot
-      tmux
-      neofetch
-      bottom
-      exa
-      ripgrep
-      autotiling
-      lazygit
-      _1password
-      _1password-gui
-      tree-sitter
-      nodejs
-      python310Packages.cfn-lint
-      fd
-      xclip
-    ];
-  };
-
-  nixpkgs.config.allowUnfree = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
@@ -114,18 +47,6 @@
     vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
   ];
-
-  environment.variables.EDITOR = "nvim";
-  nixpkgs.overlays = [
-    (self: super: {
-      neovim = super.neovim.override {
-        viAlias = true;
-        vimAlias = true;
-      };
-    })
-  ];
-
-  environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
