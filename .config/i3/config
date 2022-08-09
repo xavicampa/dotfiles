@@ -93,6 +93,9 @@ bindsym $mod+p mode "$mode_displays"
 # exec --no-startup-id nm-applet
 
 # Use pactl to adjust volume in PulseAudio.
+exec --no-startup-id ddcutil setvcp 62 100 --display 0
+exec --no-startup-id ddcutil setvcp 62 100 --display 1
+exec --no-startup-id ddcutil setvcp 62 100 --display 2
 set $refresh_i3status killall -SIGUSR1 i3status
 bindsym XF86AudioRaiseVolume exec --no-startup-id pamixer -i 5 && dunstify -h string:x-dunst-stack-tag:audio "Volume: `pamixer --get-volume-human`" -h int:value:"`pamixer --get-volume`" && $refresh_i3status
 bindsym XF86AudioLowerVolume exec --no-startup-id pamixer -d 5 && dunstify -h string:x-dunst-stack-tag:audio "Volume: `pamixer --get-volume-human`" -h int:value:"`pamixer --get-volume`" && $refresh_i3status
