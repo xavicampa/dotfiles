@@ -79,8 +79,22 @@
       python39Packages.python-lsp-server
       xfce.thunar
       spotify
-      sumneko-lua-language-server 
+      sumneko-lua-language-server
       rnix-lsp
+      nvtop
+      pavucontrol
+      slack
+      nodePackages.typescript-language-server
+      neovide
+      discord
     ];
   };
+
+  # hardware.pulseaudio.configFile = pkgs.writeText "default.pa" ''
+  #   load-module module-alsa-sink device=hw:1,3 sink_name=HDMI-0
+  #   load-module module-alsa-sink device=hw:1,7 sink_name=DP-0
+  #   load-module module-combined-sink sink_name=Combined
+  #   set-default-sink Combined
+  # '';
+
 }

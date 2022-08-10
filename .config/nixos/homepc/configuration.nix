@@ -1,25 +1,30 @@
 { config, pkgs, ... }:
 
-
+# let
+#   dotfiles = pkgs.fetchFromGitHub {
+#     owner = "xavicampa";
+#     repo = "dotfiles";
+#     rev = "7fe224fa9016a92dd3fd556b9f2951aa003ec2e0";
+#     sha256 = "sha256-1D1V5KK3t8GEXSn9wQ0C8vVE150H54JALT98SevE4TU=";
+#   };
+# in
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
+      # Include the results of the hardware scan.
       ./hardware-configuration.nix
       /home/javi/.config/nixos/homepc/javi.nix
+      <home-manager/nixos>
     ];
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  
-  boot.kernelModules = [ "i2c-dev" ];
-  hardware.i2c.enable = true;
-  hardware.bluetooth.enable = true;
 
   networking.hostName = "homepc"; # Define your hostname.
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-  networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
+  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
@@ -32,13 +37,14 @@
     };
     videoDrivers = [ "nvidia" ];
     libinput = {
-    	enable = true;
+      enable = true;
     };
   };
 
   # Enable sound.
   sound.enable = true;
-  hardware.pulseaudio.enable = true;
+
+  # bluetooth
   services.blueman.enable = true;
 
   # List packages installed in system profile. To search, run:
@@ -47,6 +53,15 @@
     vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
   ];
+
+  # users.users.xavi2.isNormalUser = true;
+  # home-manager.users.xavi2 = { pkgs, ... }: {
+  #   home.file = {
+  #     "dotfiles/".source = builtins.toPath "${dotfiles}/";
+  #   };
+  #   home.packages = [ pkgs.home-manager ];
+  #   programs.home-manager.enable = true;
+  # };
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
@@ -81,4 +96,3 @@
   system.stateVersion = "22.05"; # Did you read the comment?
 
 }
-
