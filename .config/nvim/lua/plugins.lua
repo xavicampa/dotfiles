@@ -21,6 +21,14 @@ return require('packer').startup(function(use)
     use 'hrsh7th/cmp-nvim-lsp'
     use 'hrsh7th/cmp-nvim-lsp-signature-help'
     use {
+        "windwp/nvim-autopairs",
+        config = function()
+            require("nvim-autopairs").setup({
+                check_ts =true
+            })
+        end
+    }
+    use {
         'preservim/nerdtree',
         requires = { { 'ryanoasis/vim-devicons' } },
     }
