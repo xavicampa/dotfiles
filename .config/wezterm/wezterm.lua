@@ -1,6 +1,7 @@
 local wezterm = require 'wezterm'
 
 return {
+  check_for_updates = false,
   window_padding = {
       left = 0,
       right = 0,
@@ -14,7 +15,7 @@ return {
   -- for example, this selects a Bold, Italic font variant.
   -- font = wezterm.font('JetBrains Mono', { weight = 'Bold', italic = true }),
   colors = {
-      background = 'rgba(12% 12% 12% 80%)',
+      background = 'rgba(12% 12% 12% 75%)',
   },
   -- color_scheme = 'tokyonight',
 }

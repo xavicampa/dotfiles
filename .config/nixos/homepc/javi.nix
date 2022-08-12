@@ -1,5 +1,4 @@
 { config, pkgs, ... }:
-
 {
   environment.variables.EDITOR = "nvim";
   nixpkgs.overlays = [
@@ -13,11 +12,12 @@
 
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
 
-  i18n.defaultLocale = "nb_NO.UTF-8";
+  i18n.defaultLocale = "en_US.UTF-8";
 
   services.xserver = {
     windowManager.i3 = {
       enable = true;
+      package = pkgs.i3-gaps;
       extraPackages = with pkgs; [
         dmenu
         i3status
@@ -32,7 +32,9 @@
     nerdfonts
   ];
 
-  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config = {
+    allowUnfree = true;
+  };
 
   users.users.javi = {
     shell = pkgs.fish;
@@ -87,6 +89,11 @@
       nodePackages.typescript-language-server
       neovide
       discord
+      wezterm
+      kitty
+      # unstable.nodePackages.graphql-language-service-cli
+      # unstable.nodePackages.graphql
+      # unstable.nodePackages.typescript
     ];
   };
 

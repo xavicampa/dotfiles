@@ -1,5 +1,10 @@
 { config, pkgs, ... }:
 
+let
+  unstableTarball =
+    fetchTarball
+      https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz;
+in
 # let
 #   dotfiles = pkgs.fetchFromGitHub {
 #     owner = "xavicampa";
@@ -20,6 +25,14 @@
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  nixpkgs.config = {
+    packageOverrides = pkgs: with pkgs; {
+      unstable = import unstableTarball {
+        config = config.nixpkgs.config;
+      };
+    };
+  };
 
   networking.hostName = "homepc"; # Define your hostname.
   # Pick only one of the below networking options.
