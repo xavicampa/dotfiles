@@ -1,11 +1,19 @@
 { config, pkgs, ... }:
 {
   environment.variables.EDITOR = "nvim";
+
   nixpkgs.overlays = [
     (self: super: {
       neovim = super.neovim.override {
         viAlias = true;
         vimAlias = true;
+      };
+      weechat = super.weechat.override {
+        configure = { availablePlugins, ... }: {
+          scripts = with super.weechatScripts; [
+            weechat-matrix
+          ];
+        };
       };
     })
   ];
@@ -87,10 +95,11 @@
       pavucontrol
       slack
       nodePackages.typescript-language-server
-      neovide
       discord
       wezterm
       kitty
+      starship
+      weechat
       # unstable.nodePackages.graphql-language-service-cli
       # unstable.nodePackages.graphql
       # unstable.nodePackages.typescript
