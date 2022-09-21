@@ -29,3 +29,12 @@ vim.opt.clipboard='unnamed,unnamedplus'
 vim.opt.foldmethod='expr'
 vim.opt.foldexpr='nvim_treesitter#foldexpr()'
 vim.opt.completeopt='menu,menuone,noselect'
+
+-- Diagnostics
+vim.diagnostic.config({
+    severity_sort = true,
+    virtual_text = false,
+    float = {
+        border = 'rounded'
+    }
+})

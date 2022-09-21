@@ -19,10 +19,10 @@ exec --no-startup-id $HOME/.screenlayout/DP-0.sh
 #exec --no-startup-id xset fp rehash
 
 # autotiling
-# exec_always --no-startup-id autotiling
+exec_always --no-startup-id autotiling
 
 # gaps
-gaps inner 20
+gaps inner 24
 gaps right 1500
 smart_gaps inverse_outer
 

@@ -4,8 +4,12 @@ local pid = vim.fn.getpid()
 -- See `:help vim.diagnostic.*` for documentation on any of the below functions
 local opts = { noremap = true, silent = true }
 vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
-vim.keymap.set('n', '<C-p>', vim.diagnostic.goto_prev, opts)
-vim.keymap.set('n', '<C-n>', vim.diagnostic.goto_next, opts)
+vim.keymap.set('n', '<C-p>', function()
+    vim.diagnostic.goto_prev({ float = false })
+end, opts)
+vim.keymap.set('n', '<C-n>', function()
+    vim.diagnostic.goto_next({ float = false })
+end, opts)
 vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
 
 local signs = { Error = " ", Warn = " ", Hint = " ", Info = " " }
@@ -15,12 +19,12 @@ for type, icon in pairs(signs) do
 end
 
 --  Rounded borders
-local orig_util_open_floating_preview = vim.lsp.util.open_floating_preview
-function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
-  opts = opts or {}
-  opts.border = opts.border or "rounded"
-  return orig_util_open_floating_preview(contents, syntax, opts, ...)
-end
+-- local orig_util_open_floating_preview = vim.lsp.util.open_floating_preview
+-- function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+--     opts = opts or {}
+--     opts.border = opts.border or "rounded"
+--     return orig_util_open_floating_preview(contents, syntax, opts, ...)
+-- end
 
 -- Use an on_attach function to only map the following keys
 -- after the language server attaches to the current buffer
@@ -54,6 +58,7 @@ local lsp_flags = {
     debounce_text_changes = 150,
 }
 require('lspconfig')['tsserver'].setup {
+    cmd = { 'typescript-language-server', '--stdio', '--tsserver-path', '/nix/store/7yhr9pm7w9l4bqn7r6qsc65mvfwsqv20-typescript-4.6.4/lib/node_modules/typescript/lib/' },
     on_attach = on_attach,
     flags = lsp_flags,
 }
@@ -99,6 +104,7 @@ require('lspconfig')['sumneko_lua'].setup {
     },
 }
 require('lspconfig')['jsonls'].setup {
+    cmd = { 'vscode-json-languageserver', '--stdio' },
     on_attach = on_attach,
     flags = lsp_flags,
 }

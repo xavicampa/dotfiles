@@ -24,7 +24,7 @@ return require('packer').startup(function(use)
         "windwp/nvim-autopairs",
         config = function()
             require("nvim-autopairs").setup({
-                check_ts =true
+                check_ts = true
             })
         end
     }
@@ -43,7 +43,7 @@ return require('packer').startup(function(use)
         'folke/trouble.nvim',
         requires = { { 'kyazdani42/nvim-web-devicons' } },
     }
-    use 'pedrohdz/vim-yaml-folds'
+    -- use 'pedrohdz/vim-yaml-folds'
     use {
         'nvim-telescope/telescope.nvim',
         requires = { { 'nvim-lua/plenary.nvim' } },
@@ -93,6 +93,17 @@ return require('packer').startup(function(use)
         end
     }
     use 'folke/tokyonight.nvim'
+    use {
+        "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
+        config = function ()
+            -- vim.diagnostic.config({
+            --     virtual_text = false,
+            --     severity_sort = true,
+            --     float = false,
+            -- })
+            require("lsp_lines").setup()
+        end,
+    }
 
     -- Automatically set up your configuration after cloning packer.nvim
     -- Put this at the end after all plugins
