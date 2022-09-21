@@ -41,6 +41,7 @@ if status --is-login
     else if which fd>/dev/null 2>/dev/null
         set -Ux FZF_DEFAULT_COMMAND 'fd --type f'
     end
+    set -Ux FZF_CTRL_T_COMMAND $FZF_DEFAULT_COMMAND
 end
 
 # tokyonight
