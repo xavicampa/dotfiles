@@ -20,7 +20,14 @@
 
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
 
-  i18n.defaultLocale = "en_US.UTF-8";
+  i18n = {
+    defaultLocale = "nb_NO.UTF-8";
+    extraLocaleSettings = {
+      LC_ALL = "nb_NO.UTF-8";
+      LANG = "en_US.UTF-8";
+      LANGUAGE = "en_US.UTF-8";
+    };
+  };
 
   services.xserver = {
     windowManager.i3 = {
@@ -44,15 +51,19 @@
     allowUnfree = true;
   };
 
+  virtualisation.docker.enable = true;
+
+  programs.fish.enable = true;
+
   users.users.javi = {
     shell = pkgs.fish;
     isNormalUser = true;
-    extraGroups = [ "wheel" "i2c" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "i2c" "docker" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       fish
       google-chrome
       alacritty
-      neovim
+      unstable.neovim
       git
       nerdfonts
       gcc
@@ -87,6 +98,8 @@
       python3
       python39Packages.cfn-lint
       python39Packages.python-lsp-server
+      python39Packages.pytest
+      python39Packages.pip
       xfce.thunar
       spotify
       sumneko-lua-language-server
@@ -100,6 +113,17 @@
       kitty
       starship
       weechat
+      nodePackages.vscode-json-languageserver
+      nodePackages.typescript
+      steam-run
+      vscode
+      zip
+      unzip
+      fishPlugins.fzf-fish
+      fzf
+      awscli2
+      postman
+      cdk-go
       # unstable.nodePackages.graphql-language-service-cli
       # unstable.nodePackages.graphql
       # unstable.nodePackages.typescript

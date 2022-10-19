@@ -37,7 +37,7 @@ return require('packer').startup(function(use)
         'Xuyuanp/nerdtree-git-plugin',
         requires = { { 'preservim/nerdtree' } },
     }
-    use 'tiagofumo/vim-nerdtree-syntax-highlight'
+    -- use 'tiagofumo/vim-nerdtree-syntax-highlight'
     use 'folke/lsp-colors.nvim'
     use {
         'folke/trouble.nvim',
