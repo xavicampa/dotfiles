@@ -8,13 +8,6 @@
         viAlias = true;
         vimAlias = true;
       };
-      weechat = super.weechat.override {
-        configure = { availablePlugins, ... }: {
-          scripts = with super.weechatScripts; [
-            weechat-matrix
-          ];
-        };
-      };
     })
   ];
 
@@ -62,7 +55,6 @@
     packages = with pkgs; [
       fish
       google-chrome
-      alacritty
       unstable.neovim
       git
       nerdfonts
@@ -104,15 +96,12 @@
       spotify
       sumneko-lua-language-server
       rnix-lsp
-      nvtop
       pavucontrol
       slack
       nodePackages.typescript-language-server
       discord
-      wezterm
       kitty
       starship
-      weechat
       nodePackages.vscode-json-languageserver
       nodePackages.typescript
       steam-run
@@ -123,7 +112,6 @@
       fzf
       awscli2
       postman
-      cdk-go
       # unstable.nodePackages.graphql-language-service-cli
       # unstable.nodePackages.graphql
       # unstable.nodePackages.typescript
