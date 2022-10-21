@@ -6,13 +6,13 @@ let
       https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz;
 in
 # let
-#  dotfiles = pkgs.fetchFromGitHub {
-#    owner = "xavicampa";
-#    repo = "dotfiles";
-#    rev = "7fe224fa9016a92dd3fd556b9f2951aa003ec2e0";
-#    sha256 = "sha256-1D1V5KK3t8GEXSn9wQ0C8vVE150H54JALT98SevE4TU=";
-#  };
-#in
+  #  dotfiles = pkgs.fetchFromGitHub {
+  #    owner = "xavicampa";
+  #    repo = "dotfiles";
+  #    rev = "7fe224fa9016a92dd3fd556b9f2951aa003ec2e0";
+  #    sha256 = "sha256-1D1V5KK3t8GEXSn9wQ0C8vVE150H54JALT98SevE4TU=";
+  #  };
+  #in
 {
   imports =
     [
@@ -28,7 +28,7 @@ in
 
   # Clean up
   nix.gc.automatic = true;
-  nix.gc.options = "--delete-older-than 8d";
+  # nix.gc.options = "--delete-older-than 8d";
 
   nixpkgs.config = {
     packageOverrides = pkgs: with pkgs; {
@@ -67,10 +67,12 @@ in
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    unstable.neovim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
     git
   ];
+
+  environment.variables.EDITOR = "nvim";
 
   users.users.xavi.isNormalUser = true;
   home-manager.users.xavi = { pkgs, ... }: {

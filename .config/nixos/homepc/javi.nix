@@ -1,7 +1,5 @@
 { config, pkgs, ... }:
 {
-  environment.variables.EDITOR = "nvim";
-
   nixpkgs.overlays = [
     (self: super: {
       neovim = super.neovim.override {
