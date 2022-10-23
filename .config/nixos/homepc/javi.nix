@@ -102,7 +102,7 @@
       starship
       nodePackages.vscode-json-languageserver
       nodePackages.typescript
-      steam-run
+      # steam-run
       vscode
       zip
       unzip
@@ -110,6 +110,7 @@
       fzf
       awscli2
       postman
+      jq
       # unstable.nodePackages.graphql-language-service-cli
       # unstable.nodePackages.graphql
       # unstable.nodePackages.typescript
