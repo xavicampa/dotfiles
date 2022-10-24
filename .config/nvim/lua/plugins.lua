@@ -30,20 +30,28 @@ return require('packer').startup(function(use)
     }
     use {
         'preservim/nerdtree',
-        requires = { { 'ryanoasis/vim-devicons' } },
+        requires = {
+            { 'ryanoasis/vim-devicons' },
+            { 'lewis6991/gitsigns.nvim' },
+        },
     }
     use 'itchyny/lightline.vim'
     use {
         'Xuyuanp/nerdtree-git-plugin',
         requires = { { 'preservim/nerdtree' } },
     }
-    -- use 'tiagofumo/vim-nerdtree-syntax-highlight'
+    -- use {
+    --     'tiagofumo/vim-nerdtree-syntax-highlight',
+    --     requires = {
+    --         { 'preservim/nerdtree' },
+    --     }
+    -- }
     use 'folke/lsp-colors.nvim'
     use {
         'folke/trouble.nvim',
         requires = { { 'kyazdani42/nvim-web-devicons' } },
     }
-    -- use 'pedrohdz/vim-yaml-folds'
+    use 'pedrohdz/vim-yaml-folds'
     use {
         'nvim-telescope/telescope.nvim',
         requires = { { 'nvim-lua/plenary.nvim' } },
@@ -63,12 +71,14 @@ return require('packer').startup(function(use)
     use {
         'jose-elias-alvarez/null-ls.nvim',
         config = function()
-            require('null-ls').setup {
+            require('null-ls').setup({
                 sources = {
                     require("null-ls").builtins.diagnostics.cfn_lint
                 },
-            }
-        end
+                debug = true,
+            })
+        end,
+        requires = { "nvim-lua/plenary.nvim" }
     }
     use 'iamcco/markdown-preview.nvim'
     use {
@@ -95,12 +105,7 @@ return require('packer').startup(function(use)
     use 'folke/tokyonight.nvim'
     use {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
-        config = function ()
-            -- vim.diagnostic.config({
-            --     virtual_text = false,
-            --     severity_sort = true,
-            --     float = false,
-            -- })
+        config = function()
             require("lsp_lines").setup()
         end,
     }

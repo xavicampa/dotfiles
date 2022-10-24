@@ -58,7 +58,8 @@ local lsp_flags = {
     debounce_text_changes = 150,
 }
 require('lspconfig')['tsserver'].setup {
-    cmd = { 'typescript-language-server', '--stdio', '--tsserver-path', '/nix/store/7yhr9pm7w9l4bqn7r6qsc65mvfwsqv20-typescript-4.6.4/lib/node_modules/typescript/lib/' },
+    cmd = { 'typescript-language-server', '--stdio', '--tsserver-path',
+        '/nix/store/7yhr9pm7w9l4bqn7r6qsc65mvfwsqv20-typescript-4.6.4/lib/node_modules/typescript/lib/' },
     on_attach = on_attach,
     flags = lsp_flags,
 }
@@ -102,11 +103,6 @@ require('lspconfig')['sumneko_lua'].setup {
             },
         },
     },
-}
-require('lspconfig')['jsonls'].setup {
-    cmd = { 'vscode-json-languageserver', '--stdio' },
-    on_attach = on_attach,
-    flags = lsp_flags,
 }
 require('lspconfig')['rnix'].setup {
     on_attach = on_attach,
