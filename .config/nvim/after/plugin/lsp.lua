@@ -108,3 +108,15 @@ require('lspconfig')['rnix'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
+require('null-ls').setup {
+    sources = {
+        require("null-ls").builtins.diagnostics.cfn_lint.with({
+            args = {
+                '-i', 'E3043',  -- Do not try to parse nested stack's TemplateURL
+                '--format', 'parseable',
+                '-'
+            }
+        })
+    },
+    -- debug = true,
+}
