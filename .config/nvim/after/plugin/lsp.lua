@@ -108,11 +108,34 @@ require('lspconfig')['rnix'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
+require('lspconfig')['rust_analyzer'].setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
+    settings = {
+        ["rust-analyzer"] = {
+            imports = {
+                granularity = {
+                    group = "module",
+                },
+                prefix = "self",
+            },
+            cargo = {
+                buildScripts = {
+                    enable = true,
+                },
+            },
+            procMacro = {
+                enable = true
+            },
+        }
+    }
+}
 require('null-ls').setup {
     sources = {
         require("null-ls").builtins.diagnostics.cfn_lint.with({
             args = {
-                '-i', 'E3043',  -- Do not try to parse nested stack's TemplateURL
+                '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL
+                '-i', 'E3043', -- Do not try to parse nested stack's TemplateURL
                 '--format', 'parseable',
                 '-'
             }
