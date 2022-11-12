@@ -46,7 +46,6 @@
 
     exa = {
       enable = true;
-      enableAliases = true;
     };
 
     fish = {
@@ -58,6 +57,11 @@
 
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
+        ls = "${pkgs.exa}/bin/exa --icons";
+        ll = "${pkgs.exa}/bin/exa -l --icons";
+        la = "${pkgs.exa}/bin/exa -a --icons";
+        lt = "${pkgs.exa}/bin/exa --tree --icons";
+        lla = "${pkgs.exa}/bin/exa -la --icons";
       };
       shellInit = ''
         fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
@@ -73,6 +77,16 @@
           };
         }
       ];
+    };
+
+    tmux = {
+      enable = true;
+      baseIndex = 1;
+      secureSocket = false;
+      extraConfig = ''
+        set-option -g mouse on
+        set-option -g default-command "fish"
+      '';
     };
 
     starship = {
