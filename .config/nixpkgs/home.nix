@@ -13,8 +13,8 @@
     pkgs.nodejs
     pkgs.ripgrep
     pkgs.rnix-lsp
-    pkgs.tree-sitter
     pkgs.sumneko-lua-language-server
+    pkgs.tree-sitter
   ];
 
   # This value determines the Home Manager release that your
@@ -51,6 +51,11 @@
 
     fish = {
       enable = true;
+      loginShellInit = ''
+        fish_add_path /opt/homebrew/bin
+        set fish_greeting
+      '';
+
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
       };
