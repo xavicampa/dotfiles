@@ -39,6 +39,7 @@
 
     direnv = {
       enable = true;
+
       nix-direnv = {
         enable = true;
       };
@@ -50,11 +51,11 @@
 
     fish = {
       enable = true;
+
       loginShellInit = ''
         fish_add_path /opt/homebrew/bin
         set fish_greeting
       '';
-
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
         ls = "${pkgs.exa}/bin/exa --icons";
@@ -81,8 +82,14 @@
 
     tmux = {
       enable = true;
+
       baseIndex = 1;
-      secureSocket = false;
+      escapeTime = 10;
+      plugins = with pkgs.tmuxPlugins; [
+        nord
+      ];
+      terminal = "screen-256color";
+
       extraConfig = ''
         set-option -g mouse on
         set-option -g default-command "fish"
@@ -91,6 +98,7 @@
 
     starship = {
       enable = true;
+
       settings = {
         add_newline = false;
       };
