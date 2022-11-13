@@ -1,5 +1,8 @@
 { config, pkgs, ... }:
 
+let
+    pkgsUnstable = import <nixpkgs-unstable> {};
+in
 {
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
@@ -14,11 +17,7 @@
     pkgs.btop
     pkgs.fd
     pkgs.neofetch
-    pkgs.nodejs
     pkgs.ripgrep
-    pkgs.rnix-lsp
-    pkgs.sumneko-lua-language-server
-    pkgs.tree-sitter
   ];
 
   # This value determines the Home Manager release that your
@@ -34,12 +33,12 @@
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
 
+
   programs = {
 
     fzf.enable = true;
     jq.enable = true;
     lazygit.enable = true;
-    neovim.enable = true;
 
     direnv = {
       enable = true;
@@ -82,9 +81,20 @@
         lt = "${pkgs.exa}/bin/exa --tree --icons";
         lla = "${pkgs.exa}/bin/exa -la --icons";
       };
-      shellInit = ''
-        fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
-      '';
+      shellInit = if builtins.pathExists "/nix/var/nix/profiles/default" then ''
+        fenv source '$HOME/.nix-profile/etc/profile.d/nix-daemon.sh'
+      '' else "";
+    };
+
+    neovim = {
+        enable = true;
+        package = pkgsUnstable.neovim-unwrapped;
+        extraPackages = [
+            pkgs.nodejs
+            pkgs.rnix-lsp
+            pkgs.sumneko-lua-language-server
+            pkgs.tree-sitter
+        ];
     };
 
     tmux = {
