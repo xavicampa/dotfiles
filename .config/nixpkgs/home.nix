@@ -1,8 +1,5 @@
 { config, pkgs, ... }:
 
-let
-    pkgsUnstable = import <nixpkgs-unstable> {};
-in
 {
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
@@ -16,6 +13,7 @@ in
   home.packages = [
     pkgs.btop
     pkgs.fd
+    pkgs.zig
     pkgs.neofetch
     pkgs.ripgrep
   ];
@@ -88,13 +86,14 @@ in
 
     neovim = {
         enable = true;
-        package = pkgsUnstable.neovim-unwrapped;
         extraPackages = [
             pkgs.nodejs
             pkgs.rnix-lsp
             pkgs.sumneko-lua-language-server
             pkgs.tree-sitter
         ];
+        withNodeJs = true;
+        withPython3 = true;
     };
 
     tmux = {
