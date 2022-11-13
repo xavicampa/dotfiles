@@ -46,6 +46,8 @@ in
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
 
+  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_470;
+
   # Enable the X11 windowing system.
   services.xserver = {
     enable = true;

@@ -58,7 +58,7 @@
       nerdfonts
       gcc
       rofi
-      linuxPackages.nvidia_x11
+      linuxPackages.nvidia_x11_legacy470
       bottom
       btop
       xorg.xmodmap
@@ -76,40 +76,28 @@
       neofetch
       bottom
       exa
-      ripgrep
       autotiling
       lazygit
       _1password
       _1password-gui
       tree-sitter
-      nodejs
-      fd
       xclip
-      python3
-      python39Packages.cfn-lint
-      python39Packages.python-lsp-server
-      python39Packages.pytest
-      python39Packages.pip
       xfce.thunar
       spotify
       sumneko-lua-language-server
       rnix-lsp
       pavucontrol
       slack
-      nodePackages.typescript-language-server
       discord
       kitty
       starship
-      nodePackages.vscode-json-languageserver
-      nodePackages.typescript
-      # steam-run
       vscode
       zip
       unzip
       fishPlugins.fzf-fish
+      fd
       fzf
-      awscli2
-      postman
+      ripgrep
       jq
       # unstable.nodePackages.graphql-language-service-cli
       # unstable.nodePackages.graphql

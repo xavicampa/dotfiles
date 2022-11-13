@@ -13,6 +13,7 @@
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   boot.extraModulePackages = [ ];
 
+
   fileSystems."/" =
     { device = "/dev/disk/by-uuid/f141d862-cf81-4510-ae33-45970ab2d15b";
       fsType = "ext4";
