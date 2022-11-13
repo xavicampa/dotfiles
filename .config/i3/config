@@ -12,7 +12,7 @@
 set $mod Mod1
 
 # displays
-exec --no-startup-id $HOME/.screenlayout/DP-0.sh
+# exec --no-startup-id $HOME/.screenlayout/DP-0.sh
 
 # fonts
 #exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
@@ -22,9 +22,9 @@ exec --no-startup-id $HOME/.screenlayout/DP-0.sh
 exec_always --no-startup-id autotiling
 
 # gaps
-gaps inner 24
+# gaps inner 24
 # gaps right 1500
-smart_gaps inverse_outer
+# smart_gaps inverse_outer
 
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
@@ -32,6 +32,7 @@ font pango:JetBrainsMono Nerd Font
 
 # window title bars and border
 default_border pixel 1
+# default_border none
 # for_window [class=".*"] border pixel 0
 
 #default_floating_border pixel 1
@@ -41,7 +42,7 @@ default_border pixel 1
 #exec --no-startup-id $HOME/.config/polybar/launch_polybar.sh
 
 # compositor
-exec --no-startup-id picom -b --experimental-backends
+# exec --no-startup-id picom -b --experimental-backends
 
 # keyboard
 # exec --no-startup-id setxkbmap -option caps:ctrl_modifier
@@ -78,11 +79,12 @@ mode "$mode_system" {
 bindsym $mod+BackSpace mode "$mode_system"
 
 # displays mode
-set $mode_displays DP-0 (1), dual (2), HDMI-0 (3)
+set $mode_displays DP-0 (1), dual (2), HDMI-0 (3), GT740-dual (4)
 mode "$mode_displays" {
     bindsym 1 exec --no-startup-id $HOME/.screenlayout/DP-0.sh, mode "default"
     bindsym 2 exec --no-startup-id $HOME/.screenlayout/dual.sh, mode "default"
     bindsym 3 exec --no-startup-id $HOME/.screenlayout/HDMI-0.sh, mode "default"
+    bindsym 4 exec --no-startup-id $HOME/.screenlayout/HDMI-0-740.sh, mode "default"
 
     # back to normal: Enter or Escape
     bindsym Return mode "default"
@@ -292,7 +294,7 @@ bar {
         status_command i3status
         # workspace_min_width 24
         colors {
-            background #0C0C0C00
+            # background #0C0C0C00
             #statusline #00000000
         }
 }
