@@ -119,31 +119,32 @@
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" "docker" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
-      google-chrome
-      rofi
-      linuxPackages.nvidia_x11_legacy470
-      xorg.xmodmap
-      xorg.xinput
-      pamixer
-      blueman
-      pasystray
-      dunst
-      picom
-      feh
-      ddcutil
-      rofimoji
-      flameshot
-      autotiling
       _1password
       _1password-gui
+      autotiling
+      blueman
+      ddcutil
+      discord
+      dunst
+      feh
+      firefox
+      flameshot
+      google-chrome
+      kitty
+      linuxPackages.nvidia_x11_legacy470
+      pamixer
+      pasystray
+      pavucontrol
+      picom
+      rofi
+      rofimoji
+      slack
+      spotify
+      vscode
+      xorg.xinput
+      xorg.xmodmap
       xclip
       xfce.thunar
-      spotify
-      pavucontrol
-      slack
-      discord
-      kitty
-      vscode
     ];
   };
 
