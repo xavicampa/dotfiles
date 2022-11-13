@@ -51,16 +51,16 @@
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" "docker" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
-      fish
+      # fish
       google-chrome
-      unstable.neovim
-      git
-      nerdfonts
-      gcc
+      # unstable.neovim
+      # git
+      # nerdfonts
+      # gcc
       rofi
       linuxPackages.nvidia_x11_legacy470
-      bottom
-      btop
+      # bottom
+      # btop
       xorg.xmodmap
       xorg.xinput
       pamixer
@@ -72,33 +72,32 @@
       ddcutil
       rofimoji
       flameshot
-      tmux
-      neofetch
-      bottom
-      exa
+      # tmux
+      # neofetch
+      # exa
       autotiling
-      lazygit
+      # lazygit
       _1password
       _1password-gui
-      tree-sitter
+      # tree-sitter
       xclip
       xfce.thunar
       spotify
-      sumneko-lua-language-server
-      rnix-lsp
+      # sumneko-lua-language-server
+      # rnix-lsp
       pavucontrol
       slack
       discord
       kitty
-      starship
+      # starship
       vscode
-      zip
-      unzip
-      fishPlugins.fzf-fish
-      fd
-      fzf
-      ripgrep
-      jq
+      # zip
+      # unzip
+      # fishPlugins.fzf-fish
+      # fd
+      # fzf
+      # ripgrep
+      # jq
       # unstable.nodePackages.graphql-language-service-cli
       # unstable.nodePackages.graphql
       # unstable.nodePackages.typescript

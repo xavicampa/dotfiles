@@ -19,7 +19,7 @@ in
       # Include the results of the hardware scan.
       ./hardware-configuration.nix
       /home/javi/.config/nixos/homepc/javi.nix
-      <home-manager/nixos>
+      # <home-manager/nixos>
     ];
 
   # Use the systemd-boot EFI boot loader.
@@ -69,21 +69,21 @@ in
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    unstable.neovim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    # unstable.neovim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
     git
   ];
 
-  environment.variables.EDITOR = "nvim";
+  # environment.variables.EDITOR = "nvim";
 
-  users.users.xavi.isNormalUser = true;
-  home-manager.users.xavi = { pkgs, ... }: {
-    # home.file.".config/nixpkgs/dotfiles".source = dotfiles;
-    home.packages = with pkgs; [
-      home-manager
-    ];
-    programs.home-manager.enable = true;
-  };
+  # users.users.xavi.isNormalUser = true;
+  # home-manager.users.xavi = { pkgs, ... }: {
+  #   # home.file.".config/nixpkgs/dotfiles".source = dotfiles;
+  #   home.packages = with pkgs; [
+  #     home-manager
+  #   ];
+  #   programs.home-manager.enable = true;
+  # };
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
