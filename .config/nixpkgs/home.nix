@@ -4,7 +4,11 @@
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "javi";
-  home.homeDirectory = "/Users/javi";
+  home.homeDirectory = if builtins.pathExists "/Users/javi" then "/Users/javi" else "/home/javi";
+
+  home.sessionVariables = {
+    EDITOR = "nvim";
+  };
 
   home.packages = [
     pkgs.btop
@@ -52,20 +56,12 @@
     fish = {
       enable = true;
 
+      interactiveShellInit = ''
+        set -g SHELL ${pkgs.fish}/bin/fish
+      '';
       loginShellInit = ''
         fish_add_path /opt/homebrew/bin
         set fish_greeting
-      '';
-      shellAliases = {
-        dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
-        ls = "${pkgs.exa}/bin/exa --icons";
-        ll = "${pkgs.exa}/bin/exa -l --icons";
-        la = "${pkgs.exa}/bin/exa -a --icons";
-        lt = "${pkgs.exa}/bin/exa --tree --icons";
-        lla = "${pkgs.exa}/bin/exa -la --icons";
-      };
-      shellInit = ''
-        fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
       '';
       plugins = [
         {
@@ -78,6 +74,17 @@
           };
         }
       ];
+      shellAliases = {
+        dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
+        ls = "${pkgs.exa}/bin/exa --icons";
+        ll = "${pkgs.exa}/bin/exa -l --icons";
+        la = "${pkgs.exa}/bin/exa -a --icons";
+        lt = "${pkgs.exa}/bin/exa --tree --icons";
+        lla = "${pkgs.exa}/bin/exa -la --icons";
+      };
+      shellInit = ''
+        fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+      '';
     };
 
     tmux = {
