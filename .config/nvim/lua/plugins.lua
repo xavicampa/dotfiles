@@ -84,7 +84,6 @@ return require('packer').startup(function(use)
             vim.api.nvim_set_keymap("n", "<leader>gg", ":LazyGit<CR>", { noremap = true })
         end
     }
-    use 'rafi/vim-venom'
     use {
         'lukas-reineke/indent-blankline.nvim',
         config = function()
