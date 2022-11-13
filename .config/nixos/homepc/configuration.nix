@@ -1,25 +1,10 @@
 { config, pkgs, ... }:
 
-let
-  unstableTarball =
-    fetchTarball
-      https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz;
-in
-# let
-  #  dotfiles = pkgs.fetchFromGitHub {
-  #    owner = "xavicampa";
-  #    repo = "dotfiles";
-  #    rev = "7fe224fa9016a92dd3fd556b9f2951aa003ec2e0";
-  #    sha256 = "sha256-1D1V5KK3t8GEXSn9wQ0C8vVE150H54JALT98SevE4TU=";
-  #  };
-  #in
 {
   imports =
     [
       # Include the results of the hardware scan.
       ./hardware-configuration.nix
-      /home/javi/.config/nixos/homepc/javi.nix
-      # <home-manager/nixos>
     ];
 
   # Use the systemd-boot EFI boot loader.
@@ -28,15 +13,6 @@ in
 
   # Clean up
   nix.gc.automatic = true;
-  # nix.gc.options = "--delete-older-than 8d";
-
-  nixpkgs.config = {
-    packageOverrides = pkgs: with pkgs; {
-      unstable = import unstableTarball {
-        config = config.nixpkgs.config;
-      };
-    };
-  };
 
   networking.hostName = "homepc"; # Define your hostname.
   # Pick only one of the below networking options.
@@ -69,34 +45,15 @@ in
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    # unstable.neovim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
     git
   ];
 
-  # environment.variables.EDITOR = "nvim";
-
-  # users.users.xavi.isNormalUser = true;
-  # home-manager.users.xavi = { pkgs, ... }: {
-  #   # home.file.".config/nixpkgs/dotfiles".source = dotfiles;
-  #   home.packages = with pkgs; [
-  #     home-manager
-  #   ];
-  #   programs.home-manager.enable = true;
-  # };
-
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
 
   # List services that you want to enable:
 
   # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
+  services.openssh.enable = true;
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
@@ -116,5 +73,78 @@ in
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.05"; # Did you read the comment?
+
+
+  # javi home section
+  #
+  environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
+
+  i18n = {
+    defaultLocale = "nb_NO.UTF-8";
+    extraLocaleSettings = {
+      LC_ALL = "nb_NO.UTF-8";
+      LANG = "en_US.UTF-8";
+      LANGUAGE = "en_US.UTF-8";
+    };
+  };
+
+  services.xserver = {
+    windowManager.i3 = {
+      enable = true;
+      package = pkgs.i3-gaps;
+      extraPackages = with pkgs; [
+        dmenu
+        i3status
+        i3lock
+        i3blocks
+      ];
+    };
+    layout = "no";
+  };
+
+  fonts.fonts = with pkgs; [
+    nerdfonts
+  ];
+
+  nixpkgs.config = {
+    allowUnfree = true;
+  };
+
+  virtualisation.docker.enable = true;
+
+  programs.fish.enable = true;
+
+  users.users.javi = {
+    shell = pkgs.fish;
+    isNormalUser = true;
+    extraGroups = [ "wheel" "i2c" "docker" ]; # Enable ‘sudo’ for the user.
+    packages = with pkgs; [
+      google-chrome
+      rofi
+      linuxPackages.nvidia_x11_legacy470
+      xorg.xmodmap
+      xorg.xinput
+      pamixer
+      blueman
+      pasystray
+      dunst
+      picom
+      feh
+      ddcutil
+      rofimoji
+      flameshot
+      autotiling
+      _1password
+      _1password-gui
+      xclip
+      xfce.thunar
+      spotify
+      pavucontrol
+      slack
+      discord
+      kitty
+      vscode
+    ];
+  };
 
 }
