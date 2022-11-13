@@ -80,7 +80,7 @@
         lla = "${pkgs.exa}/bin/exa -la --icons";
       };
       shellInit = if builtins.pathExists "/nix/var/nix/profiles/default" then ''
-        fenv source '$HOME/.nix-profile/etc/profile.d/nix-daemon.sh'
+        fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
       '' else "";
     };
 
