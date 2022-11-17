@@ -13,9 +13,9 @@
   home.packages = [
     pkgs.btop
     pkgs.fd
-    pkgs.zig
     pkgs.neofetch
     pkgs.ripgrep
+    pkgs.zig
   ];
 
   # This value determines the Home Manager release that your
@@ -55,8 +55,6 @@
 
       interactiveShellInit = ''
         set -g SHELL ${pkgs.fish}/bin/fish
-      '';
-      loginShellInit = ''
         fish_add_path /opt/homebrew/bin
         set fish_greeting
       '';
