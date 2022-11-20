@@ -145,4 +145,3 @@ font: "JetBrainsMono Nerd Font 20";
 /*	me-accept-entry: "MouseDPrimary";*/
 /*	me-accept-custom: "Control+MouseDPrimary";*/
 }
-@theme "/etc/rofi/themes/Arc-Dark.rasi"
