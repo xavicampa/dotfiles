@@ -15,6 +15,7 @@
     pkgs.fd
     pkgs.kitty-themes
     pkgs.neofetch
+    pkgs.nerdfonts
     pkgs.ripgrep
     pkgs.zig
   ];
@@ -29,9 +30,10 @@
   # changes in each release.
   home.stateVersion = "22.05";
 
+  fonts.fontconfig.enable = true;
+
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-
 
   programs = {
 
@@ -87,8 +89,12 @@
     kitty = {
       enable = true;
       font = {
-        name = "JetBrainsMono Nerdfont";
+        name = "JetBrainsMonoNL Nerd Font";
         size = 12;
+      };
+      settings = {
+        macos_quit_when_last_window_closed = "yes";
+        remember_window_size = "no";
       };
       theme = "Gruvbox Material Dark Medium";
     };
