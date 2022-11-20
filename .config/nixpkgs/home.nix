@@ -13,6 +13,7 @@
   home.packages = [
     pkgs.btop
     pkgs.fd
+    pkgs.kitty-themes
     pkgs.neofetch
     pkgs.ripgrep
     pkgs.zig
@@ -77,21 +78,31 @@
         lt = "${pkgs.exa}/bin/exa --tree --icons";
         lla = "${pkgs.exa}/bin/exa -la --icons";
       };
-      shellInit = if builtins.pathExists "/nix/var/nix/profiles/default" then ''
-        fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
-      '' else "";
+      shellInit =
+        if builtins.pathExists "/nix/var/nix/profiles/default" then ''
+          fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+        '' else "";
+    };
+
+    kitty = {
+      enable = true;
+      font = {
+        name = "JetBrainsMono Nerdfont";
+        size = 12;
+      };
+      theme = "Gruvbox Material Dark Medium";
     };
 
     neovim = {
-        enable = true;
-        extraPackages = [
-            pkgs.nodejs
-            pkgs.rnix-lsp
-            pkgs.sumneko-lua-language-server
-            pkgs.tree-sitter
-        ];
-        withNodeJs = true;
-        withPython3 = true;
+      enable = true;
+      extraPackages = [
+        pkgs.nodejs
+        pkgs.rnix-lsp
+        pkgs.sumneko-lua-language-server
+        pkgs.tree-sitter
+      ];
+      withNodeJs = true;
+      withPython3 = true;
     };
 
     tmux = {

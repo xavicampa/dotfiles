@@ -93,7 +93,8 @@ return require('packer').startup(function(use)
             }
         end
     }
-    use 'folke/tokyonight.nvim'
+    -- use 'folke/tokyonight.nvim'
+    use { "ellisonleao/gruvbox.nvim" }
     use {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         config = function()
