@@ -111,7 +111,7 @@
       baseIndex = 1;
       escapeTime = 10;
       plugins = with pkgs.tmuxPlugins; [
-        nord
+        gruvbox
       ];
       terminal = "screen-256color";
 
