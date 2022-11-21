@@ -1,6 +1,8 @@
 -- Colorscheme
 vim.opt.termguicolors = true
 vim.opt.background = 'dark'
+vim.g.gruvbox_italic = 1
+-- vim.g.gruvbox_contrast_dark = 'soft'
 -- vim.g.tokyonight_transparent = 1
 -- vim.g.tokyonight_style = 'night'
 -- vim.g.lightline = { colorscheme = 'tokyonight' }

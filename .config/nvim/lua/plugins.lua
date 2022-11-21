@@ -94,7 +94,10 @@ return require('packer').startup(function(use)
         end
     }
     -- use 'folke/tokyonight.nvim'
-    use { "ellisonleao/gruvbox.nvim" }
+    use 'gruvbox-community/gruvbox'
+    -- use 'ellisonleao/gruvbox.nvim'
+    -- use 'sainnhe/gruvbox-material'
+    -- use 'sainnhe/everforest'
     use {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         config = function()

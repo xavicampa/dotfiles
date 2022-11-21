@@ -89,14 +89,14 @@
     kitty = {
       enable = true;
       font = {
-        name = "JetBrainsMonoNL Nerd Font";
-        size = 12;
+        name = "JetBrainsMono Nerd Font";
+        size = 14;
       };
       settings = {
         macos_quit_when_last_window_closed = "yes";
         remember_window_size = "no";
       };
-      theme = "Gruvbox Material Dark Medium";
+      theme = "Gruvbox Dark";
     };
 
     neovim = {
@@ -119,11 +119,10 @@
       plugins = with pkgs.tmuxPlugins; [
         gruvbox
       ];
-      terminal = "screen-256color";
+      terminal = "xterm-kitty";
 
       extraConfig = ''
         set-option -g mouse on
-        set-option -g default-command "fish"
       '';
     };
 
