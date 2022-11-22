@@ -10,6 +10,14 @@
     EDITOR = "nvim";
   };
 
+  nixpkgs.overlays = [
+    (self: super: {
+      nerdfonts = super.nerdfonts.override {
+        fonts = [ "JetBrainsMono" ];
+      };
+    })
+  ];
+
   home.packages = [
     pkgs.btop
     pkgs.fd
