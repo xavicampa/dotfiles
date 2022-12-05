@@ -22,7 +22,7 @@
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
 
-  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_470;
+  # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_470;
 
   # Enable the X11 windowing system.
   services.xserver = {
@@ -72,7 +72,7 @@
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "22.05"; # Did you read the comment?
+  system.stateVersion = "22.11"; # Did you read the comment?
 
 
   # javi home section
@@ -131,7 +131,7 @@
       flameshot
       google-chrome
       kitty
-      linuxPackages.nvidia_x11_legacy470
+      # linuxPackages.nvidia_x11_legacy470
       pamixer
       pasystray
       pavucontrol

@@ -12,7 +12,7 @@
 set $mod Mod1
 
 # displays
-# exec --no-startup-id $HOME/.screenlayout/DP-0.sh
+exec --no-startup-id $HOME/.screenlayout/DP-0.sh
 
 # fonts
 #exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
@@ -42,7 +42,7 @@ default_border pixel 1
 #exec --no-startup-id $HOME/.config/polybar/launch_polybar.sh
 
 # compositor
-# exec --no-startup-id picom -b --experimental-backends
+exec --no-startup-id picom -b --experimental-backends
 
 # keyboard
 # exec --no-startup-id setxkbmap -option caps:ctrl_modifier
