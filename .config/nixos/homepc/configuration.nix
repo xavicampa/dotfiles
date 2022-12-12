@@ -23,6 +23,7 @@
   time.timeZone = "Europe/Oslo";
 
   # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_470;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
 
   # Enable the X11 windowing system.
   services.xserver = {
@@ -44,10 +45,10 @@
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
-  environment.systemPackages = with pkgs; [
-    wget
-    git
-  ];
+  # environment.systemPackages = with pkgs; [
+  #   wget
+  #   git
+  # ];
 
 
   # List services that you want to enable:
@@ -102,9 +103,9 @@
     layout = "no";
   };
 
-  fonts.fonts = with pkgs; [
-    nerdfonts
-  ];
+  # fonts.fonts = with pkgs; [
+  #   nerdfonts
+  # ];
 
   nixpkgs.config = {
     allowUnfree = true;
@@ -129,9 +130,9 @@
       feh
       firefox
       flameshot
+      git
       google-chrome
       kitty
-      # linuxPackages.nvidia_x11_legacy470
       pamixer
       pasystray
       pavucontrol

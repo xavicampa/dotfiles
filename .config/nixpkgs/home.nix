@@ -98,7 +98,7 @@
       enable = true;
       font = {
         name = "JetBrainsMono Nerd Font";
-        size = 14;
+        size = 13;
       };
       settings = {
         macos_quit_when_last_window_closed = "yes";
