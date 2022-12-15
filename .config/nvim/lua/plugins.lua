@@ -105,6 +105,32 @@ return require('packer').startup(function(use)
         end,
     }
 
+    use {
+        "terrortylor/nvim-comment",
+        config = function()
+            require("nvim_comment").setup({
+                hook = function()
+                    require("ts_context_commentstring.internal").update_commentstring()
+                end,
+            })
+        end,
+    }
+
+    use {
+        "JoosepAlviste/nvim-ts-context-commentstring",
+        requires = {
+            "nvim-treesitter/nvim-treesitter"
+        },
+        config = function()
+            require("nvim-treesitter.configs").setup {
+                context_commentstring = {
+                    enable = true,
+                    enable_autocmd = false,
+                }
+            }
+        end
+    }
+
     -- Automatically set up your configuration after cloning packer.nvim
     -- Put this at the end after all plugins
     if packer_bootstrap then
