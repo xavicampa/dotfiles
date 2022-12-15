@@ -103,6 +103,8 @@
       settings = {
         macos_quit_when_last_window_closed = "yes";
         remember_window_size = "no";
+        initial_window_width = "80c";
+        initial_window_height = "25c";
       };
       theme = "Gruvbox Dark";
     };
