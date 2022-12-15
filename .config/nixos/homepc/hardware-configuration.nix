@@ -5,22 +5,25 @@
 
 {
   imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
+    [
+      (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   boot.extraModulePackages = [ ];
-
+  boot.loader.systemd-boot.consoleMode = "max";
 
   fileSystems."/" =
-    { device = "/dev/disk/by-uuid/f141d862-cf81-4510-ae33-45970ab2d15b";
+    {
+      device = "/dev/disk/by-uuid/f141d862-cf81-4510-ae33-45970ab2d15b";
       fsType = "ext4";
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/5324-3635";
+    {
+      device = "/dev/disk/by-uuid/5324-3635";
       fsType = "vfat";
     };
 
@@ -35,8 +38,11 @@
   # networking.interfaces.enp3s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
 
-  powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
+  # powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+
+  # hidpi
+  hardware.video.hidpi.enable = true;
 
   # bluetooth
   hardware.i2c.enable = true;

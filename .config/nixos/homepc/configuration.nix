@@ -90,6 +90,8 @@
   };
 
   services.xserver = {
+    dpi = 112;
+    layout = "no";
     windowManager.i3 = {
       enable = true;
       package = pkgs.i3-gaps;
@@ -100,7 +102,6 @@
         i3blocks
       ];
     };
-    layout = "no";
   };
 
   # fonts.fonts = with pkgs; [
