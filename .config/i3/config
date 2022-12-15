@@ -12,7 +12,7 @@
 set $mod Mod1
 
 # displays
-exec --no-startup-id $HOME/.screenlayout/DP-0.sh
+# exec --no-startup-id $HOME/.screenlayout/DP-0.sh
 
 # fonts
 #exec --no-startup-id xset +fp "$HOME/.local/share/fonts"
@@ -79,12 +79,11 @@ mode "$mode_system" {
 bindsym $mod+BackSpace mode "$mode_system"
 
 # displays mode
-set $mode_displays DP-0 (1), dual (2), HDMI-0 (3), GT740-dual (4)
+set $mode_displays DP-0 (1), dual (2), HDMI-0 (3)
 mode "$mode_displays" {
     bindsym 1 exec --no-startup-id $HOME/.screenlayout/DP-0.sh, mode "default"
     bindsym 2 exec --no-startup-id $HOME/.screenlayout/dual.sh, mode "default"
     bindsym 3 exec --no-startup-id $HOME/.screenlayout/HDMI-0.sh, mode "default"
-    bindsym 4 exec --no-startup-id $HOME/.screenlayout/HDMI-0-740.sh, mode "default"
 
     # back to normal: Enter or Escape
     bindsym Return mode "default"
