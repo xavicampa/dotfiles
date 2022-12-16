@@ -117,8 +117,8 @@
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
       ];
-      withNodeJs = true;
-      withPython3 = true;
+      withNodeJs = false;
+      withPython3 = false;
     };
 
     tmux = {
