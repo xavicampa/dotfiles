@@ -1,6 +1,8 @@
 { config, pkgs, ... }:
 
 {
+
+
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "javi";
@@ -98,7 +100,7 @@
       enable = true;
       font = {
         name = "JetBrainsMono Nerd Font";
-        size = 13;
+        size = 14;
       };
       settings = {
         macos_quit_when_last_window_closed = "yes";
@@ -117,8 +119,8 @@
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
       ];
-      withNodeJs = false;
-      withPython3 = false;
+      withNodeJs = true;
+      withPython3 = true;
     };
 
     tmux = {
