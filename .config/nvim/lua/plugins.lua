@@ -93,11 +93,13 @@ return require('packer').startup(function(use)
             }
         end
     }
+
     -- use 'folke/tokyonight.nvim'
     use 'gruvbox-community/gruvbox'
     -- use 'ellisonleao/gruvbox.nvim'
     -- use 'sainnhe/gruvbox-material'
     -- use 'sainnhe/everforest'
+
     use {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         config = function()
@@ -119,7 +121,8 @@ return require('packer').startup(function(use)
     use {
         "JoosepAlviste/nvim-ts-context-commentstring",
         requires = {
-            "nvim-treesitter/nvim-treesitter"
+            "nvim-treesitter/nvim-treesitter",
+            "terrortylor/nvim-comment",
         },
         config = function()
             require("nvim-treesitter.configs").setup {
