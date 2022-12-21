@@ -13,6 +13,7 @@
 
   # Clean up
   nix.gc.automatic = true;
+  nix.settings.auto-optimise-store = true;
 
   networking.hostName = "homepc"; # Define your hostname.
   # Pick only one of the below networking options.
@@ -55,6 +56,10 @@
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
+
+  services.kmscon = {
+    enable = true;
+  };
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
@@ -133,7 +138,6 @@
       flameshot
       git
       google-chrome
-      kitty
       pamixer
       pasystray
       pavucontrol
