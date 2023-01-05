@@ -27,7 +27,7 @@
     pkgs.neofetch
     pkgs.nerdfonts
     pkgs.ripgrep
-    pkgs.zig
+    # pkgs.zig
   ];
 
   # This value determines the Home Manager release that your
