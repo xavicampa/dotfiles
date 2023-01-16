@@ -9,11 +9,22 @@
       (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
+  boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
-  boot.extraModulePackages = [ ];
-  boot.loader.systemd-boot.consoleMode = "max";
+  # boot.extraModulePackages = [ ];
+  boot.loader.systemd-boot.consoleMode = "keep";
+  /* boot.kernelPatches = [ */
+  /*   { */
+  /*     name = "big-navi"; */
+  /*     patch = null; */
+  /*     extraConfig = '' */
+  /*       DRM_AMD_DC_DCN3_0 y */
+  /*     ''; */
+  /*   } */
+  /* ]; */
+  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.beta;
 
   fileSystems."/" =
     {
@@ -38,11 +49,14 @@
   # networking.interfaces.enp3s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
 
-  powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
+  # powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 
   # hidpi
-  hardware.video.hidpi.enable = true;
+  # hardware.video.hidpi.enable = true;
+
+  # opengl
+  hardware.opengl.enable = true;
 
   # bluetooth
   hardware.i2c.enable = true;

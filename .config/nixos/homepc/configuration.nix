@@ -23,21 +23,6 @@
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
 
-  # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_470;
-  boot.kernelPackages = pkgs.linuxPackages_latest;
-
-  # Enable the X11 windowing system.
-  services.xserver = {
-    enable = true;
-    displayManager = {
-      defaultSession = "none+i3";
-    };
-    videoDrivers = [ "nvidia" ];
-    libinput = {
-      enable = true;
-    };
-  };
-
   # Enable sound.
   sound.enable = true;
 
@@ -47,8 +32,7 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   # environment.systemPackages = with pkgs; [
-  #   wget
-  #   git
+  #   linuxKernel.packages.linux_6_1.nvidia_x11_production
   # ];
 
 
@@ -57,9 +41,9 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  services.kmscon = {
-    enable = true;
-  };
+  /* services.kmscon = { */
+  /*   enable = true; */
+  /* }; */
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
@@ -94,18 +78,27 @@
     };
   };
 
+  # Enable the X11 windowing system.
   services.xserver = {
+    enable = true;
+    displayManager = {
+      defaultSession = "none+i3";
+    };
     dpi = 112;
     layout = "no";
+    libinput = {
+      enable = true;
+    };
+    videoDrivers = [ "nvidia" ];
     windowManager.i3 = {
       enable = true;
-      package = pkgs.i3-gaps;
       extraPackages = with pkgs; [
         dmenu
         i3status
         i3lock
         i3blocks
       ];
+      package = pkgs.i3-gaps;
     };
   };
 
