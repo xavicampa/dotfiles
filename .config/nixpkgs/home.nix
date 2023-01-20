@@ -22,12 +22,10 @@
 
   home.packages = [
     pkgs.btop
-    pkgs.fd
     pkgs.kitty-themes
     pkgs.neofetch
     pkgs.nerdfonts
-    pkgs.ripgrep
-    # pkgs.zig
+    /* pkgs.zig */
   ];
 
   # This value determines the Home Manager release that your
@@ -70,6 +68,9 @@
         set -g SHELL ${pkgs.fish}/bin/fish
         fish_add_path /opt/homebrew/bin
         set fish_greeting
+        set -Ux PYENV_ROOT $HOME/.pyenv
+        set -U fish_user_paths $PYENV_ROOT/bin $fish_user_paths
+        pyenv init - | source
       '';
       plugins = [
         {
@@ -114,7 +115,8 @@
     neovim = {
       enable = true;
       extraPackages = [
-        pkgs.nodejs
+        pkgs.fd
+        pkgs.ripgrep
         pkgs.rnix-lsp
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
