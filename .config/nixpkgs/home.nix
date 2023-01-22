@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 let
-  nodePackages = import ~/node2nix/default.nix {
+  nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
 
