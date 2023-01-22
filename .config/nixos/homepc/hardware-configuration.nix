@@ -28,13 +28,13 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/f141d862-cf81-4510-ae33-45970ab2d15b";
+      device = "/dev/disk/by-label/NIXROOT";
       fsType = "ext4";
     };
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/5324-3635";
+      device = "/dev/disk/by-label/NIXBOOT";
       fsType = "vfat";
     };
 
