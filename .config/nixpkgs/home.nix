@@ -70,7 +70,6 @@
         set fish_greeting
         set -Ux PYENV_ROOT $HOME/.pyenv
         set -U fish_user_paths $PYENV_ROOT/bin $fish_user_paths
-        pyenv init - | source
       '';
       plugins = [
         {
@@ -116,6 +115,7 @@
       enable = true;
       extraPackages = [
         pkgs.fd
+        pkgs.gcc
         pkgs.ripgrep
         pkgs.rnix-lsp
         pkgs.sumneko-lua-language-server
