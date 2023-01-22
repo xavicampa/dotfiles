@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 {
   imports =
@@ -113,6 +113,17 @@
   virtualisation.docker.enable = true;
 
   programs.fish.enable = true;
+
+  # This seems to make aws amplify work in nixos
+  programs.nix-ld.enable = true;
+  environment.variables = {
+    NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
+      pkgs.stdenv.cc.cc
+      pkgs.openssl
+      # ...
+    ];
+    NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
+  };
 
   users.users.javi = {
     shell = pkgs.fish;
