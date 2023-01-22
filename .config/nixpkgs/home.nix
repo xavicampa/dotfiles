@@ -33,6 +33,7 @@ in
     pkgs.nodejs
     pkgs.nodePackages.node2nix
     nodePackages."@aws-amplify/cli"
+    nodePackages."aws-cdk"
     pkgs.python39
     /* pkgs.zig */
   ];
