@@ -1,8 +1,13 @@
 { config, pkgs, ... }:
 
+let
+  nodePackages = import ~/node2nix/default.nix {
+    inherit pkgs;
+  };
+
+in
+
 {
-
-
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "javi";
@@ -25,6 +30,10 @@
     pkgs.kitty-themes
     pkgs.neofetch
     pkgs.nerdfonts
+    pkgs.nodejs
+    pkgs.nodePackages.node2nix
+    nodePackages."@aws-amplify/cli"
+    pkgs.python39
     /* pkgs.zig */
   ];
 
@@ -68,8 +77,6 @@
         set -g SHELL ${pkgs.fish}/bin/fish
         fish_add_path /opt/homebrew/bin
         set fish_greeting
-        set -Ux PYENV_ROOT $HOME/.pyenv
-        set -U fish_user_paths $PYENV_ROOT/bin $fish_user_paths
       '';
       plugins = [
         {
