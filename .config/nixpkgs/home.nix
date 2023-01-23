@@ -26,15 +26,19 @@ in
   ];
 
   home.packages = [
+    nodePackages."@aws-amplify/cli"
+    nodePackages."aws-cdk"
     pkgs.btop
     pkgs.kitty-themes
     pkgs.neofetch
     pkgs.nerdfonts
     pkgs.nodejs
     pkgs.nodePackages.node2nix
-    nodePackages."@aws-amplify/cli"
-    nodePackages."aws-cdk"
+    pkgs.nodePackages.typescript
+    pkgs.nodePackages.typescript-language-server
+    pkgs.p7zip
     pkgs.python39
+    pkgs.unzip
     /* pkgs.zig */
   ];
 
@@ -138,8 +142,10 @@ in
 
       baseIndex = 1;
       escapeTime = 10;
+      keyMode = "vi";
       plugins = with pkgs.tmuxPlugins; [
         gruvbox
+        yank
       ];
       terminal = "xterm-kitty";
 
