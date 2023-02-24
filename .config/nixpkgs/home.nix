@@ -4,7 +4,6 @@ let
   nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
-
 in
 
 {
@@ -30,14 +29,17 @@ in
     nodePackages."aws-cdk"
     pkgs.btop
     pkgs.kitty-themes
+    pkgs.lxappearance
     pkgs.neofetch
     pkgs.nerdfonts
     pkgs.nodejs
     pkgs.nodePackages.node2nix
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
+    pkgs.nodePackages.create-react-app
     pkgs.p7zip
     pkgs.python39
+    pkgs.python39Packages.python-lsp-server
     pkgs.unzip
     /* pkgs.zig */
   ];

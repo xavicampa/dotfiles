@@ -64,7 +64,6 @@
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.11"; # Did you read the comment?
 
-
   # javi home section
   #
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
@@ -125,6 +124,10 @@
     NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
   };
 
+  programs.thunar.plugins = with pkgs.xfce; [
+    thunar-archive-plugin
+  ];
+
   users.users.javi = {
     shell = pkgs.fish;
     isNormalUser = true;
@@ -138,6 +141,7 @@
       discord
       dunst
       feh
+      gnome.file-roller
       firefox
       flameshot
       git

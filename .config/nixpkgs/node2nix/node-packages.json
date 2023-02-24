@@ -1,1 +1,5 @@
-["@aws-amplify/cli", "aws-cdk"]
+[
+    "@aws-amplify/cli",
+    "aws-cdk",
+    "create-react-app"
+]
