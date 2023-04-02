@@ -27,9 +27,13 @@ in
   home.packages = [
     nodePackages."@aws-amplify/cli"
     nodePackages."aws-cdk"
+    pkgs.awscli2
     pkgs.btop
+    pkgs.figlet
     pkgs.kitty-themes
+    pkgs.haskellPackages.patat
     pkgs.lxappearance
+    pkgs.marksman
     pkgs.neofetch
     pkgs.nerdfonts
     pkgs.nodejs
