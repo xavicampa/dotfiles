@@ -14,6 +14,7 @@ in
 
   home.sessionVariables = {
     EDITOR = "nvim";
+    SHELL = "${pkgs.zsh}/bin/zsh";
   };
 
   nixpkgs.overlays = [
@@ -30,6 +31,8 @@ in
     pkgs.awscli2
     pkgs.btop
     pkgs.figlet
+    pkgs.imgcat
+    pkgs.haskellPackages.patat
     pkgs.kitty-themes
     pkgs.haskellPackages.patat
     pkgs.lxappearance
@@ -38,12 +41,15 @@ in
     pkgs.nerdfonts
     pkgs.nodejs
     pkgs.nodePackages.node2nix
+    pkgs.nodePackages.pyright
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
     pkgs.nodePackages.create-react-app
     pkgs.p7zip
     pkgs.python39
     pkgs.python39Packages.python-lsp-server
+    pkgs.python39Packages.cfn-lint
+    pkgs.sqlmap
     pkgs.unzip
     /* pkgs.zig */
   ];
@@ -69,49 +75,16 @@ in
     jq.enable = true;
     lazygit.enable = true;
 
-    direnv = {
-      enable = true;
-
-      nix-direnv = {
-        enable = true;
-      };
-    };
+    /* direnv = { */
+    /*   enable = true; */
+    /*  */
+    /*   nix-direnv = { */
+    /*     enable = true; */
+    /*   }; */
+    /* }; */
 
     exa = {
       enable = true;
-    };
-
-    fish = {
-      enable = true;
-
-      interactiveShellInit = ''
-        set -g SHELL ${pkgs.fish}/bin/fish
-        fish_add_path /opt/homebrew/bin
-        set fish_greeting
-      '';
-      plugins = [
-        {
-          name = "plugin-foreign-env";
-          src = pkgs.fetchFromGitHub {
-            owner = "oh-my-fish";
-            repo = "plugin-foreign-env";
-            rev = "dddd9213272a0ab848d474d0cbde12ad034e65bc";
-            sha256 = "00xqlyl3lffc5l0viin1nyp819wf81fncqyz87jx8ljjdhilmgbs";
-          };
-        }
-      ];
-      shellAliases = {
-        dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
-        ls = "${pkgs.exa}/bin/exa --icons";
-        ll = "${pkgs.exa}/bin/exa -l --icons";
-        la = "${pkgs.exa}/bin/exa -a --icons";
-        lt = "${pkgs.exa}/bin/exa --tree --icons";
-        lla = "${pkgs.exa}/bin/exa -la --icons";
-      };
-      shellInit =
-        if builtins.pathExists "/nix/var/nix/profiles/default" then ''
-          fenv source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
-        '' else "";
     };
 
     kitty = {
@@ -126,7 +99,8 @@ in
         initial_window_width = "80c";
         initial_window_height = "25c";
       };
-      theme = "Gruvbox Dark";
+      /* theme = "Gruvbox Dark"; */
+      theme = "Catppuccin-Macchiato";
     };
 
     neovim = {
@@ -143,28 +117,49 @@ in
       withPython3 = true;
     };
 
-    tmux = {
-      enable = true;
-
-      baseIndex = 1;
-      escapeTime = 10;
-      keyMode = "vi";
-      plugins = with pkgs.tmuxPlugins; [
-        gruvbox
-        yank
-      ];
-      terminal = "xterm-kitty";
-
-      extraConfig = ''
-        set-option -g mouse on
-      '';
-    };
+    /* tmux = { */
+    /*   enable = true; */
+    /*  */
+    /*   baseIndex = 1; */
+    /*   escapeTime = 10; */
+    /*   keyMode = "vi"; */
+    /*   plugins = with pkgs.tmuxPlugins; [ */
+    /*     gruvbox */
+    /*     yank */
+    /*   ]; */
+    /*   terminal = "xterm-kitty"; */
+    /*  */
+    /*   extraConfig = '' */
+    /*     set-option -g mouse on */
+    /*   ''; */
+    /* }; */
 
     starship = {
       enable = true;
-
       settings = {
         add_newline = false;
+      };
+    };
+
+    zsh = {
+      enable = true;
+      enableAutosuggestions = true;
+      enableCompletion = true;
+      initExtra = ''
+        export PATH=$PATH:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin
+      '';
+      shellAliases = {
+        dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
+        /* ls = "${pkgs.exa}/bin/exa --icons"; */
+        ll = "${pkgs.exa}/bin/exa -l --icons";
+        /* la = "${pkgs.exa}/bin/exa -a --icons"; */
+        /* lt = "${pkgs.exa}/bin/exa --tree --icons"; */
+        /* lla = "${pkgs.exa}/bin/exa -la --icons"; */
+      };
+      oh-my-zsh = {
+        enable = true;
+        plugins = [ "git" "brew" "docker" "npm" "pip"];
+        /* theme = "robbyrussell"; */
       };
     };
   };
