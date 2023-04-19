@@ -20,14 +20,14 @@ return require('packer').startup(function(use)
     use 'hrsh7th/cmp-nvim-lua'
     use 'hrsh7th/cmp-nvim-lsp'
     use 'hrsh7th/cmp-nvim-lsp-signature-help'
-    use {
-        "windwp/nvim-autopairs",
-        config = function()
-            require("nvim-autopairs").setup({
-                check_ts = true
-            })
-        end
-    }
+    -- use {
+    --     "windwp/nvim-autopairs",
+    --     config = function()
+    --         require("nvim-autopairs").setup({
+    --             check_ts = true
+    --         })
+    --     end
+    -- }
     use {
         'preservim/nerdtree',
         requires = {
@@ -46,11 +46,11 @@ return require('packer').startup(function(use)
     --         { 'preservim/nerdtree' },
     --     }
     -- }
-    use 'folke/lsp-colors.nvim'
-    use {
-        'folke/trouble.nvim',
-        requires = { { 'kyazdani42/nvim-web-devicons' } },
-    }
+    -- use 'folke/lsp-colors.nvim'
+    -- use {
+    --     'folke/trouble.nvim',
+    --     requires = { { 'kyazdani42/nvim-web-devicons' } },
+    -- }
     use 'pedrohdz/vim-yaml-folds'
     use {
         'nvim-telescope/telescope.nvim',
@@ -72,7 +72,7 @@ return require('packer').startup(function(use)
         'jose-elias-alvarez/null-ls.nvim',
         requires = { "nvim-lua/plenary.nvim" }
     }
-    use 'iamcco/markdown-preview.nvim'
+    -- use 'iamcco/markdown-preview.nvim'
     use {
         'phaazon/hop.nvim',
         branch = 'v2'
@@ -84,29 +84,30 @@ return require('packer').startup(function(use)
             vim.api.nvim_set_keymap("n", "<leader>gg", ":LazyGit<CR>", { noremap = true })
         end
     }
-    use {
-        'lukas-reineke/indent-blankline.nvim',
-        config = function()
-            vim.opt.list = true
-            require("indent_blankline").setup {
-                show_current_context = true
-            }
-        end
-    }
-
+    -- use {
+    --     'lukas-reineke/indent-blankline.nvim',
+    --     config = function()
+    --         vim.opt.list = true
+    --         require("indent_blankline").setup {
+    --             show_current_context = true
+    --         }
+    --     end
+    -- }
     -- use 'folke/tokyonight.nvim'
-    use 'gruvbox-community/gruvbox'
+    -- use 'gruvbox-community/gruvbox'
     -- use 'ellisonleao/gruvbox.nvim'
     -- use 'sainnhe/gruvbox-material'
     -- use 'sainnhe/everforest'
-
+    use {
+        "catppuccin/nvim",
+        as = "catppuccin"
+    }
     use {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         config = function()
             require("lsp_lines").setup()
         end,
     }
-
     use {
         "terrortylor/nvim-comment",
         config = function()
@@ -117,7 +118,6 @@ return require('packer').startup(function(use)
             })
         end,
     }
-
     use {
         "JoosepAlviste/nvim-ts-context-commentstring",
         requires = {

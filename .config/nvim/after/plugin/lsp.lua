@@ -135,6 +135,8 @@ require('lspconfig')['rust_analyzer'].setup {
     }
 }
 require('null-ls').setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
     sources = {
         require("null-ls").builtins.diagnostics.cfn_lint.with({
             args = {

@@ -1,4 +1,6 @@
 require 'nvim-treesitter.configs'.setup {
+    auto_install = true,
+
     -- A list of parser names, or "all"
     ensure_installed = { "python", "lua", "yaml", "graphql", "javascript", "json", "go", "nix", "tsx", "typescript" },
 
