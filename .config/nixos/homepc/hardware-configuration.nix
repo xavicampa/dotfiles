@@ -9,7 +9,7 @@
       (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  # boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
@@ -24,6 +24,7 @@
   /*     ''; */
   /*   } */
   /* ]; */
+
   hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.beta;
 
   fileSystems."/" =
@@ -64,12 +65,11 @@
 
   # hardware.pulseaudio.enable = true;
   security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-    # If you want to use JACK applications, uncomment this
-    #jack.enable = true;
-  };
+  hardware.pulseaudio.enable = true;
+  /* services.pipewire = { */
+  /*   enable = true; */
+  /*   alsa.enable = true; */
+  /*   alsa.support32Bit = true; */
+  /*   pulse.enable = true; */
+  /* }; */
 }

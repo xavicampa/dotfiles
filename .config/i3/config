@@ -31,7 +31,7 @@ exec_always --no-startup-id autotiling
 font pango:JetBrainsMono Nerd Font
 
 # window title bars and border
-default_border pixel 1
+default_border pixel 2
 # default_border none
 # for_window [class=".*"] border pixel 0
 

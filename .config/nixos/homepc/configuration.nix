@@ -80,8 +80,17 @@
   # Enable the X11 windowing system.
   services.xserver = {
     enable = true;
+    desktopManager = {
+      gnome.enable = true;
+    };
     displayManager = {
       defaultSession = "none+i3";
+      gdm.enable = true;
+      sessionCommands = ''
+        if test -f ~/.Xmodmap; then
+            ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
+        fi
+      '';
     };
     dpi = 112;
     layout = "no";
@@ -124,9 +133,9 @@
     NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
   };
 
-  programs.thunar.plugins = with pkgs.xfce; [
-    thunar-archive-plugin
-  ];
+  /* programs.thunar.plugins = with pkgs.xfce; [ */
+  /*   thunar-archive-plugin */
+  /* ]; */
 
   users.users.javi = {
     shell = pkgs.fish;
@@ -163,3 +172,4 @@
   };
 
 }
+
