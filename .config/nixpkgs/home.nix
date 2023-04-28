@@ -31,11 +31,11 @@ in
     pkgs.awscli2
     pkgs.btop
     pkgs.figlet
+    pkgs.graph-easy
     pkgs.imgcat
     pkgs.haskellPackages.patat
     pkgs.kitty-themes
     pkgs.haskellPackages.patat
-    pkgs.lxappearance
     pkgs.marksman
     pkgs.neofetch
     pkgs.nerdfonts
@@ -49,6 +49,7 @@ in
     pkgs.python39
     pkgs.python39Packages.python-lsp-server
     pkgs.python39Packages.cfn-lint
+    pkgs.slides
     pkgs.sqlmap
     pkgs.unzip
     /* pkgs.zig */
