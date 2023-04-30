@@ -298,7 +298,7 @@ bar {
         }
 }
 
-exec --no-startup-id kitty --class termscratchpad tmux
+exec --no-startup-id kitty --class termscratchpad
 for_window [instance="termscratchpad"] move scratchpad
 
 # Make the currently focused window a scratchpad

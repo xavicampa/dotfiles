@@ -120,25 +120,27 @@
 
   virtualisation.docker.enable = true;
 
-  programs.fish.enable = true;
+  programs.zsh.enable = true;
 
   # This seems to make aws amplify work in nixos
-  programs.nix-ld.enable = true;
-  environment.variables = {
-    NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
-      pkgs.stdenv.cc.cc
-      pkgs.openssl
-      # ...
-    ];
-    NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
+  # programs.nix-ld.enable = true;
+  programs.nix-ld = {
+      enable = true;
   };
+  # environment.variables = {
+  #   NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
+  #     pkgs.stdenv.cc.cc
+  #     pkgs.openssl
+  #   ];
+  #   NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
+  # };
 
   /* programs.thunar.plugins = with pkgs.xfce; [ */
   /*   thunar-archive-plugin */
   /* ]; */
 
   users.users.javi = {
-    shell = pkgs.fish;
+    shell = pkgs.zsh;
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" "docker" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
