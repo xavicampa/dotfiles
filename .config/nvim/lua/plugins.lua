@@ -35,7 +35,11 @@ return require('packer').startup(function(use)
             { 'lewis6991/gitsigns.nvim' },
         },
     }
-    use 'itchyny/lightline.vim'
+    -- use 'itchyny/lightline.vim'
+    use {
+        'nvim-lualine/lualine.nvim',
+        requires = { 'nvim-tree/nvim-web-devicons', opt = true }
+    }
     use {
         'Xuyuanp/nerdtree-git-plugin',
         requires = { { 'preservim/nerdtree' } },
@@ -98,10 +102,11 @@ return require('packer').startup(function(use)
     -- use 'ellisonleao/gruvbox.nvim'
     -- use 'sainnhe/gruvbox-material'
     -- use 'sainnhe/everforest'
-    use {
-        "catppuccin/nvim",
-        as = "catppuccin"
-    }
+    -- use {
+    --     "catppuccin/nvim",
+    --     as = "catppuccin"
+    -- }
+    use 'Mofiqul/dracula.nvim'
     use {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         config = function()
