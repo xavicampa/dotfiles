@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   nodePackages = import ./node2nix/default.nix {
@@ -17,28 +17,16 @@ in
     SHELL = "${pkgs.zsh}/bin/zsh";
   };
 
-  nixpkgs.overlays = [
-    (self: super: {
-      nerdfonts = super.nerdfonts.override {
-        fonts = [ "JetBrainsMono" ];
-      };
-    })
-  ];
-
   home.packages = [
     nodePackages."@aws-amplify/cli"
     nodePackages."aws-cdk"
     pkgs.awscli2
     pkgs.btop
-    pkgs.figlet
     pkgs.graph-easy
-    pkgs.imgcat
-    pkgs.haskellPackages.patat
     pkgs.kitty-themes
-    pkgs.haskellPackages.patat
     pkgs.marksman
     pkgs.neofetch
-    pkgs.nerdfonts
+    (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.nodejs
     pkgs.nodePackages.node2nix
     pkgs.nodePackages.pyright
@@ -50,9 +38,7 @@ in
     pkgs.python3Packages.python-lsp-server
     pkgs.python3Packages.cfn-lint
     pkgs.slides
-    pkgs.sqlmap
     pkgs.unzip
-    /* pkgs.zig */
   ];
 
   # This value determines the Home Manager release that your
@@ -65,7 +51,7 @@ in
   # changes in each release.
   home.stateVersion = "22.11";
 
-  fonts.fontconfig.enable = true;
+  fonts.fontconfig.enable = lib.mkForce true;
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
@@ -160,7 +146,7 @@ in
       };
       oh-my-zsh = {
         enable = true;
-        plugins = [ "git" "brew" "docker" "npm" "pip"];
+        plugins = [ "git" "brew" "docker" "npm" "pip" ];
         /* theme = "robbyrussell"; */
       };
     };
