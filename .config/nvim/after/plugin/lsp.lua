@@ -75,15 +75,15 @@ require('lspconfig')['pyright'].setup {
 --     on_attach = on_attach,
 --     flags = lsp_flags,
 -- }
-require('lspconfig')['gopls'].setup {
-    on_attach = on_attach,
-    flags = lsp_flags,
-}
-require('lspconfig')['omnisharp'].setup {
-    cmd = { "/home/javi/omnisharp/OmniSharp", "--languageserver", "--hostPID", tostring(pid) };
-    on_attach = on_attach,
-    flags = lsp_flags,
-}
+-- require('lspconfig')['gopls'].setup {
+--     on_attach = on_attach,
+--     flags = lsp_flags,
+-- }
+-- require('lspconfig')['omnisharp'].setup {
+--     cmd = { "/home/javi/omnisharp/OmniSharp", "--languageserver", "--hostPID", tostring(pid) };
+--     on_attach = on_attach,
+--     flags = lsp_flags,
+-- }
 require('lspconfig')['lua_ls'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
@@ -112,32 +112,33 @@ require('lspconfig')['rnix'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
-require('lspconfig')['rust_analyzer'].setup {
-    on_attach = on_attach,
-    flags = lsp_flags,
-    settings = {
-        ["rust-analyzer"] = {
-            imports = {
-                granularity = {
-                    group = "module",
-                },
-                prefix = "self",
-            },
-            cargo = {
-                buildScripts = {
-                    enable = true,
-                },
-            },
-            procMacro = {
-                enable = true
-            },
-        }
-    }
-}
+-- require('lspconfig')['rust_analyzer'].setup {
+--     on_attach = on_attach,
+--     flags = lsp_flags,
+--     settings = {
+--         ["rust-analyzer"] = {
+--             imports = {
+--                 granularity = {
+--                     group = "module",
+--                 },
+--                 prefix = "self",
+--             },
+--             cargo = {
+--                 buildScripts = {
+--                     enable = true,
+--                 },
+--             },
+--             procMacro = {
+--                 enable = true
+--             },
+--         }
+--     }
+-- }
 require('null-ls').setup {
     on_attach = on_attach,
     flags = lsp_flags,
     sources = {
+        require("null-ls").builtins.formatting.black,
         require("null-ls").builtins.diagnostics.cfn_lint.with({
             args = {
                 '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL

@@ -20,20 +20,23 @@ in
   home.packages = [
     nodePackages."@aws-amplify/cli"
     pkgs.awscli2
+    pkgs.aws-sam-cli
     pkgs.btop
     pkgs.graph-easy
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
-    pkgs.node2nix
     pkgs.nodePackages.aws-cdk
+    pkgs.nerdfonts
+    pkgs.node2nix
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
-    pkgs.nodePackages.create-react-app
     pkgs.p7zip
     pkgs.python3
+    pkgs.python3Packages.black
     pkgs.python3Packages.cfn-lint
+    pkgs.python3Packages.python-lsp-server
     pkgs.slides
     pkgs.unzip
   ];
@@ -131,7 +134,7 @@ in
       enableAutosuggestions = true;
       enableCompletion = true;
       initExtra = ''
-        export PATH=$PATH:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin
+        export PATH=/opt/homebrew/opt/openssl@1.1/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
       '';
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
