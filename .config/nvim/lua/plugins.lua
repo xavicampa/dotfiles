@@ -72,6 +72,7 @@ return require('packer').startup(function(use)
             require('gitsigns').setup()
         end
     }
+    use 'tpope/vim-fugitive'
     use {
         'jose-elias-alvarez/null-ls.nvim',
         requires = { "nvim-lua/plenary.nvim" }
