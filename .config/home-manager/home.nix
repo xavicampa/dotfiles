@@ -27,16 +27,16 @@ in
     pkgs.marksman
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
-    pkgs.nodePackages.aws-cdk
     pkgs.nerdfonts
     pkgs.node2nix
+    pkgs.nodePackages.aws-cdk
+    pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
     pkgs.p7zip
     pkgs.python3
     pkgs.python3Packages.black
     pkgs.python3Packages.cfn-lint
-    pkgs.python3Packages.python-lsp-server
     pkgs.slides
     pkgs.unzip
   ];
