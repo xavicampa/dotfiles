@@ -157,6 +157,7 @@
       flameshot
       git
       google-chrome
+      nodejs_18
       pamixer
       pasystray
       pavucontrol

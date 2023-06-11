@@ -111,10 +111,10 @@ exec --no-startup-id blueman-applet
 # Adjust mouse scrolling and speed
 exec_always --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Natural Scrolling Enabled" 1
 exec_always --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Profile Enabled" 0, 0
-exec_always --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Speed" -0.5
+exec_always --no-startup-id xinput set-prop pointer:"Logitech G Pro " "libinput Accel Speed" -0.7
 exec_always --no-startup-id xinput set-prop 15 "libinput Natural Scrolling Enabled" 1
 exec_always --no-startup-id xinput set-prop 15 "libinput Accel Profile Enabled" 0, 0
-exec_always --no-startup-id xinput set-prop 15 "libinput Accel Speed" -0.5
+exec_always --no-startup-id xinput set-prop 15 "libinput Accel Speed" -0.7
 
 # Use ddcutil to control display brightness via F1-F4
 bindcode 70 exec --no-startup-id ddcutil setvcp 10 + 25 --display 2
