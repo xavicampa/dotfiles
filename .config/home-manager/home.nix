@@ -19,7 +19,6 @@ in
 
   home.packages = [
     nodePackages."@aws-amplify/cli"
-    nodePackages."aws-cdk"
     pkgs.awscli2
     pkgs.btop
     pkgs.graph-easy
@@ -27,15 +26,13 @@ in
     pkgs.marksman
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
-    pkgs.nodejs
-    pkgs.nodePackages.node2nix
-    pkgs.nodePackages.pyright
+    pkgs.node2nix
+    pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
     pkgs.nodePackages.create-react-app
     pkgs.p7zip
     pkgs.python3
-    pkgs.python3Packages.python-lsp-server
     pkgs.python3Packages.cfn-lint
     pkgs.slides
     pkgs.unzip
