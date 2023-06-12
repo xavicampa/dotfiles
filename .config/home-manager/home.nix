@@ -4,8 +4,13 @@ let
   nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
+  pythonEnv = pkgs.python3.withPackages (ppkgs: [
+    ppkgs.black
+    ppkgs.cfn-lint
+    ppkgs.greenlet
+    ppkgs.pynvim
+  ]);
 in
-
 {
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
@@ -31,13 +36,10 @@ in
     pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
-    pkgs.nodePackages.typescript-language-server
     pkgs.p7zip
-    pkgs.python3
-    pkgs.python3Packages.black
-    pkgs.python3Packages.cfn-lint
     pkgs.slides
     pkgs.unzip
+    pythonEnv
   ];
 
   # This value determines the Home Manager release that your
@@ -48,7 +50,7 @@ in
   # You can update Home Manager without changing this value. See
   # the Home Manager release notes for a list of state version
   # changes in each release.
-  home.stateVersion = "22.11";
+  home.stateVersion = "23.05";
 
   fonts.fontconfig.enable = lib.mkForce true;
 
@@ -95,13 +97,19 @@ in
       extraPackages = [
         pkgs.fd
         pkgs.gcc
+        pkgs.nodePackages.typescript-language-server
         pkgs.ripgrep
         pkgs.rnix-lsp
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
       ];
-      withNodeJs = true;
-      withPython3 = true;
+      extraLuaConfig = ''
+        vim.g.python3_host_prog='${pythonEnv}/bin/python3'
+        vim.g.python_host_prog='${pythonEnv}/bin/python'
+        require 'options'
+        require 'plugins'
+        require 'remap'
+      '';
     };
 
     /* tmux = { */
@@ -133,7 +141,7 @@ in
       enableAutosuggestions = true;
       enableCompletion = true;
       initExtra = ''
-        export PATH=/opt/homebrew/opt/openssl@1.1/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
+        export PATH=/opt/homebrew/opt/node@18/bin:/opt/homebrew/opt/openssl@1.1/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
       '';
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
