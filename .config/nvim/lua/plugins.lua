@@ -13,7 +13,6 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
     "folke/which-key.nvim",
-    "wbthomason/packer.nvim",
     "nvim-treesitter/nvim-treesitter",
     "neovim/nvim-lspconfig",
     "SirVer/ultisnips",
@@ -108,18 +107,18 @@ require("lazy").setup({
             }
         end
     },
-    {
-        "jackMort/ChatGPT.nvim",
-        event = "VeryLazy",
-        dependencies = {
-            "MunifTanjim/nui.nvim",
-            "nvim-lua/plenary.nvim",
-            "nvim-telescope/telescope.nvim"
-        },
-        config = function()
-            require("chatgpt").setup({
-                api_key_cmd = "op read op://private/openai/credential --no-newline"
-            })
-        end
-    }
+    -- {
+    --     "jackMort/ChatGPT.nvim",
+    --     event = "VeryLazy",
+    --     dependencies = {
+    --         "MunifTanjim/nui.nvim",
+    --         "nvim-lua/plenary.nvim",
+    --         "nvim-telescope/telescope.nvim"
+    --     },
+    --     config = function()
+    --         require("chatgpt").setup({
+    --             api_key_cmd = "op read op://private/openai/credential --no-newline"
+    --         })
+    --     end
+    -- }
 })
