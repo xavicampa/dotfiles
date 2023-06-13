@@ -139,6 +139,7 @@ require('null-ls').setup {
     flags = lsp_flags,
     sources = {
         require("null-ls").builtins.formatting.black,
+        require("null-ls").builtins.formatting.prettier,
         require("null-ls").builtins.diagnostics.cfn_lint.with({
             args = {
                 '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL

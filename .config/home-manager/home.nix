@@ -35,6 +35,7 @@ in
     pkgs.node2nix
     pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
+    pkgs.nodePackages.prettier
     pkgs.nodePackages.typescript
     pkgs.p7zip
     pkgs.slides
