@@ -1,125 +1,89 @@
-local fn = vim.fn
-local install_path = fn.stdpath('data') .. '/site/pack/packer/start/packer.nvim'
-if fn.empty(fn.glob(install_path)) > 0 then
-    packer_bootstrap = fn.system({ 'git', 'clone', '--depth', '1', 'https://github.com/wbthomason/packer.nvim',
-        install_path })
-    vim.cmd [[packadd packer.nvim]]
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.loop.fs_stat(lazypath) then
+    vim.fn.system({
+        "git",
+        "clone",
+        "--filter=blob:none",
+        "https://github.com/folke/lazy.nvim.git",
+        "--branch=stable", -- latest stable release
+        lazypath,
+    })
 end
+vim.opt.rtp:prepend(lazypath)
 
-return require('packer').startup(function(use)
-    use 'wbthomason/packer.nvim'
-    use 'nvim-treesitter/nvim-treesitter'
-    use 'neovim/nvim-lspconfig'
-    use 'SirVer/ultisnips'
-    use 'honza/vim-snippets'
-    use 'quangnguyen30192/cmp-nvim-ultisnips'
-    use 'onsails/lspkind.nvim'
-    use 'hrsh7th/nvim-cmp'
-    use 'hrsh7th/cmp-buffer'
-    use 'hrsh7th/cmp-path'
-    use 'hrsh7th/cmp-nvim-lua'
-    use 'hrsh7th/cmp-nvim-lsp'
-    use 'hrsh7th/cmp-nvim-lsp-signature-help'
-    -- use {
-    --     "windwp/nvim-autopairs",
-    --     config = function()
-    --         require("nvim-autopairs").setup({
-    --             check_ts = true
-    --         })
-    --     end
-    -- }
-    use {
-        'preservim/nerdtree',
-        requires = {
-            { 'ryanoasis/vim-devicons' },
-            { 'lewis6991/gitsigns.nvim' },
-        },
-    }
-    -- use 'itchyny/lightline.vim'
-    use {
-        'nvim-lualine/lualine.nvim',
-        requires = { 'nvim-tree/nvim-web-devicons', opt = true }
-    }
-    use {
-        'Xuyuanp/nerdtree-git-plugin',
-        requires = { { 'preservim/nerdtree' } },
-    }
-    -- use {
-    --     'tiagofumo/vim-nerdtree-syntax-highlight',
-    --     requires = {
-    --         { 'preservim/nerdtree' },
-    --     }
-    -- }
-    -- use 'folke/lsp-colors.nvim'
-    -- use {
-    --     'folke/trouble.nvim',
-    --     requires = { { 'kyazdani42/nvim-web-devicons' } },
-    -- }
-    use 'pedrohdz/vim-yaml-folds'
-    use {
-        'nvim-telescope/telescope.nvim',
-        requires = { { 'nvim-lua/plenary.nvim' } },
+require("lazy").setup({
+    "folke/which-key.nvim",
+    "wbthomason/packer.nvim",
+    "nvim-treesitter/nvim-treesitter",
+    "neovim/nvim-lspconfig",
+    "SirVer/ultisnips",
+    "honza/vim-snippets",
+    "quangnguyen30192/cmp-nvim-ultisnips",
+    "onsails/lspkind.nvim",
+    "hrsh7th/nvim-cmp",
+    "hrsh7th/cmp-buffer",
+    "hrsh7th/cmp-path",
+    "hrsh7th/cmp-nvim-lua",
+    "hrsh7th/cmp-nvim-lsp",
+    "hrsh7th/cmp-nvim-lsp-signature-help",
+    "pedrohdz/vim-yaml-folds",
+    "tpope/vim-fugitive",
+    {
+        "preservim/nerdtree",
+        dependencies = {
+            "ryanoasis/vim-devicons",
+            "lewis6991/gitsigns.nvim"
+        }
+    },
+    {
+        "nvim-lualine/lualine.nvim",
+        dependencies = { "nvim-tree/nvim-web-devicons" }
+    },
+    {
+        "xuyuanp/nerdtree-git-plugin",
+        dependencies = { "preservim/nerdtree" }
+    },
+    {
+        "nvim-telescope/telescope.nvim",
+        dependencies = { "nvim-lua/plenary.nvim" },
         config = function()
             vim.api.nvim_set_keymap("n", "<leader>ff", ":Telescope find_files<CR>", { noremap = true })
             vim.api.nvim_set_keymap("n", "<leader>fg", ":Telescope live_grep<CR>", { noremap = true })
             vim.api.nvim_set_keymap("n", "<leader>fb", ":Telescope buffers<CR>", { noremap = true })
             vim.api.nvim_set_keymap("n", "<leader>fh", ":Telescope help_tags<CR>", { noremap = true })
         end
-    }
-    use {
-        'lewis6991/gitsigns.nvim',
+    },
+    {
+        "lewis6991/gitsigns.nvim",
         config = function()
-            require('gitsigns').setup()
+            require("gitsigns").setup()
         end
-    }
-    use 'tpope/vim-fugitive'
-    use {
-        'jose-elias-alvarez/null-ls.nvim',
-        requires = { "nvim-lua/plenary.nvim" }
-    }
-    -- use 'iamcco/markdown-preview.nvim'
-    use {
-        "iamcco/markdown-preview.nvim",
-        run = "cd app && npm install",
-        setup = function() vim.g.mkdp_filetypes = { "markdown" } end, ft = { "markdown" }
-    }
-    use {
-        'phaazon/hop.nvim',
-        branch = 'v2'
-    }
-    use {
-        'kdheepak/lazygit.nvim',
+    },
+    {
+        "jose-elias-alvarez/null-ls.nvim",
+        dependencies = { "nvim-lua/plenary.nvim" }
+    },
+    --    {
+    --         "iamcco/markdown-preview.nvim",
+    --         run = "cd app && npm install",
+    --         setup = function() vim.g.mkdp_filetypes = { "markdown" } end, ft = { "markdown" }
+    --     }
+    "phaazon/hop.nvim",
+    {
+        "kdheepak/lazygit.nvim",
         config = function()
             vim.g.lazygit_floating_window_scaling_factor = 0.8
             vim.api.nvim_set_keymap("n", "<leader>gg", ":LazyGit<CR>", { noremap = true })
         end
-    }
-    -- use {
-    --     'lukas-reineke/indent-blankline.nvim',
-    --     config = function()
-    --         vim.opt.list = true
-    --         require("indent_blankline").setup {
-    --             show_current_context = true
-    --         }
-    --     end
-    -- }
-    -- use 'folke/tokyonight.nvim'
-    -- use 'gruvbox-community/gruvbox'
-    -- use 'ellisonleao/gruvbox.nvim'
-    -- use 'sainnhe/gruvbox-material'
-    -- use 'sainnhe/everforest'
-    -- use {
-    --     "catppuccin/nvim",
-    --     as = "catppuccin"
-    -- }
-    use 'Mofiqul/dracula.nvim'
-    use {
+    },
+    "Mofiqul/dracula.nvim",
+    {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         config = function()
             require("lsp_lines").setup()
         end,
-    }
-    use {
+    },
+    {
         "terrortylor/nvim-comment",
         config = function()
             require("nvim_comment").setup({
@@ -128,10 +92,10 @@ return require('packer').startup(function(use)
                 end,
             })
         end,
-    }
-    use {
+    },
+    {
         "JoosepAlviste/nvim-ts-context-commentstring",
-        requires = {
+        dependencies = {
             "nvim-treesitter/nvim-treesitter",
             "terrortylor/nvim-comment",
         },
@@ -143,11 +107,19 @@ return require('packer').startup(function(use)
                 }
             }
         end
+    },
+    {
+        "jackMort/ChatGPT.nvim",
+        event = "VeryLazy",
+        dependencies = {
+            "MunifTanjim/nui.nvim",
+            "nvim-lua/plenary.nvim",
+            "nvim-telescope/telescope.nvim"
+        },
+        config = function()
+            require("chatgpt").setup({
+                api_key_cmd = "op read op://private/openai/credential --no-newline"
+            })
+        end
     }
-
-    -- Automatically set up your configuration after cloning packer.nvim
-    -- Put this at the end after all plugins
-    if packer_bootstrap then
-        require('packer').sync()
-    end
-end)
+})
