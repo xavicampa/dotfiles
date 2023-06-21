@@ -4,7 +4,7 @@ let
   nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
-  pythonEnv = pkgs.python3.withPackages (ppkgs: [
+  pythonEnv = pkgs.python311.withPackages (ppkgs: [
     ppkgs.black
     ppkgs.cfn-lint
     ppkgs.greenlet
@@ -24,6 +24,7 @@ in
 
   home.packages = [
     nodePackages."@aws-amplify/cli"
+    nodePackages."aws-cdk"
     pkgs.awscli2
     pkgs.aws-sam-cli
     pkgs.btop
@@ -33,10 +34,8 @@ in
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.node2nix
-    pkgs.nodePackages.aws-cdk
+    # pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
-    pkgs.nodePackages.prettier
-    pkgs.nodePackages.pyright
     pkgs.nodePackages.typescript
     pkgs.p7zip
     pkgs.slides
@@ -99,6 +98,8 @@ in
       extraPackages = [
         pkgs.fd
         pkgs.gcc
+        pkgs.nodePackages.prettier
+        pkgs.nodePackages.pyright
         pkgs.nodePackages.typescript-language-server
         pkgs.ripgrep
         pkgs.rnix-lsp

@@ -26,12 +26,11 @@ require("lazy").setup({
     "hrsh7th/cmp-nvim-lsp",
     "hrsh7th/cmp-nvim-lsp-signature-help",
     "pedrohdz/vim-yaml-folds",
-    "tpope/vim-fugitive",
+    "lewis6991/gitsigns.nvim",
     {
         "preservim/nerdtree",
         dependencies = {
             "ryanoasis/vim-devicons",
-            "lewis6991/gitsigns.nvim"
         }
     },
     {
