@@ -93,7 +93,7 @@
       '';
     };
     dpi = 112;
-    layout = "no";
+    xkb.layout = "no";
     libinput = {
       enable = true;
     };
@@ -162,6 +162,7 @@
       pasystray
       pavucontrol
       picom
+      # postman
       rofi
       rofimoji
       slack
