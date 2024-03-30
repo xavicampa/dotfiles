@@ -39,7 +39,7 @@ vim.opt.termguicolors = true
 -- vim.cmd([[colorscheme tokyonight]]) -- called twice for indent-blankline to pick up the colors?
 -- vim.cmd([[colorscheme catppuccin]])
 -- vim.cmd([[colorscheme catppuccin]])
--- vim.cmd([[Catppuccin macchiato]])
+-- vim.cmd([[Catppuccin mocha]])
 
 vim.cmd([[colorscheme dracula]])
 vim.cmd([[colorscheme dracula]])

@@ -1,4 +1,5 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+
 if not vim.loop.fs_stat(lazypath) then
     vim.fn.system({
         "git",
@@ -27,6 +28,7 @@ require("lazy").setup({
     "hrsh7th/cmp-nvim-lsp-signature-help",
     "pedrohdz/vim-yaml-folds",
     "lewis6991/gitsigns.nvim",
+    -- { "catppuccin/nvim", name = "catppuccin", priority = 1000 },
     {
         "preservim/nerdtree",
         dependencies = {
@@ -35,7 +37,7 @@ require("lazy").setup({
     },
     {
         "nvim-lualine/lualine.nvim",
-        dependencies = { "nvim-tree/nvim-web-devicons" }
+        dependencies = { "nvim-tree/nvim-web-devicons" },
     },
     {
         "xuyuanp/nerdtree-git-plugin",
@@ -98,12 +100,15 @@ require("lazy").setup({
             "terrortylor/nvim-comment",
         },
         config = function()
-            require("nvim-treesitter.configs").setup {
-                context_commentstring = {
-                    enable = true,
-                    enable_autocmd = false,
-                }
-            }
+            -- require("ts_context_commentstring").setup {
+            --     skip_ts_context_commentstring_movule = false
+            -- }
+            -- require("nvim-treesitter.configs").setup {
+            --     context_commentstring = {
+            --         enable = true,
+            --         enable_autocmd = false,
+            --     }
+            -- }
         end
     },
     {
@@ -118,7 +123,57 @@ require("lazy").setup({
             -- or leave it empty to use the default settings
             -- refer to the configuration section below
         }
-    }
+    },
+    {
+        "nomnivore/ollama.nvim",
+        dependencies = {
+            "nvim-lua/plenary.nvim",
+        },
+
+        -- All the user commands added by the plugin
+        cmd = { "Ollama", "OllamaModel", "OllamaServe", "OllamaServeStop" },
+
+        keys = {
+            -- Sample keybind for prompt menu. Note that the <c-u> is important for selections to work properly.
+            {
+                "<leader>oo",
+                ":<c-u>lua require('ollama').prompt()<cr>",
+                desc = "ollama prompt",
+                mode = { "n", "v" },
+            },
+
+            -- Sample keybind for direct prompting. Note that the <c-u> is important for selections to work properly.
+            {
+                "<leader>oG",
+                ":<c-u>lua require('ollama').prompt('Generate_Code')<cr>",
+                desc = "ollama Generate Code",
+                mode = { "n", "v" },
+            },
+        },
+        opts = {
+            -- model = "llama2:13b",
+            -- model = "dolphin:latest",
+            -- model = "dolphin-mixtral:8x7b-v2.7-q2_K",
+            model = "codellama:34b",
+            -- model = "dolphin-mixtral:8x7b-v2.7-q3_K_M",
+            -- model = "codellama:13b-code-q6_K",
+            -- url = "http://homepc:11434"
+        }
+    },
+    -- Minimal configuration
+    -- {
+    --     "David-Kunz/gen.nvim",
+    --     opts = {
+    --         model = "codellama:34b"
+    --     }
+    -- },
+    -- {
+    --     'huggingface/llm.nvim',
+    --     opts = {
+    --         model = "http://localhost:11434/api/generate"
+    --         -- cf Setup
+    --     }
+    -- },
     -- {
     --     "jackMort/ChatGPT.nvim",
     --     event = "VeryLazy",

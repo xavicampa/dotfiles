@@ -1,15 +1,57 @@
 { config, lib, pkgs, ... }:
 
 let
+
   nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
+
   pythonEnv = pkgs.python311.withPackages (ppkgs: [
     ppkgs.black
     ppkgs.cfn-lint
     ppkgs.greenlet
     ppkgs.pynvim
+    # ppkgs.aws-sam-cli
+    # (
+    #   buildPythonPackage rec {
+    #     pname = "aws-sam-translator";
+    #     version = "1.73.0";
+    #     src = fetchPypi {
+    #       inherit pname version;
+    #       sha256 = "sha256-v6fK06ePAC7e7F45/WG2Fs+E809hAQxdwvenaEX+egI=";
+    #     };
+    #     doCheck = false;
+    #     propagatedBuildInputs = [
+    #       # Specify dependencies
+    #       ppkgs.boto3
+    #       ppkgs.jsonschema
+    #       ppkgs.typing-extensions
+    #       ppkgs.pydantic
+    #     ];
+    #   }
+    # )
   ]);
+
+  # pythonEnvCustom = ps: with ps; [
+  # (
+  #   buildPythonPackage rec {
+  #     pname = "cfn-lint";
+  #     version = "0.79.7";
+  #     src = fetchPypi {
+  #       inherit pname version;
+  #       sha256 = "sha256-/NwZWomBBIKvk6M1tXUA/JKBEZmNg4kIf4X9WRVfyQQ=";
+  #     };
+  #     doCheck = false;
+  #     propagatedBuildInputs = [
+  #       # Specify dependencies
+  #       # pkgs.python3Packages.numpy
+  #       # pkgs.python311Packages.aws-sam-translator
+  #       pkgs.python311Packages.pyyaml
+  #     ];
+  #   }
+  # )
+  # ];
+
 in
 {
   # Home Manager needs a bit of information about you and the
@@ -23,17 +65,20 @@ in
   };
 
   home.packages = [
+    # pkgs.nodejs_18
     nodePackages."@aws-amplify/cli"
-    nodePackages."aws-cdk"
+    # nodePackages."aws-cdk"
     pkgs.awscli2
-    pkgs.aws-sam-cli
+    # pkgs.aws-sam-cli
     pkgs.btop
     pkgs.graph-easy
+    pkgs.git-remote-codecommit
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
+    # pkgs.nix-du
     pkgs.node2nix
     # pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
@@ -42,6 +87,7 @@ in
     pkgs.slides
     pkgs.unzip
     pythonEnv
+    # (pkgs.python311.withPackages pythonEnvCustom)
   ];
 
   # This value determines the Home Manager release that your
@@ -73,7 +119,7 @@ in
     /*   }; */
     /* }; */
 
-    exa = {
+    eza = {
       enable = true;
     };
 
@@ -141,23 +187,24 @@ in
     };
 
     zsh = {
-      enable = true;
       enableAutosuggestions = true;
+      enable = true;
       enableCompletion = true;
       initExtra = ''
-        export PATH=/opt/homebrew/opt/node@18/bin:/opt/homebrew/opt/openssl@1.1/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
+        export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/opt/openssl/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
+        export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
       '';
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
         /* ls = "${pkgs.exa}/bin/exa --icons"; */
-        ll = "${pkgs.exa}/bin/exa -l --icons";
+        ll = "${pkgs.eza}/bin/eza -l --icons";
         /* la = "${pkgs.exa}/bin/exa -a --icons"; */
         /* lt = "${pkgs.exa}/bin/exa --tree --icons"; */
         /* lla = "${pkgs.exa}/bin/exa -la --icons"; */
       };
       oh-my-zsh = {
         enable = true;
-        plugins = [ "git" "brew" "docker" "npm" "pip" ];
+        plugins = [ "aws" "git" "brew" "docker" "npm" "pip" ];
         /* theme = "robbyrussell"; */
       };
     };
