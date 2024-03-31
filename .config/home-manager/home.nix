@@ -2,6 +2,19 @@
 
 let
 
+    unstable = import <unstable> {
+        config = {
+            packageOverrides = pkgs: {
+                btop = pkgs.btop.overrideAttrs (oldAttrs: {
+                    nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [unstable.addOpenGLRunpath];
+                    postFixup = ''
+                      addOpenGLRunpath $out/bin/btop
+                    '';
+                });
+            };
+        };
+    };
+
   nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
@@ -70,7 +83,7 @@ in
     # nodePackages."aws-cdk"
     pkgs.awscli2
     # pkgs.aws-sam-cli
-    # pkgs.btop
+    unstable.btop
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
