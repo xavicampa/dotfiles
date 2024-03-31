@@ -1,18 +1,5 @@
 { config, lib, pkgs, ... }:
-# let
-#     unstable = import <unstable> {
-#         config = {
-#             packageOverrides = pkgs: {
-#                 btop = pkgs.btop.overrideAttrs (oldAttrs: {
-#                     nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [unstable.addOpenGLRunpath];
-#                     postFixup = ''
-#                       addOpenGLRunpath $out/bin/btop
-#                     '';
-#                 });
-#             };
-#         };
-#     };
-# in
+
 {
   imports =
     [
@@ -162,7 +149,6 @@
       _1password-gui
       autotiling
       blueman
-      # unstable.btop
       ddcutil
       discord
       dunst
