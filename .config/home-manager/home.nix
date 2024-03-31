@@ -70,7 +70,7 @@ in
     # nodePackages."aws-cdk"
     pkgs.awscli2
     # pkgs.aws-sam-cli
-    pkgs.btop
+    # pkgs.btop
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
@@ -83,6 +83,7 @@ in
     # pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
+    # (pkgs.ollama.override { acceleration = "cuda"; })
     pkgs.p7zip
     pkgs.slides
     pkgs.unzip
@@ -149,7 +150,7 @@ in
         pkgs.nodePackages.pyright
         pkgs.nodePackages.typescript-language-server
         pkgs.ripgrep
-        pkgs.rnix-lsp
+        # pkgs.rnix-lsp
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
       ];

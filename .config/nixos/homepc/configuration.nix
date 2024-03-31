@@ -1,5 +1,18 @@
 { config, lib, pkgs, ... }:
-
+let
+    unstable = import <unstable> {
+        config = {
+            packageOverrides = pkgs: {
+                btop = pkgs.btop.overrideAttrs (oldAttrs: {
+                    nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [unstable.addOpenGLRunpath];
+                    postFixup = ''
+                      addOpenGLRunpath $out/bin/btop
+                    '';
+                });
+            };
+        };
+    };
+in
 {
   imports =
     [
@@ -139,6 +152,7 @@
   /*   thunar-archive-plugin */
   /* ]; */
 
+
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
@@ -148,6 +162,7 @@
       _1password-gui
       autotiling
       blueman
+      unstable.btop
       ddcutil
       discord
       dunst
@@ -158,6 +173,7 @@
       git
       google-chrome
       nodejs_18
+      (ollama.override { acceleration = "cuda"; })
       pamixer
       pasystray
       pavucontrol
