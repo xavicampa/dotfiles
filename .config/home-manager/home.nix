@@ -2,19 +2,6 @@
 
 let
 
-    unstable = import <unstable> {
-        config = {
-            packageOverrides = pkgs: {
-                btop = pkgs.btop.overrideAttrs (oldAttrs: {
-                    nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [unstable.addOpenGLRunpath];
-                    postFixup = ''
-                      addOpenGLRunpath $out/bin/btop
-                    '';
-                });
-            };
-        };
-    };
-
   nodePackages = import ./node2nix/default.nix {
     inherit pkgs;
   };
@@ -83,7 +70,13 @@ in
     # nodePackages."aws-cdk"
     pkgs.awscli2
     # pkgs.aws-sam-cli
-    unstable.btop
+    (pkgs.btop.overrideAttrs (oldAttrs: {
+        nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [pkgs.addOpenGLRunpath];
+        postFixup = ''
+          addOpenGLRunpath $out/bin/btop
+        '';
+    }))
+    pkgs.btop
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
@@ -159,6 +152,7 @@ in
       extraPackages = [
         pkgs.fd
         pkgs.gcc
+        pkgs.nixd
         pkgs.nodePackages.prettier
         pkgs.nodePackages.pyright
         pkgs.nodePackages.typescript-language-server
@@ -201,7 +195,9 @@ in
     };
 
     zsh = {
-      enableAutosuggestions = true;
+      autosuggestion = {
+          enable = true;
+      };
       enable = true;
       enableCompletion = true;
       initExtra = ''
