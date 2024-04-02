@@ -108,10 +108,14 @@ require('lspconfig')['lua_ls'].setup {
         },
     },
 }
-require('lspconfig')['rnix'].setup {
-    on_attach = on_attach,
-    flags = lsp_flags,
+-- require('lspconfig')['rnix'].setup {
+--     on_attach = on_attach,
+--     flags = lsp_flags,
+-- }
+
+require('lspconfig')['nixd'].setup {
 }
+
 -- require('lspconfig')['rust_analyzer'].setup {
 --     on_attach = on_attach,
 --     flags = lsp_flags,
