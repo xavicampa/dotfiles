@@ -92,7 +92,7 @@
         fi
       '';
     };
-    dpi = 112;
+    # dpi = 112;
     xkb.layout = "no";
     libinput = {
       enable = true;
