@@ -136,6 +136,9 @@ in
         name = "JetBrainsMono Nerd Font";
         size = 14;
       };
+      keybindings = {
+        "ctrl+shift+h" = "previous_window";
+      };
       settings = {
         macos_quit_when_last_window_closed = "yes";
         remember_window_size = "no";
