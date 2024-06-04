@@ -6,12 +6,12 @@ let
     inherit pkgs;
   };
 
-  pythonEnv = pkgs.python311.withPackages (ppkgs: [
+  pythonEnv = pkgs.python3.withPackages (ppkgs: [
+    ppkgs.python
     ppkgs.black
     ppkgs.cfn-lint
     ppkgs.greenlet
     ppkgs.pynvim
-    # ppkgs.aws-sam-cli
     # (
     #   buildPythonPackage rec {
     #     pname = "aws-sam-translator";
@@ -60,16 +60,19 @@ in
   home.homeDirectory = if builtins.pathExists "/Users/javi" then "/Users/javi" else "/home/javi";
 
   home.sessionVariables = {
-    EDITOR = "nvim";
+    # EDITOR = "nvim";
     SHELL = "${pkgs.zsh}/bin/zsh";
   };
 
+  nix.package = pkgs.nixVersions.latest;
+
   home.packages = [
-    # pkgs.nodejs_18
+    config.nix.package
+    pkgs.nodejs
     nodePackages."@aws-amplify/cli"
     # nodePackages."aws-cdk"
     pkgs.awscli2
-    # pkgs.aws-sam-cli
+    pkgs.aws-sam-cli
     (pkgs.btop.overrideAttrs (oldAttrs: {
         nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [pkgs.addOpenGLRunpath];
         postFixup = ''
@@ -86,7 +89,7 @@ in
     pkgs.newman
     # pkgs.nix-du
     pkgs.node2nix
-    # pkgs.nodePackages.aws-cdk
+    pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     # (pkgs.ollama.override { acceleration = "cuda"; })
@@ -114,17 +117,17 @@ in
 
   programs = {
 
+    fd.enable = true;
     fzf.enable = true;
     jq.enable = true;
     lazygit.enable = true;
 
-    /* direnv = { */
-    /*   enable = true; */
-    /*  */
-    /*   nix-direnv = { */
-    /*     enable = true; */
-    /*   }; */
-    /* }; */
+    direnv = {
+      enable = true;
+      nix-direnv = {
+        enable = true;
+      };
+    };
 
     eza = {
       enable = true;
@@ -144,6 +147,8 @@ in
         remember_window_size = "no";
         initial_window_width = "80c";
         initial_window_height = "25c";
+        background_opacity = "0.90";
+        background_blur = 24;
       };
       /* theme = "Gruvbox Dark"; */
       # theme = "Catppuccin-Macchiato";
@@ -151,10 +156,18 @@ in
     };
 
     neovim = {
+      defaultEditor = true;
       enable = true;
+      extraLuaConfig = ''
+        vim.g.python3_host_prog='${pythonEnv}/bin/python3'
+        vim.g.python_host_prog='${pythonEnv}/bin/python'
+        require 'options'
+        require 'plugins'
+        require 'remap'
+      '';
       extraPackages = [
-        pkgs.fd
         pkgs.gcc
+        # pkgs.llm-ls
         pkgs.nixd
         pkgs.nodePackages.prettier
         pkgs.nodePackages.pyright
@@ -164,13 +177,6 @@ in
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
       ];
-      extraLuaConfig = ''
-        vim.g.python3_host_prog='${pythonEnv}/bin/python3'
-        vim.g.python_host_prog='${pythonEnv}/bin/python'
-        require 'options'
-        require 'plugins'
-        require 'remap'
-      '';
     };
 
     /* tmux = { */
