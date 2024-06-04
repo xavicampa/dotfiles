@@ -87,7 +87,7 @@ in
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
-    # pkgs.nix-du
+    pkgs.nix-du
     pkgs.node2nix
     pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
