@@ -84,25 +84,25 @@ require("lazy").setup({
             require("lsp_lines").setup()
         end,
     },
-    {
-        "terrortylor/nvim-comment",
-        config = function()
-            require("nvim_comment").setup({
-                hook = function()
-                    require("ts_context_commentstring.internal").update_commentstring()
-                end,
-            })
-        end,
-    },
-    {
-        "JoosepAlviste/nvim-ts-context-commentstring",
-        dependencies = {
-            "nvim-treesitter/nvim-treesitter",
-            "terrortylor/nvim-comment",
-        },
-        config = function()
-        end
-    },
+    -- {
+    --     "terrortylor/nvim-comment",
+    --     config = function()
+    --         require("nvim_comment").setup({
+    --             hook = function()
+    --                 require("ts_context_commentstring.internal").update_commentstring()
+    --             end,
+    --         })
+    --     end,
+    -- },
+    -- {
+    --     "JoosepAlviste/nvim-ts-context-commentstring",
+    --     dependencies = {
+    --         "nvim-treesitter/nvim-treesitter",
+    --         "terrortylor/nvim-comment",
+    --     },
+    --     config = function()
+    --     end
+    -- },
     {
         "folke/which-key.nvim",
         event = "VeryLazy",
