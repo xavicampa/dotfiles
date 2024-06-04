@@ -6,12 +6,6 @@ require("dracula").setup {
     italic_comment = true,
 }
 
-require('lualine').setup {
-  options = {
-    theme = 'dracula-nvim'
-  }
-}
-
 vim.opt.termguicolors = true
 -- vim.opt.background = 'dark'
 

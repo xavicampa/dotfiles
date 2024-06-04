@@ -114,6 +114,8 @@ require('lspconfig')['lua_ls'].setup {
 -- }
 
 require('lspconfig')['nixd'].setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
 }
 
 -- require('lspconfig')['rust_analyzer'].setup {
@@ -156,6 +158,10 @@ require('null-ls').setup {
     -- debug = true,
 }
 require('lspconfig')['marksman'].setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
+}
+require'lspconfig'.jdtls.setup{
     on_attach = on_attach,
     flags = lsp_flags,
 }
