@@ -39,7 +39,7 @@
   # List services that you want to enable:
 
   # Enable the OpenSSH daemon.
-  services.openssh.enable = true;
+  # services.openssh.enable = true;
 
   /* services.kmscon = { */
   /*   enable = true; */
@@ -64,6 +64,14 @@
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.11"; # Did you read the comment?
 
+  # environment.systemPackages = with pkgs; [
+  #   hyprland
+  #   swww # for wallpapers
+  #   xdg-desktop-portal-gtk
+  #   xdg-desktop-portal-hyprland
+  #   xwayland
+  # ];  
+
   # javi home section
   #
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
@@ -76,6 +84,15 @@
       LANGUAGE = "en_US.UTF-8";
     };
   };
+
+  # programs.hyprland = {
+  #   enable = true; 
+  #   xwayland.enable = true;
+  # };
+  #
+  # environment.sessionVariables = {
+  #   NIXOS_OZONE_WL = "1";
+  # };
 
   # Enable the X11 windowing system.
   services.xserver = {
@@ -178,4 +195,3 @@
   };
 
 }
-
