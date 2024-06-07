@@ -186,6 +186,7 @@
       rofimoji
       slack
       spotify
+      stow
       vscode
       xorg.xinput
       xorg.xmodmap
