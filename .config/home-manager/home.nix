@@ -83,6 +83,7 @@ in
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
+    # pkgs.llm-ls
     pkgs.marksman
     pkgs.neofetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
@@ -170,8 +171,8 @@ in
         # pkgs.llm-ls
         pkgs.nixd
         pkgs.nodePackages.prettier
-        pkgs.nodePackages.pyright
         pkgs.nodePackages.typescript-language-server
+        pkgs.pyright
         pkgs.ripgrep
         # pkgs.rnix-lsp
         pkgs.sumneko-lua-language-server
