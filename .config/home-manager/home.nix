@@ -54,6 +54,7 @@ let
 
 in
 {
+
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "javi";
@@ -224,7 +225,7 @@ in
       };
       oh-my-zsh = {
         enable = true;
-        plugins = [ "aws" "git" "brew" "docker" "npm" "pip" ];
+        plugins = [ "aws" "git" "brew" "docker" "npm" "pip"];
         /* theme = "robbyrussell"; */
       };
     };

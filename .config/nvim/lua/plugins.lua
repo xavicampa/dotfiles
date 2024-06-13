@@ -84,6 +84,7 @@ require("lazy").setup({
             require("lsp_lines").setup()
         end,
     },
+    "Hoffs/omnisharp-extended-lsp.nvim",
     -- {
     --     "terrortylor/nvim-comment",
     --     config = function()

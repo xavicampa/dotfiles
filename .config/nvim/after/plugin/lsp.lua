@@ -50,7 +50,43 @@ local on_attach = function(client, bufnr)
     vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
     vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
     vim.keymap.set('n', '<space>f', vim.lsp.buf.format, bufopts)
+end
 
+-- Use an on_attach function to only map the following keys
+-- after the language server attaches to the current buffer
+local on_attach_omnisharp = function(client, bufnr)
+    -- Enable completion triggered by <c-x><c-o>
+    vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
+
+    -- Mappings.
+    -- See `:help vim.lsp.*` for documentation on any of the below functions
+    local bufopts = { noremap = true, silent = true, buffer = bufnr }
+    vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
+    -- vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
+    vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
+    -- vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
+    vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
+    vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
+    vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
+    vim.keymap.set('n', '<space>wl', function()
+        print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+    end, bufopts)
+    -- vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
+    vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
+    vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
+    -- vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
+
+    -- replaces vim.lsp.buf.definition()
+    vim.keymap.set('n', 'gd', '<cmd>lua require("omnisharp_extended").lsp_definition()<cr>', bufopts)
+
+    -- replaces vim.lsp.buf.type_definition()
+    vim.keymap.set('n', '<space>D', '<cmd>lua require("omnisharp_extended").lsp_type_definition()<cr>', bufopts)
+
+    -- replaces vim.lsp.buf.references()
+    vim.keymap.set('n', 'gr', '<cmd>lua require("omnisharp_extended").lsp_references()<cr>', bufopts)
+
+    -- replaces vim.lsp.buf.implementation()
+    vim.keymap.set('n', 'gi', '<cmd>lua require("omnisharp_extended").lsp_implementation()<cr>', bufopts)
 end
 
 local lsp_flags = {
@@ -79,11 +115,51 @@ require('lspconfig')['pyright'].setup {
 --     on_attach = on_attach,
 --     flags = lsp_flags,
 -- }
--- require('lspconfig')['omnisharp'].setup {
---     cmd = { "/home/javi/omnisharp/OmniSharp", "--languageserver", "--hostPID", tostring(pid) };
---     on_attach = on_attach,
---     flags = lsp_flags,
--- }
+require('lspconfig')['omnisharp'].setup {
+    -- cmd = { "/home/javi/omnisharp/OmniSharp", "--languageserver", "--hostPID", tostring(pid) },
+    -- cmd = { os.getenv("OMNISHARP_PATH"), "--languageserver", "--hostPID", tostring(pid) },
+    cmd = { "OmniSharp", "--languageserver", "--hostPID", tostring(pid) },
+    on_attach = on_attach_omnisharp,
+    flags = lsp_flags,
+    -- settings = {
+    --     FormattingOptions = {
+    --         -- Enables support for reading code style, naming convention and analyzer
+    --         -- settings from .editorconfig.
+    --         EnableEditorConfigSupport = true,
+    --         -- Specifies whether 'using' directives should be grouped and sorted during
+    --         -- document formatting.
+    --         OrganizeImports = nil,
+    --     },
+    --     MsBuild = {
+    --         -- If true, MSBuild project system will only load projects for files that
+    --         -- were opened in the editor. This setting is useful for big C# codebases
+    --         -- and allows for faster initialization of code navigation features only
+    --         -- for projects that are relevant to code that is being edited. With this
+    --         -- setting enabled OmniSharp may load fewer projects and may thus display
+    --         -- incomplete reference lists for symbols.
+    --         LoadProjectsOnDemand = nil,
+    --     },
+    --     RoslynExtensionsOptions = {
+    --         -- Enables support for roslyn analyzers, code fixes and rulesets.
+    --         EnableAnalyzersSupport = nil,
+    --         -- Enables support for showing unimported types and unimported extension
+    --         -- methods in completion lists. When committed, the appropriate using
+    --         -- directive will be added at the top of the current file. This option can
+    --         -- have a negative impact on initial completion responsiveness,
+    --         -- particularly for the first few completion sessions after opening a
+    --         -- solution.
+    --         EnableImportCompletion = nil,
+    --         -- Only run analyzers against open files when 'enableRoslynAnalyzers' is
+    --         -- true
+    --         AnalyzeOpenDocumentsOnly = nil,
+    --     },
+    --     Sdk = {
+    --         -- Specifies whether to include preview versions of the .NET SDK when
+    --         -- determining which version to use for project loading.
+    --         IncludePrereleases = true,
+    --     },
+    -- },
+}
 require('lspconfig')['lua_ls'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
@@ -161,7 +237,7 @@ require('lspconfig')['marksman'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
-require'lspconfig'.jdtls.setup{
+require 'lspconfig'.jdtls.setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
