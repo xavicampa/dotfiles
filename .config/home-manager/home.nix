@@ -72,6 +72,7 @@ in
     pkgs.nodejs
     nodePackages."@aws-amplify/cli"
     # nodePackages."aws-cdk"
+    nodePackages."@angular/cli"
     pkgs.awscli2
     pkgs.aws-sam-cli
     (pkgs.btop.overrideAttrs (oldAttrs: {
