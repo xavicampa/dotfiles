@@ -80,7 +80,7 @@ in
           addOpenGLRunpath $out/bin/btop
         '';
     }))
-    pkgs.btop
+    # pkgs.btop
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
@@ -96,6 +96,7 @@ in
     pkgs.nodePackages.typescript
     # (pkgs.ollama.override { acceleration = "cuda"; })
     pkgs.p7zip
+    pkgs.ripgrep
     pkgs.slides
     pkgs.unzip
     pythonEnv
@@ -174,7 +175,6 @@ in
         pkgs.nodePackages.prettier
         pkgs.nodePackages.typescript-language-server
         pkgs.pyright
-        pkgs.ripgrep
         # pkgs.rnix-lsp
         pkgs.sumneko-lua-language-server
         pkgs.tree-sitter
