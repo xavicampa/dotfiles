@@ -5,6 +5,7 @@
     [
       # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      # ./sentinel.nix
     ];
 
   # Use the systemd-boot EFI boot loader.
@@ -95,13 +96,18 @@
   # };
 
   # Enable the X11 windowing system.
+  services.displayManager = {
+      defaultSession = "none+i3";
+  };
+  services.libinput = {
+      enable = true;
+  };
   services.xserver = {
     enable = true;
     desktopManager = {
       gnome.enable = true;
     };
     displayManager = {
-      defaultSession = "none+i3";
       gdm.enable = true;
       sessionCommands = ''
         if test -f ~/.Xmodmap; then
@@ -111,9 +117,6 @@
     };
     # dpi = 112;
     xkb.layout = "no";
-    libinput = {
-      enable = true;
-    };
     videoDrivers = [ "nvidia" ];
     windowManager.i3 = {
       enable = true;
@@ -156,6 +159,9 @@
   /*   thunar-archive-plugin */
   /* ]; */
 
+  programs.appgate-sdp = {
+      enable = true;
+  };
 
   users.users.javi = {
     shell = pkgs.zsh;
@@ -164,6 +170,7 @@
     packages = with pkgs; [
       _1password
       _1password-gui
+      # appgate-sdp
       autotiling
       blueman
       ddcutil

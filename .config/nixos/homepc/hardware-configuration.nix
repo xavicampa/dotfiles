@@ -57,7 +57,7 @@
   # hardware.video.hidpi.enable = true;
 
   # opengl
-  hardware.opengl.enable = true;
+  hardware.graphics.enable = true;
 
   # bluetooth
   hardware.i2c.enable = true;
