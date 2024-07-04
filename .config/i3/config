@@ -46,7 +46,7 @@ exec --no-startup-id picom -b --experimental-backends
 
 # keyboard
 # exec --no-startup-id setxkbmap -option caps:ctrl_modifier
-exec --no-startup-id xmodmap ~/.config/i3/vim_xmodmap
+# exec --no-startup-id xmodmap ~/.config/i3/vim_xmodmap
 
 # background
 #exec_always --no-startup-id xsetroot -solid "black"
