@@ -141,7 +141,7 @@ in
       enable = true;
       font = {
         name = "JetBrainsMono Nerd Font";
-        size = 16;
+        size = 14;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
