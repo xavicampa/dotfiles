@@ -87,7 +87,7 @@ in
     pkgs.kitty-themes
     # pkgs.llm-ls
     pkgs.marksman
-    pkgs.neofetch
+    pkgs.fastfetch
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
     pkgs.nix-du
@@ -141,7 +141,7 @@ in
       enable = true;
       font = {
         name = "JetBrainsMono Nerd Font";
-        size = 14;
+        size = 16;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
