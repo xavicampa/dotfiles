@@ -28,20 +28,22 @@ require("lazy").setup({
     "hrsh7th/cmp-nvim-lsp-signature-help",
     "pedrohdz/vim-yaml-folds",
     "lewis6991/gitsigns.nvim",
-    -- { "catppuccin/nvim", name = "catppuccin", priority = 1000 },
     {
         "preservim/nerdtree",
         dependencies = {
             "ryanoasis/vim-devicons",
+            "xuyuanp/nerdtree-git-plugin",
         }
     },
     {
         "nvim-lualine/lualine.nvim",
-        dependencies = { "nvim-tree/nvim-web-devicons" },
-    },
-    {
-        "xuyuanp/nerdtree-git-plugin",
-        dependencies = { "preservim/nerdtree" }
+        dependencies = {
+            "nvim-tree/nvim-web-devicons",
+        },
+        config = function()
+            require("lualine").setup {
+            }
+        end
     },
     {
         "nvim-telescope/telescope.nvim",

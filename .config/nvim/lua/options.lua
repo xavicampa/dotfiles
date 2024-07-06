@@ -42,4 +42,4 @@ vim.diagnostic.config({
 })
 
 -- nerdtree workaround
-vim.g.NERDTreeMinimalMenu = 1
+-- vim.g.NERDTreeMinimalMenu = 1
