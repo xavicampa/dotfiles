@@ -153,6 +153,8 @@ in
         initial_window_height = "25c";
         background_opacity = "0.90";
         background_blur = 24;
+        tab_bar_style = "powerline";
+        tab_powerline_style = "slanted";
       };
       /* theme = "Gruvbox Dark"; */
       # theme = "Catppuccin-Macchiato";
