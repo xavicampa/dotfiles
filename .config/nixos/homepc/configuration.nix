@@ -104,16 +104,16 @@
   };
   services.xserver = {
     enable = true;
-    desktopManager = {
-      gnome.enable = true;
-    };
+    # desktopManager = {
+    #   gnome.enable = true;
+    # };
     displayManager = {
       gdm.enable = true;
-      sessionCommands = ''
-        if test -f ~/.Xmodmap; then
-            ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
-        fi
-      '';
+      # sessionCommands = ''
+      #   if test -f ~/.Xmodmap; then
+      #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
+      #   fi
+      # '';
     };
     # dpi = 112;
     xkb.layout = "no";
@@ -126,7 +126,7 @@
         i3lock
         i3blocks
       ];
-      package = pkgs.i3-gaps;
+      # package = pkgs.i3-gaps;
     };
   };
 
@@ -170,7 +170,6 @@
     packages = with pkgs; [
       _1password
       _1password-gui
-      # appgate-sdp
       autotiling
       blueman
       ddcutil

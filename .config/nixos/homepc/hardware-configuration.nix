@@ -9,23 +9,12 @@
       (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  # boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   # boot.extraModulePackages = [ ];
-  boot.loader.systemd-boot.consoleMode = "keep";
-  /* boot.kernelPatches = [ */
-  /*   { */
-  /*     name = "big-navi"; */
-  /*     patch = null; */
-  /*     extraConfig = '' */
-  /*       DRM_AMD_DC_DCN3_0 y */
-  /*     ''; */
-  /*   } */
-  /* ]; */
-
-  # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.beta;
+  # boot.loader.systemd-boot.consoleMode = "auto";
 
   fileSystems."/" =
     {
@@ -80,7 +69,7 @@
     nvidiaSettings = true;
 
     # Optionally, you may need to select the appropriate driver version for your specific GPU.
-    package = config.boot.kernelPackages.nvidiaPackages.production;
+    package = config.boot.kernelPackages.nvidiaPackages.latest;
     # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
     #   version = "555.58";
     #   sha256_64bit = "sha256-bXvcXkg2kQZuCNKRZM5QoTaTjF4l2TtrsKUvyicj5ew=";
@@ -98,7 +87,6 @@
   hardware.i2c.enable = true;
   hardware.bluetooth.enable = true;
 
-  # hardware.pulseaudio.enable = true;
   security.rtkit.enable = true;
   hardware.pulseaudio.enable = true;
   /* services.pipewire = { */
