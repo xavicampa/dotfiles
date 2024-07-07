@@ -52,13 +52,16 @@ let
   # )
   # ];
 
+  # flag on macos
+  macos = builtins.pathExists "/Users/javi";
+
 in
 {
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "javi";
-  home.homeDirectory = if builtins.pathExists "/Users/javi" then "/Users/javi" else "/home/javi";
+  home.homeDirectory = if macos then "/Users/javi" else "/home/javi";
 
   home.sessionVariables = {
     # EDITOR = "nvim";
@@ -141,7 +144,7 @@ in
       enable = true;
       font = {
         name = "JetBrainsMono Nerd Font";
-        size = 14;
+        size = if macos then 16 else 14;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
