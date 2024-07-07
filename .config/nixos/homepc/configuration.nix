@@ -86,22 +86,29 @@
     };
   };
 
-  # programs.hyprland = {
-  #   enable = true; 
-  #   xwayland.enable = true;
-  # };
-  #
-  # environment.sessionVariables = {
-  #   NIXOS_OZONE_WL = "1";
-  # };
+  programs.hyprland = {
+    enable = true; 
+    xwayland.enable = true;
+  };
+
+  programs.waybar = {
+      enable = true;
+  };
+
+  environment.sessionVariables = {
+    NIXOS_OZONE_WL = "1";
+  };
 
   # Enable the X11 windowing system.
   services.displayManager = {
-      defaultSession = "none+i3";
+      # defaultSession = "none+i3";
+      defaultSession = "hyprland";
   };
+
   services.libinput = {
       enable = true;
   };
+
   services.xserver = {
     enable = true;
     # desktopManager = {
@@ -109,13 +116,12 @@
     # };
     displayManager = {
       gdm.enable = true;
-      # sessionCommands = ''
-      #   if test -f ~/.Xmodmap; then
-      #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
-      #   fi
-      # '';
+  #     # sessionCommands = ''
+  #     #   if test -f ~/.Xmodmap; then
+  #     #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
+  #     #   fi
+  #     # '';
     };
-    # dpi = 112;
     xkb.layout = "no";
     videoDrivers = [ "nvidia" ];
     windowManager.i3 = {
@@ -172,11 +178,12 @@
       _1password-gui
       autotiling
       blueman
+      copyq
       ddcutil
       discord
       dunst
       feh
-      gnome.file-roller
+      file-roller
       firefox
       flameshot
       git
@@ -194,6 +201,8 @@
       spotify
       stow
       vscode
+      wofi
+      wofi-emoji
       xorg.xinput
       xorg.xmodmap
       xclip
