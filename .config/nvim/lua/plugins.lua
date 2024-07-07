@@ -31,7 +31,7 @@ require("lazy").setup({
     {
         "preservim/nerdtree",
         dependencies = {
-            "ryanoasis/vim-devicons",
+            "Deftera186/vim-devicons",
             "xuyuanp/nerdtree-git-plugin",
         }
     },
