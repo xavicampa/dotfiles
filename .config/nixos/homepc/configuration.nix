@@ -182,6 +182,7 @@
       ddcutil
       discord
       dunst
+      egl-wayland
       feh
       file-roller
       firefox

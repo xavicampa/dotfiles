@@ -23,7 +23,7 @@
     "memory",
     "temperature",
     //"backlight",
-    "custom/brightness",
+    //"custom/brightness",
     "keyboard-state",
     "hyprland/language",
     //"battery",
