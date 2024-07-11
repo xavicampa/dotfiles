@@ -206,7 +206,7 @@
       wofi-emoji
       xorg.xinput
       xorg.xmodmap
-      xclip
+      xsel
       xfce.thunar
     ];
   };
