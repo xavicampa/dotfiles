@@ -24,9 +24,6 @@
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
 
-  # Enable sound.
-  sound.enable = true;
-
   # bluetooth
   services.blueman.enable = true;
 
@@ -190,12 +187,12 @@
       git
       google-chrome
       nodejs_18
-      (ollama.override { acceleration = "cuda"; })
+      # (ollama.override { acceleration = "cuda"; })
       pamixer
       pasystray
       pavucontrol
       picom
-      # postman
+      postman
       rofi
       rofimoji
       slack

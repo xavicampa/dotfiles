@@ -16,6 +16,7 @@
   # boot.extraModulePackages = [ ];
   # boot.loader.systemd-boot.consoleMode = "auto";
   boot.kernelParams = [
+    "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
     # "nvidia.NVreg_EnableGpuFirmware=0"
     # "nvidia-drm.modeset=1"
     "nvidia-drm.fbdev=1"
@@ -54,7 +55,7 @@
     # Enable this if you have graphical corruption issues or application crashes after waking
     # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead 
     # of just the bare essentials.
-    powerManagement.enable = false;
+    powerManagement.enable = true;
 
     # Fine-grained power management. Turns off GPU when not in use.
     # Experimental and only works on modern Nvidia GPUs (Turing or newer).
