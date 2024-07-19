@@ -72,12 +72,11 @@ in
 
   home.packages = [
     config.nix.package
-    pkgs.nodejs
-    nodePackages."@aws-amplify/cli"
-    # nodePackages."aws-cdk"
+    # pkgs.nodejs
+    # nodePackages."@aws-amplify/cli"
     nodePackages."@angular/cli"
     pkgs.awscli2
-    pkgs.aws-sam-cli
+    # pkgs.aws-sam-cli
     (pkgs.btop.overrideAttrs (oldAttrs: {
         nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [pkgs.addOpenGLRunpath];
         postFixup = ''
@@ -98,6 +97,7 @@ in
     pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
+    pkgs.nodePackages.prettier
     # (pkgs.ollama.override { acceleration = "cuda"; })
     pkgs.p7zip
     pkgs.ripgrep
@@ -178,7 +178,7 @@ in
         pkgs.gcc
         # pkgs.llm-ls
         pkgs.nixd
-        pkgs.nodePackages.prettier
+        # pkgs.nodePackages.prettier
         pkgs.nodePackages.typescript-language-server
         pkgs.pyright
         # pkgs.rnix-lsp

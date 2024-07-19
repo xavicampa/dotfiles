@@ -1,5 +1,3 @@
 [
-  "@aws-amplify/cli",
-  "@angular/cli",
-  "aws-cdk"
+  "@angular/cli"
 ]
