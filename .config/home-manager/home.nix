@@ -90,6 +90,7 @@ in
     # pkgs.llm-ls
     pkgs.marksman
     pkgs.fastfetch
+    pkgs.lemminx
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
     pkgs.nix-du
