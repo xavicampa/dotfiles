@@ -39,7 +39,7 @@ require("lazy").setup({
         "nvim-lualine/lualine.nvim",
         dependencies = {
             "nvim-tree/nvim-web-devicons",
-            "nomnivore/ollama.nvim",
+            -- "nomnivore/ollama.nvim",
         },
         config = function()
             -- local function cond()
@@ -118,38 +118,5 @@ require("lazy").setup({
         opts = {},
     },
     "stevearc/dressing.nvim",
-    -- {
-    --     "nomnivore/ollama.nvim",
-    --     dependencies = {
-    --         "nvim-lua/plenary.nvim",
-    --     },
-    --     cmd = { "Ollama", "OllamaModel", "OllamaServe", "OllamaServeStop" },
-    --     keys = {
-    --         {
-    --             "<leader>oo",
-    --             ":<c-u>lua require('ollama').prompt()<cr>",
-    --             desc = "ollama prompt",
-    --             mode = { "n", "v" },
-    --         },
-    --         {
-    --             "<leader>oG",
-    --             ":<c-u>lua require('ollama').prompt('Generate_Code')<cr>",
-    --             desc = "ollama Generate Code",
-    --             mode = { "n", "v" },
-    --         },
-    --     },
-    --     opts = {
-    --         model = "codeqwen",
-    --         -- model = "qwen:32b"
-    --         -- model = "llama3"
-    --         -- model = "llama2:13b",
-    --         -- model = "dolphin:latest",
-    --         -- model = "dolphin-mixtral:8x7b-v2.7-q2_K",
-    --         -- model = "codellama:34b",
-    --         -- model = "dolphin-mixtral:8x7b-v2.7-q3_K_M",
-    --         -- model = "codellama:13b-code-q6_K",
-    --         -- url = "http://homepc:11434"
-    --         -- url = "http://Bedroc-Proxy-YrRxlY5LRo9Z-1372903793.us-west-2.elb.amazonaws.com/api/v1"
-    --     }
-    -- },
+    "David-Kunz/gen.nvim",
 })
