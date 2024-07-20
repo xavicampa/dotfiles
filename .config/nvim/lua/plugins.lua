@@ -39,9 +39,22 @@ require("lazy").setup({
         "nvim-lualine/lualine.nvim",
         dependencies = {
             "nvim-tree/nvim-web-devicons",
+            "nomnivore/ollama.nvim",
         },
         config = function()
+            -- local function cond()
+            --     return package.loaded["ollama"] and require("ollama").status ~= nil
+            -- end
+            -- local function status_icon()
+            --     local status = require("ollama").status()
+            --     if status == "IDLE" then
+            --         return "󱙺 "
+            --     elseif status == "WORKING" then
+            --         return "󰚩 "
+            --     end
+            -- end
             require("lualine").setup {
+                -- sections = { lualine_x = { status_icon, cond } }
             }
         end
     },
@@ -87,25 +100,6 @@ require("lazy").setup({
         end,
     },
     "Hoffs/omnisharp-extended-lsp.nvim",
-    -- {
-    --     "terrortylor/nvim-comment",
-    --     config = function()
-    --         require("nvim_comment").setup({
-    --             hook = function()
-    --                 require("ts_context_commentstring.internal").update_commentstring()
-    --             end,
-    --         })
-    --     end,
-    -- },
-    -- {
-    --     "JoosepAlviste/nvim-ts-context-commentstring",
-    --     dependencies = {
-    --         "nvim-treesitter/nvim-treesitter",
-    --         "terrortylor/nvim-comment",
-    --     },
-    --     config = function()
-    --     end
-    -- },
     {
         "folke/which-key.nvim",
         event = "VeryLazy",
@@ -123,40 +117,20 @@ require("lazy").setup({
         "folke/trouble.nvim",
         opts = {},
     },
-    -- {
-    --   "folke/noice.nvim",
-    --   event = "VeryLazy",
-    --   opts = {
-    --     -- add any options here
-    --   },
-    --   dependencies = {
-    --     -- if you lazy-load any plugin below, make sure to add proper `module="..."` entries
-    --     "MunifTanjim/nui.nvim",
-    --     -- OPTIONAL:
-    --     --   `nvim-notify` is only needed, if you want to use the notification view.
-    --     --   If not available, we use `mini` as the fallback
-    --     "rcarriga/nvim-notify",
-    --     }
-    -- },
+    "stevearc/dressing.nvim",
     -- {
     --     "nomnivore/ollama.nvim",
     --     dependencies = {
     --         "nvim-lua/plenary.nvim",
     --     },
-    --
-    --     -- All the user commands added by the plugin
     --     cmd = { "Ollama", "OllamaModel", "OllamaServe", "OllamaServeStop" },
-    --
     --     keys = {
-    --         -- Sample keybind for prompt menu. Note that the <c-u> is important for selections to work properly.
     --         {
     --             "<leader>oo",
     --             ":<c-u>lua require('ollama').prompt()<cr>",
     --             desc = "ollama prompt",
     --             mode = { "n", "v" },
     --         },
-    --
-    --         -- Sample keybind for direct prompting. Note that the <c-u> is important for selections to work properly.
     --         {
     --             "<leader>oG",
     --             ":<c-u>lua require('ollama').prompt('Generate_Code')<cr>",
@@ -165,7 +139,7 @@ require("lazy").setup({
     --         },
     --     },
     --     opts = {
-    --         model = "codeqwen"
+    --         model = "codeqwen",
     --         -- model = "qwen:32b"
     --         -- model = "llama3"
     --         -- model = "llama2:13b",
@@ -178,85 +152,4 @@ require("lazy").setup({
     --         -- url = "http://Bedroc-Proxy-YrRxlY5LRo9Z-1372903793.us-west-2.elb.amazonaws.com/api/v1"
     --     }
     -- },
-    -- {
-    --     "mfussenegger/nvim-jdtls"
-    -- }
-    -- {
-    --     "David-Kunz/gen.nvim",
-    --     opts = {
-    --         host = "http://bedroc-proxy-yrrxly5lro9z-1372903793.us-west-2.elb.amazonaws.com/api/v1",
-    --         -- model = "codellama:34b"
-    --         model = "anthropic.claude-3-sonnet-20240229-v1:0"
-    --     }
-    -- },
-    -- {
-    --     'huggingface/llm.nvim',
-    --     opts = {
-    --         backend = "ollama",
-    --         -- api_token = "bedrock",
-    --         -- url = "http://bedroc-proxy-yrrxly5lro9z-1372903793.us-west-2.elb.amazonaws.com/api/v1/chat/completions",
-    --         url = "http://localhost:11434",
-    --         -- model = "anthropic.claude-3-sonnet-20240229-v1:0",
-    --         model = "codeqwen",
-    --         -- request_body = {}
-    --         request_body = {
-    --             -- Modelfile options for the model you use
-    --             options = {
-    --                 temperature = 0.2,
-    --                 top_p = 0.95,
-    --             }
-    --         }
-    --     }
-    -- },
-    -- {
-    --     "jackMort/ChatGPT.nvim",
-    --     event = "VeryLazy",
-    --     dependencies = {
-    --         "MunifTanjim/nui.nvim",
-    --         "nvim-lua/plenary.nvim",
-    --         "nvim-telescope/telescope.nvim"
-    --     },
-    --     config = function()
-    --         require("chatgpt").setup({
-    --             api_key_cmd = "op read op://private/openai/credential --no-newline"
-    --         })
-    --     end
-    -- }
-    -- {
-    --     "gsuuon/model.nvim",
-    --     cmd = { "Model", "Mchat" },
-    --     init = function()
-    --         vim.filetype.add({ extension = { mchat = "mchat" } })
-    --     end,
-    --     ft = "mchat",
-    --     keys = { { "<leader>h", ":Model<cr>", mode = "v" } },
-    --     config = function()
-    --         local openai = require("model.providers.openai")
-    --         local util = require("model.util")
-    --         require("model").setup({
-    --             -- hl_group = "Substitute",
-    --             prompts = util.module.autoload("prompt_library"),
-    --             default_prompt = {
-    --                 provider = openai,
-    --                 options = {
-    --                     url =
-    --                     "http://bedroc-proxy-yrrxly5lro9z-1372903793.us-west-2.elb.amazonaws.com/api/v1/",
-    --                     authorization = "Bearer bedrock",
-    --                 },
-    --                 builder = function(input)
-    --                     return {
-    --                         model = "anthropic.claude-3-sonnet-20240229-v1:0",
-    --                         messages = {
-    --                             {
-    --                                 role = "system",
-    --                                 content = "You are helpful assistant. You will only give code in your responses without any explanation nor backticks",
-    --                             },
-    --                             { role = "user", content = input },
-    --                         },
-    --                     }
-    --                 end,
-    --             },
-    --         })
-    --     end
-    -- }
 })
