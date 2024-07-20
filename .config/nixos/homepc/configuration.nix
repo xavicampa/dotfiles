@@ -175,7 +175,6 @@
       _1password-gui
       autotiling
       blueman
-      copyq
       ddcutil
       discord
       dunst
@@ -188,6 +187,7 @@
       google-chrome
       nodejs_18
       # (ollama.override { acceleration = "cuda"; })
+      ollama-cuda
       pamixer
       pasystray
       pavucontrol
@@ -199,11 +199,11 @@
       spotify
       stow
       vscode
+      wl-clipboard
       wofi
       wofi-emoji
       xorg.xinput
       xorg.xmodmap
-      xsel
       xfce.thunar
     ];
   };
