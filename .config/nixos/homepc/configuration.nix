@@ -169,7 +169,7 @@
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
-    extraGroups = [ "wheel" "i2c" "docker" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "i2c" "docker" "input" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       _1password
       _1password-gui
