@@ -185,6 +185,7 @@
       flameshot
       git
       google-chrome
+      hyprpaper
       nodejs_18
       # (ollama.override { acceleration = "cuda"; })
       ollama-cuda
