@@ -118,5 +118,11 @@ require("lazy").setup({
         opts = {},
     },
     "stevearc/dressing.nvim",
-    "David-Kunz/gen.nvim",
+    {
+        "David-Kunz/gen.nvim",
+        opts = {
+            model = "qwen2"
+        },
+        vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>')
+    }
 })
