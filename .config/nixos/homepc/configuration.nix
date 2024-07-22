@@ -94,6 +94,7 @@
 
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
+    ELECTRON_OZONE_PLATFORM_HINT = "auto";
   };
 
   # Enable the X11 windowing system.
@@ -187,7 +188,6 @@
       google-chrome
       hyprpaper
       nodejs_18
-      # (ollama.override { acceleration = "cuda"; })
       ollama-cuda
       pamixer
       pasystray
@@ -203,9 +203,16 @@
       wl-clipboard
       wofi
       wofi-emoji
+      xfce.thunar
       xorg.xinput
       xorg.xmodmap
-      xfce.thunar
+    ];
+  };
+
+  xdg.portal = {
+    enable = true;
+    extraPortals = [
+      pkgs.xdg-desktop-portal-gtk
     ];
   };
 
