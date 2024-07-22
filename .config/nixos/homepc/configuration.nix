@@ -195,7 +195,8 @@
       pavucontrol
       picom
       postman
-      rofi
+      # rofi
+      rofi-wayland
       rofimoji
       slack
       spotify
