@@ -182,7 +182,7 @@
       egl-wayland
       feh
       file-roller
-      firefox-esr
+      firefox-bin
       flameshot
       git
       google-chrome
