@@ -187,6 +187,7 @@
       git
       google-chrome
       hyprpaper
+      hyprshot
       nodejs_18
       ollama-cuda
       pamixer
