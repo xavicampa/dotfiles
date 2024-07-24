@@ -16,10 +16,10 @@
   # boot.extraModulePackages = [ ];
   # boot.loader.systemd-boot.consoleMode = "auto";
   boot.kernelParams = [
-    "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
+    # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
     # "nvidia.NVreg_EnableGpuFirmware=0"
     # "nvidia-drm.modeset=1"
-    "nvidia-drm.fbdev=1"
+    # "nvidia-drm.fbdev=1"
   ];
 
   fileSystems."/" =
