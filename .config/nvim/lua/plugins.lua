@@ -121,8 +121,18 @@ require("lazy").setup({
     {
         "David-Kunz/gen.nvim",
         opts = {
-            model = "qwen2"
+            model = "qwen2",
         },
-        vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>')
+        vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>'),
+        init = function()
+            require("gen").prompts["Generate"] = {
+                prompt = "These are your instructions:\n\n$input\n\n" ..
+                    "Do not include examples.\n\n" ..
+                    "Do not include usage examples.\n\n" ..
+                    "Only output the result in format ```$filetype\n...\n```:\n```$filetype\n$text\n```",
+                replace = "true",
+                extract = "```$filetype\n(.-)```"
+            }
+        end,
     }
 })
