@@ -167,13 +167,14 @@
       enable = true;
   };
 
+  programs._1password.enable = true;
+  programs._1password-gui.enable = true;
+
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" "docker" "input" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
-      _1password
-      _1password-gui
       autotiling
       blueman
       ddcutil
@@ -205,6 +206,7 @@
       wl-clipboard
       wofi
       wofi-emoji
+      xdg-user-dirs
       xfce.thunar
       xorg.xinput
       xorg.xmodmap
