@@ -5,35 +5,14 @@
   border-radius: 10px;
   font-family: "JetbrainsMono Nerd Font";
   font-size: 14px;
-  min-height: 10px;
-}
-
-#taskbar {
-  margin-top: 6px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 10px;
-  transition: none;
-  color: @foreground;
-  background: transparent;
-}
-
-#taskbar button.active {
-  color: @background-darker;
-  background: @green;
-}
-
-#taskbar button {
-  margin-left: 6px;
-  margin-right: 6px;
-  transition: none;
-  color: @foreground;
-  background: @background;
-  font-size: 16px;
-  border-radius: 10px;
+  min-height: 28px;
 }
 
 window#waybar {
+  background: transparent;
+}
+
+window#waybar.empty #window {
   background: transparent;
 }
 
@@ -48,7 +27,7 @@ window#waybar.hidden {
   border-radius: 10px;
   transition: none;
   color: @foreground;
-  background: transparent;
+  background: @background;
 }
 
 #workspaces {
@@ -69,23 +48,10 @@ window#waybar.hidden {
   border-radius: 10px;
 }
 
-/*#workspaces button.occupied {*/
-/*  transition: none;*/
-/*  color: #f28fad;*/
-/*  background: transparent;*/
-/*  font-size: 4px;*/
-/*}*/
-
 #workspaces button.active {
   color: @background-darker;
   background: @green;
 }
-
-/*#workspaces button.focused {*/
-/*  color: #abe9b3;*/
-/*  border-top: 2px solid #abe9b3;*/
-/*  border-bottom: 2px solid #abe9b3;*/
-/*}*/
 
 #workspaces button.urgent {
   background: @red;
@@ -130,13 +96,6 @@ window#waybar.hidden {
 #temperature.critical {
   background: @red;
 }
-
-/*@keyframes blink {*/
-/*  to {*/
-/*    background-color: #bf616a;*/
-/*    color: #b5e8e0;*/
-/*  }*/
-/*}*/
 
 #clock {
   margin-top: 6px;
@@ -202,7 +161,7 @@ window#waybar.hidden {
 #custom-power {
   font-size: 24px;
   margin-top: 6px;
-  margin-right: 10px;
+  margin-right: 16px;
   margin-left: 10px;
   padding-left: 8px;
   padding-right: 10px;
