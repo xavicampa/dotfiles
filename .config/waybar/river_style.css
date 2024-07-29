@@ -173,3 +173,16 @@ window#waybar.hidden {
   color: @purple;
   background: transparent;
 }
+
+#custom-power {
+  font-size: 24px;
+  margin-top: 6px;
+  margin-right: 10px;
+  margin-left: 10px;
+  padding-left: 8px;
+  padding-right: 10px;
+  border-radius: 10px;
+  transition: none;
+  color: @background;
+  background: @red;
+}
