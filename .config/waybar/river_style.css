@@ -8,6 +8,31 @@
   min-height: 10px;
 }
 
+#taskbar {
+  margin-top: 6px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 10px;
+  transition: none;
+  color: @foreground;
+  background: transparent;
+}
+
+#taskbar button.active {
+  color: @background-darker;
+  background: @green;
+}
+
+#taskbar button {
+  margin-left: 6px;
+  margin-right: 6px;
+  transition: none;
+  color: @foreground;
+  background: @background;
+  font-size: 16px;
+  border-radius: 10px;
+}
+
 window#waybar {
   background: transparent;
 }
@@ -123,7 +148,7 @@ window#waybar.hidden {
   border-radius: 10px;
   transition: none;
   color: @background;
-  background: @cyan;
+  background: @green;
 }
 
 #memory {

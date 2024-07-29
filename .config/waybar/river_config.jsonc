@@ -4,8 +4,8 @@
   "modules-center": ["hyprland/window"],
   "modules-right": [
     "cpu",
-    "temperature",
     "memory",
+    "temperature",
     "pulseaudio",
     "tray",
     "clock",
@@ -60,6 +60,18 @@
   },
   "hyprland/window": {
     "separate-outputs": true,
+    "icon": true,
+    "rewrite": {
+      "(.*) - Google Chrome": "$1",
+      "(.*) — Mozilla Firefox": "$1",
+      "(.*) - Slack": "$1",
+    },
+  },
+  "wlr/taskbar": {
+    "all-outputs": false,
+    "format": "{icon} {title}",
+    "ignore-list": ["empower-electron"],
+    "on-click": "activate",
   },
   "tray": {
     "icon-size": 18,
@@ -70,13 +82,13 @@
     "format-alt": "{:%Y-%m-%d}",
   },
   "cpu": {
-    "interval": 15,
-    "format": " {}%",
+    "interval": 5,
+    "format": "  {}%",
     "max-length": 10,
   },
   "memory": {
     "interval": 30,
-    "format": " {}%",
+    "format": "  {}%",
     "max-length": 10,
   },
   "custom/media": {
@@ -117,7 +129,7 @@
     // "thermal-zone": 2,
     // "hwmon-path": "/sys/class/hwmon/hwmon2/temp1_input",
     "critical-threshold": 95,
-    // "format-critical": "{temperatureC}°C {icon}",
+    "format-critical": "{icon} {temperatureC}°C  ",
     "format": "{icon} {temperatureC}°C",
     "format-icons": ["", "", ""],
   },
