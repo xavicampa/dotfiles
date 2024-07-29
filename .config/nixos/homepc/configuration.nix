@@ -206,6 +206,7 @@
       wl-clipboard
       wofi
       wofi-emoji
+      wtype
       xdg-user-dirs
       xfce.thunar
       xorg.xinput
