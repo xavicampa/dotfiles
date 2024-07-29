@@ -26,8 +26,8 @@ window#waybar.hidden {
   padding-right: 10px;
   border-radius: 10px;
   transition: none;
-  color: @foreground;
-  background: @background;
+  color: @background;
+  background: @green;
 }
 
 #workspaces {
@@ -155,7 +155,7 @@ window#waybar.hidden {
   border-radius: 10px;
   transition: none;
   color: @purple;
-  background: transparent;
+  background: @background;
 }
 
 #custom-power {
