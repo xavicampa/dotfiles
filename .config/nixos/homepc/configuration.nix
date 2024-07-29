@@ -169,6 +169,9 @@
 
   programs._1password.enable = true;
   programs._1password-gui.enable = true;
+  programs.firefox = {
+      enable = true;
+  };
 
   users.users.javi = {
     shell = pkgs.zsh;
@@ -183,7 +186,6 @@
       egl-wayland
       feh
       file-roller
-      firefox-bin
       flameshot
       git
       google-chrome
@@ -196,7 +198,6 @@
       pavucontrol
       picom
       postman
-      # rofi
       rofi-wayland
       rofimoji
       slack
