@@ -78,28 +78,26 @@ in
     pkgs.awscli2
     # pkgs.aws-sam-cli
     (pkgs.btop.overrideAttrs (oldAttrs: {
-        nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [pkgs.addOpenGLRunpath];
+        nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [pkgs.addDriverRunpath];
         postFixup = ''
-          addOpenGLRunpath $out/bin/btop
+          addDriverRunpath $out/bin/btop
         '';
     }))
     # pkgs.btop
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
-    # pkgs.llm-ls
     pkgs.marksman
     pkgs.fastfetch
     pkgs.lemminx
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
-    pkgs.nix-du
+    # pkgs.nix-du
     pkgs.node2nix
     pkgs.nodePackages.aws-cdk
     pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     pkgs.nodePackages.prettier
-    # (pkgs.ollama.override { acceleration = "cuda"; })
     pkgs.p7zip
     pkgs.ripgrep
     pkgs.slides

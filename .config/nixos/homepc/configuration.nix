@@ -24,9 +24,6 @@
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
 
-  # bluetooth
-  services.blueman.enable = true;
-
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   # environment.systemPackages = with pkgs; [
@@ -35,6 +32,15 @@
 
 
   # List services that you want to enable:
+
+  # bluetooth
+  services.blueman.enable = true;
+
+  # ollama
+  # services.ollama = {
+  #     enable = true;
+  #     acceleration = "cuda";
+  # };
 
   # Enable the OpenSSH daemon.
   # services.openssh.enable = true;
@@ -192,7 +198,6 @@
       hyprpaper
       hyprshot
       nodejs_18
-      ollama-cuda
       pamixer
       pasystray
       pavucontrol
