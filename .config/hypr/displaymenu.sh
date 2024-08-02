@@ -1,4 +1,4 @@
-op=$( echo -e "󰍹 DisplayPort\n󰍹 HDMI\n󰍺 Both" | rofi -i -dmenu --width 300 --height 200 | awk '{print tolower($2)}' )
+op=$( echo -e "󰶐 󰍹 DisplayPort\n󰍹 󰶐 HDMI\n󰍹 󰍹 Both" | rofi -i -dmenu | awk '{print tolower($2)}' )
 
 case $op in 
   displayport)
