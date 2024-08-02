@@ -62,10 +62,11 @@
     "on-click": "pavucontrol",
   },
   "temperature": {
-    "critical-threshold": 95,
+    "critical-threshold": 90,
     "format-critical": "{icon} {temperatureC}°C  ",
     "format": "{icon} {temperatureC}°C",
-    "format-icons": ["", "", ""],
+    "format-icons": ["󰜗 ", "", "", "", "󰈸"],
+    "interval": 1,
   },
   "tray": {
     "icon-size": 18,
