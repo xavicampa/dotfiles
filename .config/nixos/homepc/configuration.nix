@@ -35,12 +35,27 @@
 
   # bluetooth
   services.blueman.enable = true;
+  nixpkgs.overlays =
+    [
+      (self: super:
+        {
+          ollama = super.ollama.overrideAttrs (old: {
+            src = super.fetchFromGitHub {
+              owner = "ollama";
+              repo = "ollama";
+              rev = "v0.3.1";
+              hash = "sha256-ctz9xh1wisG0YUxglygKHIvU9bMgMLkGqDoknb8qSAU=";
+              fetchSubmodules = true;
+            };
+          });
+        })
+    ];
 
   # ollama
-  # services.ollama = {
-  #     enable = true;
-  #     acceleration = "cuda";
-  # };
+  services.ollama = {
+    enable = true;
+    acceleration = "cuda";
+  };
 
   # Enable the OpenSSH daemon.
   # services.openssh.enable = true;
@@ -90,12 +105,12 @@
   };
 
   programs.hyprland = {
-    enable = true; 
+    enable = true;
     xwayland.enable = true;
   };
 
   programs.waybar = {
-      enable = true;
+    enable = true;
   };
 
   environment.sessionVariables = {
@@ -105,12 +120,12 @@
 
   # Enable the X11 windowing system.
   services.displayManager = {
-      # defaultSession = "none+i3";
-      defaultSession = "hyprland";
+    # defaultSession = "none+i3";
+    defaultSession = "hyprland";
   };
 
   services.libinput = {
-      enable = true;
+    enable = true;
   };
 
   services.xserver = {
@@ -120,11 +135,11 @@
     # };
     displayManager = {
       gdm.enable = true;
-  #     # sessionCommands = ''
-  #     #   if test -f ~/.Xmodmap; then
-  #     #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
-  #     #   fi
-  #     # '';
+      #     # sessionCommands = ''
+      #     #   if test -f ~/.Xmodmap; then
+      #     #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
+      #     #   fi
+      #     # '';
     };
     xkb.layout = "no";
     videoDrivers = [ "nvidia" ];
@@ -155,7 +170,7 @@
   # This seems to make aws amplify work in nixos
   # programs.nix-ld.enable = true;
   programs.nix-ld = {
-      enable = true;
+    enable = true;
   };
   # environment.variables = {
   #   NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
@@ -170,13 +185,13 @@
   /* ]; */
 
   programs.appgate-sdp = {
-      enable = true;
+    enable = true;
   };
 
   programs._1password.enable = true;
   programs._1password-gui.enable = true;
   programs.firefox = {
-      enable = true;
+    enable = true;
   };
 
   users.users.javi = {
@@ -212,6 +227,7 @@
       wl-clipboard
       wofi
       wofi-emoji
+      wpaperd
       wtype
       xdg-user-dirs
       xfce.thunar
