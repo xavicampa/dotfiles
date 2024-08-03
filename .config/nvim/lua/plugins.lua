@@ -119,20 +119,43 @@ require("lazy").setup({
     },
     "stevearc/dressing.nvim",
     {
-        "David-Kunz/gen.nvim",
+        'huggingface/llm.nvim',
         opts = {
-            model = "qwen2",
-        },
-        vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>'),
-        init = function()
-            require("gen").prompts["Generate"] = {
-                prompt = "These are your instructions:\n\n$input\n\n" ..
-                    "Do not include examples.\n\n" ..
-                    "Do not include usage examples.\n\n" ..
-                    "Only output the result in format ```$filetype\n...\n```:\n```$filetype\n$text\n```",
-                replace = "true",
-                extract = "```$filetype\n(.-)```"
-            }
-        end,
-    }
+            backend = "ollama",
+            model = "codegemma:2b-code",
+            fim = {
+                enabled = true,
+                prefix = "<|fim_prefix|>",
+                middle = "<|fim_middle|>",
+                suffix = "<|fim_suffix|>",
+            },
+            context_window = 8192,
+            url = "http://localhost:11434",
+            accept_keymap = "<C-y>",
+            dismiss_keymap = "<Esc>",
+            request_body = {
+                num_predict = 128,
+                temperature = 0,
+                top_p = 0.9,
+            },
+            tokensToClear = { "<|file_separator|>" },
+        }
+    },
+    -- {
+    --     "David-Kunz/gen.nvim",
+    --     opts = {
+    --         model = "qwen2",
+    --     },
+    --     vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>'),
+    --     init = function()
+    --         require("gen").prompts["Generate"] = {
+    --             prompt = "These are your instructions:\n\n$input\n\n" ..
+    --                 "Do not include examples.\n\n" ..
+    --                 "Do not include usage examples.\n\n" ..
+    --                 "Only output the result in format ```$filetype\n...\n```:\n```$filetype\n$text\n```",
+    --             replace = "true",
+    --             extract = "```$filetype\n(.-)```"
+    --         }
+    --     end,
+    -- }
 })
