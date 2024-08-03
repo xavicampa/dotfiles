@@ -1,4 +1,7 @@
 { config, lib, pkgs, ... }:
+let
+  stable = import <nixpkgs-stable> { config.allowUnfree = true; };
+in
 
 {
   imports =
@@ -7,6 +10,8 @@
       ./hardware-configuration.nix
       # ./sentinel.nix
     ];
+
+  nixpkgs.config.allowUnfree = true;
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
@@ -35,26 +40,27 @@
 
   # bluetooth
   services.blueman.enable = true;
-  nixpkgs.overlays =
-    [
-      (self: super:
-        {
-          ollama = super.ollama.overrideAttrs (old: {
-            src = super.fetchFromGitHub {
-              owner = "ollama";
-              repo = "ollama";
-              rev = "v0.3.1";
-              hash = "sha256-ctz9xh1wisG0YUxglygKHIvU9bMgMLkGqDoknb8qSAU=";
-              fetchSubmodules = true;
-            };
-          });
-        })
-    ];
+  # nixpkgs.overlays =
+  #   [
+  #     (self: super:
+  #       {
+  #         ollama = super.ollama.overrideAttrs (old: {
+  #           src = super.fetchFromGitHub {
+  #             owner = "ollama";
+  #             repo = "ollama";
+  #             rev = "v0.3.1";
+  #             hash = "sha256-ctz9xh1wisG0YUxglygKHIvU9bMgMLkGqDoknb8qSAU=";
+  #             fetchSubmodules = true;
+  #           };
+  #         });
+  #       })
+  #   ];
 
   # ollama
   services.ollama = {
     enable = true;
     acceleration = "cuda";
+    package = stable.ollama;
   };
 
   # Enable the OpenSSH daemon.
@@ -159,9 +165,6 @@
   #   nerdfonts
   # ];
 
-  nixpkgs.config = {
-    allowUnfree = true;
-  };
 
   virtualisation.docker.enable = true;
 
