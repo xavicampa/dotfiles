@@ -31,6 +31,7 @@ vim.opt.clipboard = 'unnamed,unnamedplus'
 vim.opt.foldmethod = 'expr'
 vim.opt.foldexpr = 'nvim_treesitter#foldexpr()'
 vim.opt.completeopt = 'menu,menuone,noselect'
+vim.opt.foldlevelstart = 1
 
 -- Diagnostics
 vim.diagnostic.config({
