@@ -177,6 +177,7 @@ in
         pkgs.gcc
         # pkgs.llm-ls
         pkgs.nixd
+        pkgs.nixpkgs-fmt
         # pkgs.nodePackages.prettier
         pkgs.nodePackages.typescript-language-server
         pkgs.pyright
