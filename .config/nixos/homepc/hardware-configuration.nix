@@ -71,7 +71,7 @@
     open = false;
 
     # Enable the Nvidia settings menu,
-	# accessible via `nvidia-settings`.
+    # accessible via `nvidia-settings`.
     nvidiaSettings = true;
 
     # Optionally, you may need to select the appropriate driver version for your specific GPU.
@@ -88,19 +88,81 @@
 
   # opengl
   hardware.graphics.enable = true;
+  hardware.nvidia-container-toolkit.enable = true;
 
   # bluetooth
   hardware.i2c.enable = true;
   hardware.bluetooth.enable = true;
 
   security.rtkit.enable = true;
-  hardware.pulseaudio.enable = true;
-  /* services.pipewire = { */
-  /*   enable = true; */
-  /*   alsa.enable = true; */
-  /*   alsa.support32Bit = true; */
-  /*   pulse.enable = true; */
-  /* }; */
+
+  # hardware.pulseaudio = {
+  #   enable = true;
+  #   extraConfig =
+  #     '' 
+  #       set-card-profile alsa_card.pci-0000_01_00.1 pro-audio
+  #       load-module module-combine-sink slaves=alsa_output.pci-0000_01_00.1.pro-output-3,alsa_output.pci-0000_01_00.1.pro-output-7
+  #       set-sink-volume alsa_output.pci-0000_01_00.1.pro-output-3 100%
+  #       set-sink-volume alsa_output.pci-0000_01_00.1.pro-output-7 85%
+  #       set-sink-volume combined 50%
+  #     '';
+  # };
+
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+    extraConfig.pipewire."91-combined-sinks" = {
+      "context.modules" = [
+        {
+          name = "libpipewire-module-combine-stream";
+          args = {
+            combine.mode = "sink";
+            node.name = "combined_sink";
+            node.description = "My Combined Sink";
+            combine.latency-compensate = false;
+            combine.props = {
+              audio.position = [ "FL" "FR" ];
+            };
+            stream.props = {
+              stream.dont-remix = true;
+            };
+            stream.rules = [
+              {
+                matches = [
+                  {
+                    media.class = "Audio/Sink";
+                    node.name = "alsa_output.pci-0000_01_00.1.pro-output-3";
+                  }
+                ];
+                actions = {
+                  create-stream = {
+                    audio.position = [ "FL" "FR" ];
+                    combine.audio.position = [ "FL" "FR" ];
+                  };
+                };
+              }
+              {
+                matches = [
+                  {
+                    media.class = "Audio/Sink";
+                    node.name = "alsa_output.pci-0000_01_00.1.pro-output-7";
+                  }
+                ];
+                actions = {
+                  create-stream = {
+                    audio.position = [ "FL" "FR" ];
+                    combine.audio.position = [ "FL" "FR" ];
+                  };
+                };
+              }
+            ];
+          };
+        }
+      ];
+    };
+  };
 
   systemd.sleep.extraConfig = ''
     AllowSuspend=yes
