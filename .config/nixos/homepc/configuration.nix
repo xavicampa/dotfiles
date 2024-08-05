@@ -116,6 +116,10 @@ in
     xwayland.enable = true;
   };
 
+  programs.ssh = {
+    enableAskPassword = false;
+  };
+
   programs.waybar = {
     enable = true;
   };
@@ -123,6 +127,7 @@ in
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
+    GIT_ASKPASS = "";
   };
 
   # Enable the X11 windowing system.
@@ -231,7 +236,7 @@ in
       wl-clipboard
       wofi
       wofi-emoji
-      wpaperd
+      # wpaperd
       wtype
       xdg-user-dirs
       xfce.thunar
