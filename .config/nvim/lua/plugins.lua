@@ -132,7 +132,7 @@ require("lazy").setup({
             context_window = 8192,
             url = "http://localhost:11434",
             accept_keymap = "<C-y>",
-            dismiss_keymap = "<Esc>",
+            dismiss_keymap = "<C-n>",
             request_body = {
                 num_predict = 128,
                 temperature = 0,
