@@ -4,7 +4,7 @@
   border: none;
   border-radius: 10px;
   font-family: "JetbrainsMono Nerd Font";
-  font-size: 13px;
+  font-size: 14px;
   min-height: 28px;
 }
 
@@ -36,11 +36,12 @@ window#waybar.hidden {
   font-size: 4px;
   margin-bottom: 0px;
   border-radius: 10px;
-  background: @background;
+  background: transparent;
   transition: none;
 }
 
 #workspaces button {
+  margin-left: 4px;
   transition: none;
   color: @foreground;
   background: @background;
