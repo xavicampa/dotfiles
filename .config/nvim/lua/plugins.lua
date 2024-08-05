@@ -122,7 +122,7 @@ require("lazy").setup({
         'huggingface/llm.nvim',
         opts = {
             backend = "ollama",
-            model = "codegemma:2b-code",
+            model = "codegemma:2b-v1.1",
             fim = {
                 enabled = true,
                 prefix = "<|fim_prefix|>",
