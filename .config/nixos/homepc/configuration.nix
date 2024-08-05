@@ -146,7 +146,11 @@ in
     #   gnome.enable = true;
     # };
     displayManager = {
-      gdm.enable = true;
+      gdm = {
+        enable = true;
+        wayland = true;
+      };
+
       #     # sessionCommands = ''
       #     #   if test -f ~/.Xmodmap; then
       #     #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
@@ -155,22 +159,20 @@ in
     };
     xkb.layout = "no";
     videoDrivers = [ "nvidia" ];
-    windowManager.i3 = {
-      enable = true;
-      extraPackages = with pkgs; [
-        dmenu
-        i3status
-        i3lock
-        i3blocks
-      ];
-      # package = pkgs.i3-gaps;
-    };
+    # windowManager.i3 = {
+    #   enable = true;
+    #   extraPackages = with pkgs; [
+    #     dmenu
+    #     i3status
+    #     i3lock
+    #     i3blocks
+    #   ];
+    # };
   };
 
   # fonts.fonts = with pkgs; [
   #   nerdfonts
   # ];
-
 
   virtualisation.docker.enable = true;
 
@@ -208,6 +210,7 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" "docker" "input" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
+      # adwaita-qt
       autotiling
       blueman
       ddcutil
@@ -216,7 +219,7 @@ in
       egl-wayland
       feh
       file-roller
-      flameshot
+      # flameshot
       git
       google-chrome
       hyprpaper
@@ -225,7 +228,7 @@ in
       pamixer
       pasystray
       pavucontrol
-      picom
+      # picom
       postman
       rofi-wayland
       rofimoji
@@ -234,14 +237,15 @@ in
       stow
       vscode
       wl-clipboard
-      wofi
-      wofi-emoji
+      # wofi
+      # wofi-emoji
       # wpaperd
       wtype
       xdg-user-dirs
+      xdg-utils
       xfce.thunar
-      xorg.xinput
-      xorg.xmodmap
+      # xorg.xinput
+      # xorg.xmodmap
     ];
   };
 
@@ -250,6 +254,7 @@ in
     extraPortals = [
       pkgs.xdg-desktop-portal-gtk
     ];
+    wlr.enable = true;
   };
 
 }
