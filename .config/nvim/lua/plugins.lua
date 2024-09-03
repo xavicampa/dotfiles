@@ -93,12 +93,12 @@ require("lazy").setup({
         end
     },
     "Mofiqul/dracula.nvim",
-    -- {
-    --     "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
-    --     config = function()
-    --         require("lsp_lines").setup()
-    --     end,
-    -- },
+    {
+        "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
+        config = function()
+            require("lsp_lines").setup()
+        end,
+    },
     "Hoffs/omnisharp-extended-lsp.nvim",
     {
         "folke/which-key.nvim",
