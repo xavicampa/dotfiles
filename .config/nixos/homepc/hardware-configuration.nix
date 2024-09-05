@@ -43,6 +43,7 @@
   networking.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp0s31f6.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp3s0.useDHCP = lib.mkDefault true;
+  networking.interfaces.enp3s0.mtu = 9000;
   # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
 
   # powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
