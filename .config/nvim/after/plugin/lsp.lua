@@ -94,9 +94,7 @@ local lsp_flags = {
     -- This is the default in Nvim 0.7+
     debounce_text_changes = 150,
 }
-require('lspconfig')['tsserver'].setup {
-    -- cmd = { 'typescript-language-server', '--stdio', '--tsserver-path',
-    --     '/nix/store/7yhr9pm7w9l4bqn7r6qsc65mvfwsqv20-typescript-4.6.4/lib/node_modules/typescript/lib/' },
+require('lspconfig')['ts_ls'].setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
@@ -189,15 +187,15 @@ require('lspconfig')['lua_ls'].setup {
 -- }
 
 require('lspconfig')['nixd'].setup {
-  on_attach = on_attach,
-  flags = lsp_flags,
-  settings = {
-    nixd = {
-       formatting = {
-          command = { "nixpkgs-fmt" },
-       }
+    on_attach = on_attach,
+    flags = lsp_flags,
+    settings = {
+        nixd = {
+            formatting = {
+                command = { "nixpkgs-fmt" },
+            }
+        }
     }
-  }
 }
 
 -- require('lspconfig')['rust_analyzer'].setup {
