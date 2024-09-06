@@ -139,7 +139,6 @@ require("lazy").setup({
             --     top_p = 0.9,
             -- },
             tokensToClear = { "<|file_separator|>" },
-            enableSuggestionsOnStartup = true,
         }
     },
     {
