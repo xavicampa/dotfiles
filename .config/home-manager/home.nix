@@ -11,6 +11,7 @@ let
     ppkgs.black
     ppkgs.cfn-lint
     ppkgs.greenlet
+    ppkgs.litellm
     ppkgs.pynvim
     # (
     #   buildPythonPackage rec {
@@ -78,10 +79,10 @@ in
     pkgs.awscli2
     # pkgs.aws-sam-cli
     (pkgs.btop.overrideAttrs (oldAttrs: {
-        nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [pkgs.addDriverRunpath];
-        postFixup = ''
-          addDriverRunpath $out/bin/btop
-        '';
+      nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ pkgs.addDriverRunpath ];
+      postFixup = ''
+        addDriverRunpath $out/bin/btop
+      '';
     }))
     # pkgs.btop
     pkgs.graph-easy
@@ -100,6 +101,7 @@ in
     pkgs.nodePackages.prettier
     pkgs.p7zip
     pkgs.ripgrep
+    pkgs.shell-gpt
     pkgs.slides
     pkgs.unzip
     pythonEnv
@@ -213,7 +215,7 @@ in
 
     zsh = {
       autosuggestion = {
-          enable = true;
+        enable = true;
       };
       enable = true;
       enableCompletion = true;
@@ -231,7 +233,7 @@ in
       };
       oh-my-zsh = {
         enable = true;
-        plugins = [ "aws" "git" "brew" "docker" "npm" "pip"];
+        plugins = [ "aws" "git" "brew" "docker" "npm" "pip" ];
         /* theme = "robbyrussell"; */
       };
     };
