@@ -159,6 +159,7 @@ in
         background_blur = 24;
         tab_bar_style = "powerline";
         tab_powerline_style = "slanted";
+        hide_window_decorations = "yes";
       };
       /* theme = "Gruvbox Dark"; */
       # theme = "Catppuccin-Macchiato";
