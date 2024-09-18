@@ -144,7 +144,7 @@ in
     kitty = {
       enable = true;
       font = {
-        name = "JetBrainsMono Nerd Font";
+        name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
         size = if macos then 16 else 14;
       };
       keybindings = {
