@@ -40,7 +40,7 @@ cmp.setup {
         ["<C-e>"] = cmp.mapping.close(),
         ["<C-y>"] = cmp.mapping.confirm {
             behavior = cmp.ConfirmBehavior.Insert,
-            select = true
+            -- select = true
         },
         ["<c-space>"] = cmp.mapping.complete(),
     },
