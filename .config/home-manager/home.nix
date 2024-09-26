@@ -163,7 +163,7 @@ in
       };
       /* theme = "Gruvbox Dark"; */
       # theme = "Catppuccin-Macchiato";
-      theme = "Dracula";
+      themeFile = "Dracula";
     };
 
     neovim = {
