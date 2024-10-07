@@ -225,6 +225,7 @@ in
       # flameshot
       git
       google-chrome
+      hypridle
       hyprpaper
       hyprshot
       nodejs_18
