@@ -159,6 +159,7 @@ in
         background_blur = 24;
         tab_bar_style = "powerline";
         tab_powerline_style = "slanted";
+        tab_title_template = "{tab.active_wd.rsplit('/', 1)[-1]}";
         hide_window_decorations = "titlebar-only";
       };
       /* theme = "Gruvbox Dark"; */
