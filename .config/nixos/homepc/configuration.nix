@@ -25,6 +25,7 @@ in
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
+  networking.firewall.trustedInterfaces = [ "docker0" ];
 
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
@@ -206,6 +207,7 @@ in
   programs._1password-gui.enable = true;
   programs.firefox = {
     enable = true;
+    package = pkgs.firefox-bin;
   };
 
   users.users.javi = {
