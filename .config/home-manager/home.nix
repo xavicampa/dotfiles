@@ -78,19 +78,23 @@ in
     nodePackages."@angular/cli"
     pkgs.awscli2
     # pkgs.aws-sam-cli
-    (pkgs.btop.overrideAttrs (oldAttrs: {
-      nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ pkgs.addDriverRunpath ];
-      postFixup = ''
-        addDriverRunpath $out/bin/btop
-      '';
-    }))
-    # pkgs.btop
+    (
+      if macos then
+        pkgs.btop
+      else
+        pkgs.btop.overrideAttrs
+          (oldAttrs: {
+            nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ pkgs.addDriverRunpath ];
+            postFixup = ''
+              addDriverRunpath $out/bin/btop
+            '';
+          })
+    )
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
-    pkgs.lemminx
     (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
     # pkgs.nix-du
@@ -145,7 +149,7 @@ in
       enable = true;
       font = {
         name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
-        size = if macos then 16 else 12;
+        size = if macos then 16 else 13;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
@@ -179,6 +183,7 @@ in
       '';
       extraPackages = [
         pkgs.gcc
+        pkgs.lemminx
         # pkgs.llm-ls
         pkgs.nixd
         pkgs.nixpkgs-fmt
