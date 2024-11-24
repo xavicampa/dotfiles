@@ -75,8 +75,8 @@ require("lazy").setup({
         end
     },
     {
-        "jose-elias-alvarez/null-ls.nvim",
-        dependencies = { "nvim-lua/plenary.nvim" }
+        "nvimtools/none-ls.nvim",
+        dependencies = { "nvim-lua/plenary.nvim" },
     },
     --    {
     --         "iamcco/markdown-preview.nvim",

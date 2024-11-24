@@ -232,7 +232,7 @@ require('null-ls').setup {
                 '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL
                 '-i', 'E3043', -- Do not try to parse nested stack's TemplateURL
                 '--format', 'parseable',
-                '-'
+                '--'
             }
         })
     },
