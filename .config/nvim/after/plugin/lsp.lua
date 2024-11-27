@@ -236,10 +236,15 @@ require('null-ls').setup {
             }
         }),
         require("null-ls").builtins.diagnostics.checkstyle.with({
-            extra_args = {
-                "-c",
-                vim.fn.expand("~/dev/nas/nas_checkstyle.xml"),
-            },
+            args = function(params)
+                return {
+                    "-f",
+                    "sarif",
+                    "-c",
+                    vim.fn.expand("~/dev/nas/nas_checkstyle.xml"),
+                    params.bufname,
+                }
+            end
         })
     },
     -- debug = true,
