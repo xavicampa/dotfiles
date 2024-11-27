@@ -149,7 +149,7 @@ in
       enable = true;
       font = {
         name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
-        size = if macos then 16 else 13;
+        size = if macos then 16 else 14;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
