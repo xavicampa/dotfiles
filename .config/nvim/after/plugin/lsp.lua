@@ -234,6 +234,12 @@ require('null-ls').setup {
                 '--format', 'parseable',
                 '--'
             }
+        }),
+        require("null-ls").builtins.diagnostics.checkstyle.with({
+            extra_args = {
+                "-c",
+                vim.fn.expand("~/dev/nas/nas_checkstyle.xml"),
+            },
         })
     },
     -- debug = true,
