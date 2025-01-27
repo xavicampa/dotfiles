@@ -11,7 +11,7 @@ let
     ppkgs.black
     ppkgs.cfn-lint
     ppkgs.greenlet
-    ppkgs.litellm
+    # ppkgs.litellm
     ppkgs.pynvim
     # (
     #   buildPythonPackage rec {
