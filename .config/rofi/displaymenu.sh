@@ -1,16 +1,16 @@
-op=$( echo -e "󰶐 󰍹 DisplayPort\n󰍹 󰶐 HDMI\n󰍹 󰍹 Both" | rofi -i -dmenu | awk '{print tolower($3)}' )
+op=$( echo -e "󰶐 󰍹 Only32\n󰍹 󰶐 Only27\n󰍹 󰍹 Both" | rofi -i -dmenu | awk '{print tolower($3)}' )
 
 case $op in 
-  displayport)
-    hyprctl dispatch dpms off HDMI-A-1
-    hyprctl dispatch dpms on DP-1
+  only32)
+    hyprctl keyword monitor "DP-3,disable"
+    hyprctl keyword monitor "HDMI-A-1,3840x2160@120,2560x0,1.2,vrr,1"
     ;;
-  hdmi)
-    hyprctl dispatch dpms on HDMI-A-1
-    hyprctl dispatch dpms off DP-1
+  only27)
+    hyprctl keyword monitor "DP-3,preferred,0x0,1"
+    hyprctl keyword monitor "HDMI-A-1,disable"
     ;;
   both)
-    hyprctl dispatch dpms on HDMI-A-1
-    hyprctl dispatch dpms on DP-1
+    hyprctl keyword monitor "DP-3,preferred,0x0,1"
+    hyprctl keyword monitor "HDMI-A-1,3840x2160@120,2560x0,1.2,vrr,1"
     ;;
 esac
