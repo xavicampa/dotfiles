@@ -64,10 +64,11 @@ in
   home.username = "javi";
   home.homeDirectory = if macos then "/Users/javi" else "/home/javi";
 
-  home.sessionVariables = {
+  # home.sessionVariables = {
     # EDITOR = "nvim";
-    SHELL = "${pkgs.zsh}/bin/zsh";
-  };
+    # SHELL = "${pkgs.zsh}/bin/zsh";
+    # TERM = "xterm-256color";
+  # };
 
   nix.package = pkgs.nixVersions.latest;
 
@@ -176,7 +177,7 @@ in
       settings = {
         font = {
           normal = [ "JetBrainsMono Nerd Font" ];
-          size = 13.0;
+          size = 14.0;
         };
       };
     };
