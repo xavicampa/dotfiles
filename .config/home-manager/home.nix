@@ -191,6 +191,7 @@ in
         require 'options'
         require 'plugins'
         require 'remap'
+        require 'neovide'
       '';
       extraPackages = [
         pkgs.gcc
