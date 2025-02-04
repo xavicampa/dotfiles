@@ -121,29 +121,36 @@ require("lazy").setup({
         'huggingface/llm.nvim',
         opts = {
             backend = "ollama",
-            model = "codegemma:2b-v1.1",
+            -- model = "codellama:7b-code",
+            -- fim = {
+            --     enabled = true,
+            --     prefix = "<PRE> ",
+            --     middle = " <MID>",
+            --     suffix = " <SUF>",
+            -- },
+            -- context_window = 4096,
+            -- url = "http://localhost:11434",
+            -- accept_keymap = "<C-y>",
+            -- dismiss_keymap = "<C-n>",
+            -- tokens_to_clear = { "<EOT>" },
+            model = "deepseek-coder-v2:16b-lite-base-q4_0",
             fim = {
                 enabled = true,
-                prefix = "<|fim_prefix|>",
-                middle = "<|fim_middle|>",
-                suffix = "<|fim_suffix|>",
+                prefix = "<｜fim▁begin｜>",
+                middle = "<｜fim▁end｜>",
+                suffix = "<｜fim▁hole｜>",
             },
-            context_window = 8192,
+            context_window = 4096,
             url = "http://localhost:11434",
             accept_keymap = "<C-y>",
             dismiss_keymap = "<C-n>",
-            -- request_body = {
-            --     num_predict = 128,
-            --     temperature = 0,
-            --     top_p = 0.9,
-            -- },
-            tokensToClear = { "<|file_separator|>" },
         }
     },
     {
         "David-Kunz/gen.nvim",
         opts = {
-            model = "llama3.1",
+            -- model = "llama3.1",
+            model = "deepseek-r1:14b",
         },
         vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>'),
         init = function()
