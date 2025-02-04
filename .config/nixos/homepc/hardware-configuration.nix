@@ -19,7 +19,7 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   # boot.extraModulePackages = [ ];
-  # boot.loader.systemd-boot.consoleMode = "auto";
+  boot.loader.systemd-boot.consoleMode = "max";
   boot.kernelParams = [
     # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
     "nvidia.NVreg_EnableGpuFirmware=0"

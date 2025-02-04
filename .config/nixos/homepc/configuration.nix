@@ -1,7 +1,8 @@
-{ config, lib, pkgs, ... }:
-let
-  stable = import <nixpkgs-stable> { config.allowUnfree = true; };
-in
+{ pkgs, ... }:
+
+# let
+#   stable = import <nixpkgs-stable> { config.allowUnfree = true; };
+# in
 
 {
   imports =
@@ -124,9 +125,9 @@ in
     enableAskPassword = false;
   };
 
-  programs.waybar = {
-    enable = true;
-  };
+  # programs.waybar = {
+  #   enable = true;
+  # };
 
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
@@ -138,30 +139,37 @@ in
   services.displayManager = {
     # defaultSession = "none+i3";
     defaultSession = "hyprland";
+    ly = {
+      enable = true;
+    };
   };
 
   services.libinput = {
     enable = true;
   };
 
+  # services.greetd = {
+  #   enable = true;
+  #   settings = {
+  #     default_session = {
+  #       command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
+  #       user = "greeter";
+  #     };
+  #   };
+  # };
+
   services.xserver = {
-    enable = true;
+    # enable = true;
     # desktopManager = {
     #   gnome.enable = true;
     # };
-    displayManager = {
-      gdm = {
-        enable = true;
-        wayland = true;
-      };
-
-      #     # sessionCommands = ''
-      #     #   if test -f ~/.Xmodmap; then
-      #     #       ${pkgs.xorg.xmodmap}/bin/xmodmap ~/.Xmodmap
-      #     #   fi
-      #     # '';
-    };
-    xkb.layout = "no";
+    # displayManager = {
+    #   gdm = {
+    #     enable = true;
+    #     wayland = true;
+    #   };
+    # };
+    # xkb.layout = "no";
     videoDrivers = [ "nvidia" ];
     # windowManager.i3 = {
     #   enable = true;
