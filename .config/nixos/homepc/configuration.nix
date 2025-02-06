@@ -224,6 +224,7 @@
     extraGroups = [ "wheel" "i2c" "docker" "input" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       # adwaita-qt
+      apple-cursor
       autotiling
       blueman
       ddcutil
@@ -235,6 +236,7 @@
       # flameshot
       git
       google-chrome
+      hyprcursor
       hypridle
       hyprpaper
       hyprshot
