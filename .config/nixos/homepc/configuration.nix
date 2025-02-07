@@ -236,7 +236,6 @@
       # flameshot
       git
       google-chrome
-      hyprcursor
       hypridle
       hyprpaper
       hyprshot
