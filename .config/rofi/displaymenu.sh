@@ -1,4 +1,4 @@
-op=$( echo -e "󰶐 󰍹 Only32\n󰍹 󰶐 Only27\n󰍹 󰍹 Both" | rofi -i -dmenu | awk '{print tolower($3)}' )
+op=$( echo -e "󰶐 󰍹 Only32\n󰍹 󰶐 Only27\n󰍹 󰍹 Both\n󰍹 󰍹 Rotate27" | rofi -i -dmenu | awk '{print tolower($3)}' )
 
 case $op in 
   only32)
@@ -12,5 +12,9 @@ case $op in
   both)
     hyprctl keyword monitor "HDMI-A-1,preferred,0x0,1"
     hyprctl keyword monitor "DP-2,3840x2160@120,2560x0,1.2,vrr,0"
+    ;;
+  rotate27)
+    hyprctl keyword monitor "HDMI-A-1,preferred,0x0,1,transform,3"
+    hyprctl keyword monitor "DP-2,3840x2160@120,1440x480,1.2,vrr,0"
     ;;
 esac
