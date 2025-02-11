@@ -100,8 +100,8 @@ in
     pkgs.newman
     # pkgs.nix-du
     pkgs.node2nix
-    pkgs.nodePackages.aws-cdk
-    pkgs.nodePackages.create-react-app
+    # pkgs.nodePackages.aws-cdk
+    # pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     pkgs.nodePackages.prettier
     pkgs.p7zip
@@ -150,7 +150,7 @@ in
       enable = true;
       font = {
         name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
-        size = if macos then 16 else 14;
+        size = if macos then 16 else 12;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
