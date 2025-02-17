@@ -172,15 +172,15 @@ in
       themeFile = "Dracula";
     };
 
-    neovide = {
-      enable = true;
-      settings = {
-        font = {
-          normal = [ "JetBrainsMono Nerd Font" ];
-          size = 14.0;
-        };
-      };
-    };
+    # neovide = {
+    #   enable = true;
+    #   settings = {
+    #     font = {
+    #       normal = [ "JetBrainsMono Nerd Font" ];
+    #       size = 14.0;
+    #     };
+    #   };
+    # };
 
     neovim = {
       defaultEditor = true;
