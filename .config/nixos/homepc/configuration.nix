@@ -26,7 +26,7 @@
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
-  networking.firewall.trustedInterfaces = [ "docker0" ];
+  # networking.firewall.trustedInterfaces = [ "docker0" ];
 
   # Set your time zone.
   time.timeZone = "Europe/Oslo";
@@ -186,7 +186,22 @@
   #   nerdfonts
   # ];
 
-  virtualisation.docker.enable = true;
+  # virtualisation.docker.enable = true;
+  virtualisation = {
+    containers.enable = true;
+    podman = {
+      defaultNetwork = {
+        settings = {
+          dns_enabled = true;
+        };
+      };
+      dockerCompat = true;
+      dockerSocket = {
+        enable = true;
+      };
+      enable = true;
+    };
+  };
 
   programs.zsh.enable = true;
 
@@ -221,19 +236,22 @@
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
-    extraGroups = [ "wheel" "i2c" "docker" "input" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "i2c" "input" "podman" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       # adwaita-qt
       apple-cursor
       autotiling
       blueman
+      bruno
       ddcutil
       discord
+      docker-compose
       dunst
       egl-wayland
       feh
       file-roller
       # flameshot
+      ghostty
       git
       google-chrome
       hypridle
@@ -244,7 +262,7 @@
       pasystray
       pavucontrol
       # picom
-      postman
+      # postman
       rofi-wayland
       rofimoji
       slack
