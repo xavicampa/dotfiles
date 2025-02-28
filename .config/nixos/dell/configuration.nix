@@ -76,4 +76,8 @@
     alsa.support32Bit = true;
     pulse.enable = true;
   };
+
+  programs.light.enable = true;
+  programs.waybar.enable = true;
+
 }

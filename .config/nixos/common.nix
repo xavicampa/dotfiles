@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 
 # let
 #   stable = import <nixpkgs-stable> { config.allowUnfree = true; };
@@ -99,6 +99,7 @@
   # javi home section
   #
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
+  environment.etc."hypr/hypr.conf".source = "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
 
   i18n = {
     defaultLocale = "nb_NO.UTF-8";
@@ -109,9 +110,11 @@
     };
   };
 
+  programs.regreet.enable = true;
   programs.hyprland = {
     enable = true;
     xwayland.enable = true;
+    withUWSM = true;
   };
 
   programs.ssh = {
@@ -129,13 +132,12 @@
   };
 
   # Enable the X11 windowing system.
-  services.displayManager = {
-    # defaultSession = "none+i3";
-    defaultSession = "hyprland";
-    ly = {
-      enable = true;
-    };
-  };
+  # services.displayManager = {
+    # defaultSession = "hyprland";
+    # ly = {
+    #   enable = true;
+    # };
+  # };
 
   services.libinput = {
     enable = true;
@@ -191,7 +193,7 @@
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
-    extraGroups = [ "wheel" "i2c" "input" "podman" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "i2c" "input" "podman" "video" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       # adwaita-qt
       apple-cursor
