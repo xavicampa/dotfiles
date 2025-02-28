@@ -2,9 +2,9 @@
 
 let
 
-  nodePackages = import ./node2nix/default.nix {
-    inherit pkgs;
-  };
+  # nodePackages = import ./node2nix/default.nix {
+  #   inherit pkgs;
+  # };
 
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
@@ -76,7 +76,7 @@ in
     config.nix.package
     # pkgs.nodejs
     # nodePackages."@aws-amplify/cli"
-    nodePackages."@angular/cli"
+    # nodePackages."@angular/cli"
     pkgs.awscli2
     # pkgs.aws-sam-cli
     (
@@ -150,7 +150,7 @@ in
       enable = true;
       font = {
         name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
-        size = if macos then 14 else 12;
+        size = if macos then 14 else 13;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
@@ -252,7 +252,7 @@ in
       };
       oh-my-zsh = {
         enable = true;
-        plugins = [ "aws" "git" "brew" "docker" "npm" "pip" ];
+        plugins = [ "aws" "git" "brew" "podman" "npm" "pip" ];
         /* theme = "robbyrussell"; */
       };
     };

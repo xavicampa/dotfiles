@@ -124,6 +124,8 @@
     videoDrivers = [ "nvidia" ];
   };
 
+  services.ollama.acceleration = "cuda";
+
   services.pipewire = {
     enable = true;
     alsa.enable = true;

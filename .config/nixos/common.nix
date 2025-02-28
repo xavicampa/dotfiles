@@ -55,7 +55,6 @@
   # ollama
   services.ollama = {
     enable = true;
-    acceleration = "cuda";
     environmentVariables = { OLLAMA_MAX_LOADED_MODELS = "5"; OLLAMA_KEEP_ALIVE = "1h"; };
     # package = stable.ollama;
   };
