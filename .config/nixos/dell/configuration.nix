@@ -62,7 +62,11 @@
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 
   # opengl
-  hardware.graphics.enable = true;
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [ intel-media-sdk ];
+  };
+
 
   # bluetooth
   hardware.i2c.enable = true;
@@ -75,6 +79,26 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
+  };
+
+  services.keyd = {
+    enable = true;
+    keyboards = {
+      default = {
+        ids = [ "0001:0001:a31694d4" ];
+        settings = {
+          main = {
+            capslock = "overload(fn, esc)";
+          };
+          fn = {
+              h = "left";
+              l = "right";
+              k = "up";
+              j = "down";
+          };
+        };
+      };
+    };
   };
 
   programs.light.enable = true;
