@@ -88,13 +88,14 @@
         ids = [ "0001:0001:a31694d4" ];
         settings = {
           main = {
-            capslock = "overload(fn, esc)";
+            capslock = "layer(nav)";
           };
-          fn = {
+          nav = {
               h = "left";
               l = "right";
               k = "up";
               j = "down";
+              backspace = "delete";
           };
         };
       };
