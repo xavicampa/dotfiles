@@ -121,23 +121,11 @@
     enableAskPassword = false;
   };
 
-  # programs.waybar = {
-  #   enable = true;
-  # };
-
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
     GIT_ASKPASS = "";
   };
-
-  # Enable the X11 windowing system.
-  # services.displayManager = {
-    # defaultSession = "hyprland";
-    # ly = {
-    #   enable = true;
-    # };
-  # };
 
   services.libinput = {
     enable = true;
