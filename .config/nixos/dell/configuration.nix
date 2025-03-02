@@ -21,18 +21,24 @@
       (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
+  # commandLineArgs for chrome video acceleration
+  nixpkgs.overlays = [
+    (final: prev: {
+      google-chrome = prev.google-chrome.override
+        {
+          commandLineArgs = "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo";
+        };
+    }
+    )
+  ];
+
   boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   # boot.extraModulePackages = [ ];
   boot.loader.systemd-boot.consoleMode = "max";
-  boot.kernelParams = [
-    # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-    # "nvidia.NVreg_EnableGpuFirmware=0"
-    # "nvidia-drm.modeset=1"
-    # "nvidia-drm.fbdev=1"
-  ];
+  boot.kernelParams = [ ];
 
   fileSystems."/" =
     {
@@ -52,21 +58,22 @@
   # (the default) this is the recommended approach. When using systemd-networkd it's
   # still possible to use this option, but it's recommended to use it in conjunction
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
-  networking.useDHCP = lib.mkDefault true;
+  networking.useDHCP = lib.mkDefault
+    true;
   # networking.interfaces.enp0s31f6.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp3s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp3s0.mtu = 9000;
   # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
 
   # powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+  hardware.cpu.intel.updateMicrocode = lib.mkDefault
+    config.hardware.enableRedistributableFirmware;
 
   # opengl
   hardware.graphics = {
     enable = true;
-    extraPackages = with pkgs; [ intel-media-sdk ];
+    extraPackages = with pkgs; [ intel-media-driver ];
   };
-
 
   # bluetooth
   hardware.i2c.enable = true;
@@ -91,11 +98,11 @@
             capslock = "layer(nav)";
           };
           nav = {
-              h = "left";
-              l = "right";
-              k = "up";
-              j = "down";
-              backspace = "delete";
+            h = "left";
+            l = "right";
+            k = "up";
+            j = "down";
+            backspace = "delete";
           };
         };
       };
