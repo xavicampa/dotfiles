@@ -1,4 +1,5 @@
 {
+  "mode": "overlay",
   "start_hidden": true,
   "modules-right": [
     //"mpd",
