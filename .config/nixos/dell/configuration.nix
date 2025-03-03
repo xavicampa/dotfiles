@@ -110,6 +110,5 @@
   };
 
   programs.light.enable = true;
-  programs.waybar.enable = true;
 
 }

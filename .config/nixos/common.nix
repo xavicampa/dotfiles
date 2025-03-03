@@ -178,6 +178,8 @@
     package = pkgs.firefox-bin;
   };
 
+  programs.waybar.enable = true;
+
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
@@ -188,6 +190,7 @@
       autotiling
       blueman
       bruno
+      busybox # killall
       ddcutil
       discord
       docker-compose
