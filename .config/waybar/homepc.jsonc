@@ -1,6 +1,4 @@
 {
-  "mode": "overlay",
-  "start_hidden": true,
   "modules-right": [
     //"mpd",
     //"idle_inhibitor",
