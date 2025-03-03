@@ -100,6 +100,7 @@
   #
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
   environment.etc."hypr/hypr.conf".source = "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
+  environment.etc."waybar/config.jsonc".source = "${config.users.users.javi.home}/.config/waybar/${config.networking.hostName}.jsonc";
 
   i18n = {
     defaultLocale = "nb_NO.UTF-8";

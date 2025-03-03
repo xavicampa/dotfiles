@@ -1,5 +1,8 @@
 // -*- mode: jsonc -*-
 {
+  "include": [
+      "/etc/waybar/config.jsonc",
+  ],
   "start_hidden": true,
   // "layer": "top", // Waybar at top layer
   // "position": "bottom", // Waybar position (top|bottom|left|right)
@@ -14,24 +17,16 @@
     //"custom/media",
   ],
   "modules-center": ["hyprland/window"],
-  "modules-right": [
-    //"mpd",
-    //"idle_inhibitor",
-    "pulseaudio",
-    "network",
-    //"power-profiles-daemon",
-    "cpu",
-    "memory",
-    "temperature",
-    //"backlight",
-    //"custom/brightness",
-    //"keyboard-state",
-    //"hyprland/language",
-    //"battery",
-    //"battery#bat2",
-    "clock",
-    "tray",
-  ],
+  //"modules-right": [
+  //  //"mpd",
+  //  //"idle_inhibitor",
+  //  "pulseaudio",
+  //  "network",
+  //  //"power-profiles-daemon",
+  //  "cpu",
+  //  "memory",
+  //  "temperature",
+  //],
   // Modules configuration
   // "sway/workspaces": {
   //     "disable-scroll": true,
@@ -132,14 +127,14 @@
   "memory": {
     "format": "{}% ",
   },
-  "temperature": {
-    // "thermal-zone": 2,
-    // "hwmon-path": "/sys/class/hwmon/hwmon2/temp1_input",
-    "critical-threshold": 95,
-    // "format-critical": "{temperatureC}°C {icon}",
-    "format": "{temperatureC}°C {icon}",
-    "format-icons": ["", "", ""],
-  },
+  //"temperature": {
+  //  // "thermal-zone": 2,
+  //  // "hwmon-path": "/sys/class/hwmon/hwmon2/temp1_input",
+  //  "critical-threshold": 95,
+  //  // "format-critical": "{temperatureC}°C {icon}",
+  //  "format": "{temperatureC}°C {icon}",
+  //  "format-icons": ["", "", ""],
+  //},
   //"backlight": {
   //  //"device": "acpi_video0",
   //  "format": "{percent}% {icon}",
