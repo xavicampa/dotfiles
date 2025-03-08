@@ -64,11 +64,12 @@ in
   home.username = "javi";
   home.homeDirectory = if macos then "/Users/javi" else "/home/javi";
 
-  # home.sessionVariables = {
+  home.sessionVariables = {
     # EDITOR = "nvim";
     # SHELL = "${pkgs.zsh}/bin/zsh";
     # TERM = "xterm-256color";
-  # };
+    NIXPKGS_ALLOW_UNFREE = 1;
+  };
 
   nix.package = pkgs.nixVersions.latest;
 

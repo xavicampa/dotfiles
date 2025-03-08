@@ -199,4 +199,9 @@
     AllowHybridSleep=no
     AllowSuspendThenHibernate=no
   '';
+
+  users.users.javi.packages = with pkgs; [
+    nvidia_oc
+    nvtopPackages.nvidia
+  ];
 }
