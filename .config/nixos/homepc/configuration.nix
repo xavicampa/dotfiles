@@ -8,9 +8,9 @@
 , ...
 }:
 
-# let
-#   stable = import <nixpkgs-stable> { config.allowUnfree = true; };
-# in
+let
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+in
 
 {
   networking.hostName = "homepc"; # Define your hostname.
@@ -60,9 +60,10 @@
   swapDevices = [
     {
       device = "/swapfile";
-      size = 16 * 1024; # 32GB
+      size = 32 * 1024; # 32GB
     }
   ];
+  boot.kernel.sysctl."vm.swappiness" = 0;
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
   # (the default) this is the recommended approach. When using systemd-networkd it's
@@ -105,6 +106,7 @@
 
     # Optionally, you may need to select the appropriate driver version for your specific GPU.
     # package = config.boot.kernelPackages.nvidiaPackages.latest;
+    # package = config.boot.kernelPackages.nvidiaPackages.stable;
     package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       version = "570.124.04"; # use new 570 drivers
       sha256_64bit = "sha256-G3hqS3Ei18QhbFiuQAdoik93jBlsFI2RkWOBXuENU8Q=";
@@ -206,7 +208,7 @@
   '';
 
   users.users.javi.packages = with pkgs; [
-    nvidia_oc
+    unstable.nvidia_oc
     nvtopPackages.nvidia
   ];
 }

@@ -97,7 +97,8 @@ in
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
-    pkgs.nerd-fonts.jetbrains-mono
+    # pkgs.nerd-fonts.jetbrains-mono
+    (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
     pkgs.newman
     # pkgs.nix-du
     pkgs.node2nix

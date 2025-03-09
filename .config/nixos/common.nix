@@ -1,8 +1,8 @@
 { pkgs, config, ... }:
 
-# let
-#   stable = import <nixpkgs-stable> { config.allowUnfree = true; };
-# in
+let
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+in
 
 {
   # imports =
@@ -198,9 +198,9 @@
       dunst
       egl-wayland
       feh
-      file-roller
+      unstable.file-roller
       # flameshot
-      ghostty
+      unstable.ghostty
       git
       google-chrome
       hypridle
