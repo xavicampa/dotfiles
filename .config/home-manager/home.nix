@@ -127,6 +127,10 @@ in
 
   fonts.fontconfig.enable = lib.mkForce true;
 
+  services.dunst = {
+    enable = if macos then false else true;
+  };
+
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
 

@@ -195,7 +195,6 @@ in
       ddcutil
       discord
       docker-compose
-      dunst
       egl-wayland
       feh
       unstable.file-roller
