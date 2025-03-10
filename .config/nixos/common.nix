@@ -172,8 +172,11 @@ in
     enable = true;
   };
 
-  programs._1password.enable = true;
-  programs._1password-gui.enable = true;
+  programs._1password-gui = {
+    enable = true;
+    package = unstable._1password-gui;
+  };
+
   programs.firefox = {
     enable = true;
     package = pkgs.firefox-bin;
