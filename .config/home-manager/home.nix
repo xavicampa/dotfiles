@@ -171,7 +171,7 @@ in
         tab_bar_style = "powerline";
         # tab_powerline_style = "slanted";
         tab_title_template = "{fmt.bold}{tab.active_wd.rsplit('/', 1)[-1]}{fmt.nobold} [{tab.active_exe}]";
-        hide_window_decorations = "titlebar-only";
+        hide_window_decorations = if macos then "no" else "titlebar-only";
       };
       /* theme = "Gruvbox Dark"; */
       # theme = "Catppuccin-Macchiato";
