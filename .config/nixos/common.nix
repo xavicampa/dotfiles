@@ -202,7 +202,7 @@ in
       feh
       unstable.file-roller
       # flameshot
-      unstable.ghostty
+      # unstable.ghostty
       git
       google-chrome
       hypridle

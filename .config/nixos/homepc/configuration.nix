@@ -76,7 +76,8 @@ in
   networking.interfaces.enp3s0.mtu = 9000;
   # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
 
-  # powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
+  # powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
+  services.thermald.enable = true;
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
   hardware.nvidia = {
     # Modesetting is required.
@@ -138,6 +139,9 @@ in
   #       set-sink-volume combined 50%
   #     '';
   # };
+
+  # Enable the OpenSSH daemon.
+  # services.openssh.enable = true;
 
   services.xserver = {
     videoDrivers = [ "nvidia" ];
