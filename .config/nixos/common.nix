@@ -209,6 +209,7 @@ in
       hyprpaper
       hyprshot
       nodejs_18
+      nix-du
       pamixer
       pasystray
       pavucontrol
