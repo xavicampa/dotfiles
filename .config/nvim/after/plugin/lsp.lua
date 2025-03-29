@@ -255,7 +255,12 @@ require('lspconfig')['marksman'].setup {
     flags = lsp_flags,
 }
 
--- require 'lspconfig'.jdtls.setup {
---     on_attach = on_attach,
---     flags = lsp_flags,
--- }
+require 'lspconfig'.jdtls.setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
+}
+
+require 'lspconfig'.gopls.setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
+}
