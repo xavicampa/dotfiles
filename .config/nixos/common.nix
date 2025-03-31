@@ -155,6 +155,9 @@ in
   # programs.nix-ld.enable = true;
   programs.nix-ld = {
     enable = true;
+    libraries = with pkgs; [
+      stdenv.cc.cc.lib
+    ];
   };
   # environment.variables = {
   #   NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
