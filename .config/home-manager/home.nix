@@ -6,7 +6,9 @@ let
   #   inherit pkgs;
   # };
 
-  pythonEnv = pkgs.python3.withPackages (ppkgs: [
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+
+  pythonEnv = unstable.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
     ppkgs.cfn-lint
