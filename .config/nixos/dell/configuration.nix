@@ -117,4 +117,7 @@
 
   programs.light.enable = true;
 
+  users.users.javi.packages = with pkgs; [
+    intel-gpu-tools
+  ];
 }
