@@ -105,7 +105,7 @@ bindsym XF86AudioLowerVolume exec --no-startup-id pamixer -d 5 && dunstify -h st
 bindsym XF86AudioMute exec --no-startup-id pamixer -t && $refresh_i3status
 # exec --no-startup-id pactl set-default-sink combined
 # exec --no-startup-id pactl set-default-source alsa_input.usb-046d_C922_Pro_Stream_Webcam_B72BB7BF-02.analog-stereo
-exec --no-startup-id pasystray
+# exec --no-startup-id pasystray
 exec --no-startup-id blueman-applet
 
 # Adjust mouse scrolling and speed
