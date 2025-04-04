@@ -111,7 +111,14 @@ in
     };
   };
 
-  programs.regreet.enable = true;
+  # programs.regreet.enable = true;
+  services.xserver = {
+    xkb.layout = "no";
+    displayManager = {
+      gdm.enable = true;
+    };
+  };
+
   programs.hyprland = {
     enable = true;
     xwayland.enable = true;
