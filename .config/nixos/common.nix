@@ -199,7 +199,6 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" "i2c" "input" "podman" "video" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
-      # adwaita-qt
       apple-cursor
       autotiling
       blueman
@@ -211,20 +210,16 @@ in
       egl-wayland
       feh
       unstable.file-roller
-      # flameshot
-      # unstable.ghostty
       git
       google-chrome
       hypridle
       hyprpaper
       hyprshot
-      nodejs_18
+      # nodejs_18
       nix-du
       pamixer
       pasystray
       pavucontrol
-      # picom
-      # postman
       rofi-wayland
       rofimoji
       slack
@@ -232,15 +227,10 @@ in
       stow
       vscode
       wl-clipboard
-      # wofi
-      # wofi-emoji
-      # wpaperd
       wtype
       xdg-user-dirs
       xdg-utils
       xfce.thunar
-      # xorg.xinput
-      # xorg.xmodmap
     ];
   };
 
