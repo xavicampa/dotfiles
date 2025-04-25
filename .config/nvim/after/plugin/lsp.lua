@@ -224,15 +224,17 @@ require('lspconfig')['nixd'].setup {
 require('null-ls').setup {
     on_attach = on_attach,
     flags = lsp_flags,
+    -- debug = true,
     sources = {
+        require("null-ls").builtins.code_actions.gitsigns,
         require("null-ls").builtins.formatting.black,
         require("null-ls").builtins.formatting.prettier,
+        require("null-ls").builtins.diagnostics.write_good,
         require("null-ls").builtins.diagnostics.cfn_lint.with({
-            args = {
-                '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL
-                '-i', 'E3043', -- Do not try to parse nested stack's TemplateURL
-                '--format', 'parseable',
-                '--'
+            extra_args = {
+                -- '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL
+                -- '-i', 'E3043', -- Do not try to parse nested stack's TemplateURL
+                '-c', 'I',  --  Include suggestions and best practices
             }
         }),
         require("null-ls").builtins.diagnostics.checkstyle.with({
@@ -247,7 +249,6 @@ require('null-ls').setup {
             end
         })
     },
-    -- debug = true,
 }
 
 require('lspconfig')['marksman'].setup {

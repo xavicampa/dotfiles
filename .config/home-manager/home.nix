@@ -11,49 +11,33 @@ let
   pythonEnv = unstable.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
-    ppkgs.cfn-lint
+    # ppkgs.cfn-lint
     ppkgs.greenlet
     # ppkgs.litellm
     ppkgs.pynvim
-    # (
-    #   buildPythonPackage rec {
-    #     pname = "aws-sam-translator";
-    #     version = "1.73.0";
-    #     src = fetchPypi {
-    #       inherit pname version;
-    #       sha256 = "sha256-v6fK06ePAC7e7F45/WG2Fs+E809hAQxdwvenaEX+egI=";
-    #     };
-    #     doCheck = false;
-    #     propagatedBuildInputs = [
-    #       # Specify dependencies
-    #       ppkgs.boto3
-    #       ppkgs.jsonschema
-    #       ppkgs.typing-extensions
-    #       ppkgs.pydantic
-    #     ];
-    #   }
-    # )
+    (
+      ppkgs.buildPythonPackage rec {
+        pname = "cfn_lint";
+        version = "1.34.2";
+        format = "wheel";
+        src = ppkgs.fetchPypi rec {
+          inherit pname version format;
+          sha256 = "sha256-tSnh91ZFWn1F890FhNA1qPswzzC4qVpJLRGig05oJnM=";
+          dist = python;
+          python = "py3";
+        };
+        propagatedBuildInputs = [
+          ppkgs.jsonpatch
+          ppkgs.networkx
+          ppkgs.pyyaml
+          ppkgs.regex
+          ppkgs.aws-sam-translator
+          ppkgs.sympy
+          ppkgs.typing-extensions
+        ];
+      }
+    )
   ]);
-
-  # pythonEnvCustom = ps: with ps; [
-  # (
-  #   buildPythonPackage rec {
-  #     pname = "cfn-lint";
-  #     version = "0.79.7";
-  #     src = fetchPypi {
-  #       inherit pname version;
-  #       sha256 = "sha256-/NwZWomBBIKvk6M1tXUA/JKBEZmNg4kIf4X9WRVfyQQ=";
-  #     };
-  #     doCheck = false;
-  #     propagatedBuildInputs = [
-  #       # Specify dependencies
-  #       # pkgs.python3Packages.numpy
-  #       # pkgs.python311Packages.aws-sam-translator
-  #       pkgs.python311Packages.pyyaml
-  #     ];
-  #   }
-  # )
-  # ];
 
   # flag on macos
   macos = builtins.pathExists "/Users/javi";
@@ -114,7 +98,6 @@ in
     pkgs.slides
     pkgs.unzip
     pythonEnv
-    # (pkgs.python311.withPackages pythonEnvCustom)
   ];
 
   # This value determines the Home Manager release that your
