@@ -13,6 +13,7 @@
             dist = python;
             python = "py3";
           };
+          patches = [ ];
           propagatedBuildInputs = [
             pythonPrev.jsonpatch
             pythonPrev.networkx
@@ -24,13 +25,8 @@
           ];
         };
       };
-      python3 = prev.python3.override
-        {
-          packageOverrides = pythonOverlay;
-        };
     in
     {
-      inherit pythonOverlay;
-      python3Packages = python3.pkgs;
+      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [ pythonOverlay ];
     })
 ]
