@@ -6,37 +6,16 @@ let
   #   inherit pkgs;
   # };
 
-  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+  # unstable = import <nixpkgs-unstable> {
+  #   config.allowUnfree = true;
+  # };
 
-  pythonEnv = unstable.python3.withPackages (ppkgs: [
+  pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
-    # ppkgs.cfn-lint
     ppkgs.greenlet
     # ppkgs.litellm
     ppkgs.pynvim
-    (
-      ppkgs.buildPythonPackage rec {
-        pname = "cfn_lint";
-        version = "1.34.2";
-        format = "wheel";
-        src = ppkgs.fetchPypi rec {
-          inherit pname version format;
-          sha256 = "sha256-tSnh91ZFWn1F890FhNA1qPswzzC4qVpJLRGig05oJnM=";
-          dist = python;
-          python = "py3";
-        };
-        propagatedBuildInputs = [
-          ppkgs.jsonpatch
-          ppkgs.networkx
-          ppkgs.pyyaml
-          ppkgs.regex
-          ppkgs.aws-sam-translator
-          ppkgs.sympy
-          ppkgs.typing-extensions
-        ];
-      }
-    )
   ]);
 
   # flag on macos
