@@ -13,6 +13,7 @@ let
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
+    ppkgs.cfn-lint
     ppkgs.greenlet
     # ppkgs.litellm
     ppkgs.pynvim
