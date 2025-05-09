@@ -1,4 +1,5 @@
 local pid = vim.fn.getpid()
+local util = require('lspconfig/util')
 
 -- Mappings.
 -- See `:help vim.diagnostic.*` for documentation on any of the below functions
@@ -234,7 +235,7 @@ require('null-ls').setup {
             extra_args = {
                 -- '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL
                 -- '-i', 'E3043', -- Do not try to parse nested stack's TemplateURL
-                '-c', 'I',  --  Include suggestions and best practices
+                '-c', 'I', --  Include suggestions and best practices
             }
         }),
         require("null-ls").builtins.diagnostics.checkstyle.with({
@@ -264,4 +265,17 @@ require 'lspconfig'.jdtls.setup {
 require 'lspconfig'.gopls.setup {
     on_attach = on_attach,
     flags = lsp_flags,
+}
+
+require 'lspconfig'.svelte.setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
+}
+
+require 'lspconfig'.kotlin_language_server.setup {
+    on_attach = on_attach,
+    flags = lsp_flags,
+    init_options = {
+        storagePath = util.path.join(vim.env.HOME, ".local/share/nvim"),
+    }
 }
