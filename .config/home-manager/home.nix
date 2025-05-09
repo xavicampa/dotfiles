@@ -6,9 +6,9 @@ let
   #   inherit pkgs;
   # };
 
-  # unstable = import <nixpkgs-unstable> {
-  #   config.allowUnfree = true;
-  # };
+  unstable = import <nixpkgs-unstable> {
+    config.allowUnfree = true;
+  };
 
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
@@ -202,9 +202,10 @@ in
 
     starship = {
       enable = true;
-      settings = {
-        add_newline = false;
-      };
+      package = unstable.starship;
+      # settings = {
+      #   add_newline = false;
+      # };
     };
 
     zsh = {
