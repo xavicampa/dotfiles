@@ -1,5 +1,4 @@
 local pid = vim.fn.getpid()
-local util = require('lspconfig/util')
 
 -- Mappings.
 -- See `:help vim.diagnostic.*` for documentation on any of the below functions
@@ -275,7 +274,6 @@ require 'lspconfig'.svelte.setup {
 require 'lspconfig'.kotlin_language_server.setup {
     on_attach = on_attach,
     flags = lsp_flags,
-    init_options = {
-        storagePath = util.path.join(vim.env.HOME, ".local/share/nvim"),
-    }
+    init_options = { storagePath = vim.env.HOME .. ".local/share/nvim", },
+    settings = { kotlin = { compiler = { jvm = { target = "21" } } } }
 }
