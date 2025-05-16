@@ -265,15 +265,3 @@ require 'lspconfig'.gopls.setup {
     on_attach = on_attach,
     flags = lsp_flags,
 }
-
-require 'lspconfig'.svelte.setup {
-    on_attach = on_attach,
-    flags = lsp_flags,
-}
-
-require 'lspconfig'.kotlin_language_server.setup {
-    on_attach = on_attach,
-    flags = lsp_flags,
-    init_options = { storagePath = vim.env.HOME .. ".local/share/nvim", },
-    settings = { kotlin = { compiler = { jvm = { target = "21" } } } }
-}

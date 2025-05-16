@@ -214,5 +214,7 @@ require("lazy").setup({
     },
     'mfussenegger/nvim-jdtls',
     'direnv/direnv.vim',
-    'psliwka/vim-smoothie'
+    'psliwka/vim-smoothie',
+    'mfussenegger/nvim-dap',
+    'mason-org/mason.nvim',
 })
