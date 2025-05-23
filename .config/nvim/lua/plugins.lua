@@ -149,8 +149,8 @@ require("lazy").setup({
     {
         "David-Kunz/gen.nvim",
         opts = {
-            -- model = "llama3.1",
-            model = "deepseek-r1:14b",
+            model = "llama3.2",
+            -- model = "deepseek-r1:14b",
         },
         vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>'),
         init = function()
