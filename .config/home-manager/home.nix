@@ -125,7 +125,7 @@ in
       enable = true;
       font = {
         name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
-        size = if macos then 14 else 11;
+        size = if macos then 14 else 12;
       };
       keybindings = {
         "ctrl+shift+h" = "previous_window";
@@ -135,8 +135,8 @@ in
         remember_window_size = "no";
         initial_window_width = "80c";
         initial_window_height = "25c";
-        # background_opacity = "0.90";
-        # background_blur = 24;
+        background_opacity = "0.90";
+        background_blur = 24;
         tab_bar_style = "powerline";
         # tab_powerline_style = "slanted";
         tab_title_template = "{fmt.bold}{tab.active_wd.rsplit('/', 1)[-1]}{fmt.nobold} [{tab.active_exe}]";
