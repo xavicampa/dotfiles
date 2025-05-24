@@ -1,8 +1,8 @@
 { pkgs, config, ... }:
 
-let
-  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-in
+# let
+#   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+# in
 
 {
   # imports =
@@ -56,7 +56,7 @@ in
   services.ollama = {
     enable = true;
     environmentVariables = { OLLAMA_MAX_LOADED_MODELS = "5"; OLLAMA_KEEP_ALIVE = "1h"; };
-    package = unstable.ollama;
+    # package = unstable.ollama;
   };
 
   # keyring
@@ -87,6 +87,10 @@ in
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.11"; # Did you read the comment?
+  system.autoUpgrade = {
+      enable = true;
+      allowReboot = false;
+  };
 
   # environment.systemPackages = with pkgs; [
   #   hyprland
@@ -184,7 +188,7 @@ in
 
   programs._1password-gui = {
     enable = true;
-    package = unstable._1password-gui;
+    # package = unstable._1password-gui;
   };
 
   programs.firefox = {
@@ -209,7 +213,8 @@ in
       docker-compose
       egl-wayland
       feh
-      unstable.file-roller
+      # unstable.file-roller
+      file-roller
       git
       google-chrome
       hypridle

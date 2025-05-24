@@ -8,9 +8,9 @@
 , ...
 }:
 
-let
-  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-in
+# let
+#   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+# in
 
 {
   networking.hostName = "homepc"; # Define your hostname.
@@ -213,7 +213,8 @@ in
   '';
 
   users.users.javi.packages = with pkgs; [
-    unstable.nvidia_oc
+    # unstable.nvidia_oc
+    nvidia_oc
     nvtopPackages.nvidia
   ];
 }

@@ -6,9 +6,9 @@ let
   #   inherit pkgs;
   # };
 
-  unstable = import <nixpkgs-unstable> {
-    config.allowUnfree = true;
-  };
+  # unstable = import <nixpkgs-unstable> {
+  #   config.allowUnfree = true;
+  # };
 
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
@@ -58,13 +58,13 @@ in
             '';
           })
     )
+    # pkgs.btop
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
-    # pkgs.nerd-fonts.jetbrains-mono
-    (pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
+    pkgs.nerd-fonts.jetbrains-mono
     pkgs.newman
     # pkgs.nix-du
     pkgs.node2nix
@@ -202,7 +202,7 @@ in
 
     starship = {
       enable = true;
-      package = unstable.starship;
+      # package = unstable.starship;
       # settings = {
       #   add_newline = false;
       # };
@@ -214,7 +214,7 @@ in
       };
       enable = true;
       enableCompletion = true;
-      initExtra = ''
+      initContent = ''
         export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/opt/openssl/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
         export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
       '';
