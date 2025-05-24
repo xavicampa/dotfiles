@@ -19,6 +19,7 @@ vim.opt.shiftwidth = 0
 vim.opt.expandtab = true
 vim.opt.autoindent = true
 vim.opt.smartindent = true
+vim.o.winborder = 'rounded'
 -- vim.opt.spell = true
 
 -- Mouse
