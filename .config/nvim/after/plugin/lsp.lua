@@ -5,10 +5,10 @@ local pid = vim.fn.getpid()
 local opts = { noremap = true, silent = true }
 vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
 vim.keymap.set('n', '<C-p>', function()
-    vim.diagnostic.goto_prev({ float = false })
+    vim.diagnostic.jump({ count = -1 })
 end, opts)
 vim.keymap.set('n', '<C-n>', function()
-    vim.diagnostic.goto_next({ float = false })
+    vim.diagnostic.jump({ count = 1 })
 end, opts)
 vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
 

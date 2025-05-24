@@ -36,7 +36,9 @@ vim.opt.foldlevelstart = 2
 -- Diagnostics
 vim.diagnostic.config({
     severity_sort = true,
-    virtual_text = false,
+    -- virtual_text = true,
+    virtual_lines = true,
+    signs = true,
     float = {
         border = 'rounded'
     }
