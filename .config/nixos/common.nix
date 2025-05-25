@@ -129,6 +129,10 @@
     withUWSM = true;
   };
 
+  programs.hyprlock = {
+      enable = true;
+  };
+
   programs.ssh = {
     enableAskPassword = false;
   };
