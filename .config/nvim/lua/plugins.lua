@@ -134,8 +134,6 @@ require("lazy").setup({
             },
             context_window = 4096,
             url = "http://localhost:11434",
-            accept_keymap = "<C-y>",
-            dismiss_keymap = "<C-n>",
             tokens_to_clear = { "<EOT>" },
             -- model = "deepseek-coder-v2:16b-lite-base-q4_0",
             -- fim = {
@@ -146,8 +144,6 @@ require("lazy").setup({
             -- },
             -- context_window = 4096,
             -- url = "http://localhost:11434",
-            -- accept_keymap = "<C-y>",
-            -- dismiss_keymap = "<C-n>",
         }
     },
     {
