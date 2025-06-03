@@ -64,12 +64,6 @@ require("lazy").setup({
     {
         "nvim-telescope/telescope.nvim",
         dependencies = { "nvim-lua/plenary.nvim" },
-        config = function()
-            vim.api.nvim_set_keymap("n", "<leader>ff", ":Telescope find_files<CR>", { noremap = true })
-            vim.api.nvim_set_keymap("n", "<leader>fg", ":Telescope live_grep<CR>", { noremap = true })
-            vim.api.nvim_set_keymap("n", "<leader>fb", ":Telescope buffers<CR>", { noremap = true })
-            vim.api.nvim_set_keymap("n", "<leader>fh", ":Telescope help_tags<CR>", { noremap = true })
-        end
     },
     {
         "lewis6991/gitsigns.nvim",
@@ -87,14 +81,7 @@ require("lazy").setup({
     --         setup = function() vim.g.mkdp_filetypes = { "markdown" } end, ft = { "markdown" }
     --     }
     "phaazon/hop.nvim",
-    {
-        "kdheepak/lazygit.nvim",
-        config = function()
-            -- vim.g.lazygit_floating_window_winblend = 10
-            vim.g.lazygit_floating_window_scaling_factor = 0.8
-            vim.api.nvim_set_keymap("n", "<leader>gg", ":LazyGit<CR>", { noremap = true })
-        end
-    },
+    "kdheepak/lazygit.nvim",
     "Mofiqul/dracula.nvim",
     {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
@@ -125,6 +112,7 @@ require("lazy").setup({
         'huggingface/llm.nvim',
         opts = {
             backend = "ollama",
+            accept_keymap = "<S-Tab>",
             model = "codellama:7b-code",
             fim = {
                 enabled = true,
@@ -152,7 +140,6 @@ require("lazy").setup({
             model = "llama3.2",
             -- model = "deepseek-r1:14b",
         },
-        vim.keymap.set({ 'n', 'v' }, '<leader>oo', ':Gen<CR>'),
         init = function()
             require("gen").prompts["Generate"] = {
                 prompt = "These are your instructions:\n\n$input\n\n" ..
