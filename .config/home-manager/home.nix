@@ -37,6 +37,11 @@ in
     NIXPKGS_ALLOW_UNFREE = 1;
   };
 
+  home.file =
+    if macos then {
+      "Library/Application Support/lazygit/".source = config.lib.file.mkOutOfStoreSymlink "/Users/javi/.config/lazygit/";
+    } else { };
+
   nix.package = pkgs.nixVersions.latest;
 
   home.packages = [
