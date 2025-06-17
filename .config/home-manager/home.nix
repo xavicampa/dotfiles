@@ -82,6 +82,7 @@ in
     pkgs.shell-gpt
     pkgs.slides
     pkgs.unzip
+    pkgs.wget
     pythonEnv
   ];
 
