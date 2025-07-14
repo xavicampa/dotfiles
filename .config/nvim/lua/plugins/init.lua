@@ -1,7 +1,11 @@
 return {
     "folke/which-key.nvim",
     "nvim-treesitter/nvim-treesitter",
-    "neovim/nvim-lspconfig",
+    {
+        "neovim/nvim-lspconfig",
+        config = function ()
+        end
+    },
     {
         "saghen/blink.cmp",
         version = '1.*',
@@ -185,9 +189,7 @@ return {
         -- dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.icons' }, -- if you use standalone mini plugins
         dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' }, -- if you prefer nvim-web-devicons
     },
-    'mfussenegger/nvim-jdtls',
     'direnv/direnv.vim',
     'psliwka/vim-smoothie',
     'mfussenegger/nvim-dap',
-    'mason-org/mason.nvim',
 }
