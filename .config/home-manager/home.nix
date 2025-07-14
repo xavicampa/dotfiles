@@ -169,10 +169,9 @@ in
       extraLuaConfig = ''
         vim.g.python3_host_prog='${pythonEnv}/bin/python3'
         vim.g.python_host_prog='${pythonEnv}/bin/python'
-        require 'options'
-        require 'plugins'
-        require 'remap'
-        require 'neovide'
+        require("config.options")
+      	require("config.lazy")
+        require("config.remap")
       '';
       extraPackages = [
         pkgs.gcc
