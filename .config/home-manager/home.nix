@@ -46,10 +46,11 @@ in
 
   home.packages = [
     config.nix.package
-    # pkgs.nodejs
+    pkgs.nodejs
     # nodePackages."@aws-amplify/cli"
     # nodePackages."@angular/cli"
     pkgs.awscli2
+    pkgs.cargo
     # pkgs.aws-sam-cli
     (
       if macos then
@@ -64,6 +65,7 @@ in
           })
     )
     # pkgs.btop
+    pkgs.go
     pkgs.graph-easy
     pkgs.git-remote-codecommit
     pkgs.kitty-themes
