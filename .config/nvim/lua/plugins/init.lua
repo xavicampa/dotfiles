@@ -8,22 +8,6 @@ return {
     "onsails/lspkind.nvim",
     "pedrohdz/vim-yaml-folds",
     {
-        "preservim/nerdtree",
-        dependencies = {
-            "Deftera186/vim-devicons",
-            "xuyuanp/nerdtree-git-plugin",
-        },
-        opts = {},
-        config = function ()
-            vim.api.nvim_set_keymap("n", "<C-t>", ":NERDTreeToggle<CR>", { noremap = true })
-            vim.g.NERDTreeQuitOnOpen=1
-            vim.g.NERDTreeGitStatusUseNerdFonts = 1
-            vim.g.NERDTreeFileExtensionHighlightFullName = 1
-            vim.g.NERDTreeExactMatchHighlightFullName = 1
-            vim.g.NERDTreePatternMatchHighlightFullName = 1
-        end
-    },
-    {
         "nvim-lualine/lualine.nvim",
         dependencies = {
             "nvim-tree/nvim-web-devicons",
@@ -50,7 +34,6 @@ return {
         "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
         opts = {},
     },
-    "Hoffs/omnisharp-extended-lsp.nvim",
     {
         "folke/which-key.nvim",
         event = "VeryLazy",
