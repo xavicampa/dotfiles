@@ -6,17 +6,20 @@ return {
     init = function()
         require("mason-lspconfig").setup_handlers({
             function(server_name) -- default handler (optional)
-                -- require("lspconfig")[server_name].setup({})
-                vim.lsp.enable(server_name)
+                require("lspconfig")[server_name].setup({})
+                -- vim.lsp.enable(server_name)
             end,
             ["omnisharp"] = function()
                 require("lspconfig")["omnisharp"].setup(
                     {
                         -- cmd = { "OmniSharp", "--languageserver", "--hostPID", tostring(pid) },
                         cmd = { "dotnet", vim.fn.stdpath "data" .. "/mason/packages/omnisharp/OmniSharp.dll" },
+                        FormattingOptions = {
+                            EnableEditorConfigSupport = false,
+                        },
                     }
                 )
-                vim.lsp.enable("omnisharp")
+                -- vim.lsp.enable("omnisharp")
             end
         })
     end,
