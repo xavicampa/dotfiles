@@ -18,9 +18,18 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # Clean up
+  # Store optimize and garbage clean up
   nix.gc.automatic = true;
-  # nix.settings.auto-optimise-store = true;
+  nix.optimise.automatic = true;
+  nix.settings = {
+    auto-optimise-store = false;
+    substituters = [
+      "https://nix-community.cachix.org"
+    ];
+    trusted-public-keys = [
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+    ];
+  };
 
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -87,10 +96,12 @@
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.11"; # Did you read the comment?
-  system.autoUpgrade = {
-      enable = true;
-      allowReboot = false;
-  };
+
+  # Auto-upgrade (not sure how it works, disabling for now)
+  # system.autoUpgrade = {
+  #   enable = true;
+  #   allowReboot = false;
+  # };
 
   # environment.systemPackages = with pkgs; [
   #   hyprland
@@ -130,7 +141,7 @@
   };
 
   programs.hyprlock = {
-      enable = true;
+    enable = true;
   };
 
   programs.ssh = {
@@ -197,7 +208,7 @@
 
   programs.firefox = {
     enable = true;
-    package = pkgs.firefox-bin;
+    # package = pkgs.firefox-bin;
   };
 
   programs.waybar.enable = true;
@@ -212,6 +223,7 @@
       blueman
       bruno
       busybox # killall
+      cachix
       ddcutil
       discord
       docker-compose
