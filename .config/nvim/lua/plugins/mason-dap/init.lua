@@ -15,7 +15,7 @@ return {
                     type = "executable",
                     -- override the command as masons version of netcoredbg does not run in macos
                     -- this var needs to be set in shell.nix
-                    command = os.getenv('NETCOREDBG_NIX_PATH') .. "/netcoredbg",
+                    command = os.getenv('NETCOREDBG_NIX_PATH'),
                     args = { "--interpreter=vscode" }
                 }
                 require('mason-nvim-dap').default_setup(config)
