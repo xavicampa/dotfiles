@@ -1,4 +1,4 @@
-local pid = vim.fn.getpid()
+-- local pid = vim.fn.getpid()
 
 return {
     "mason-org/mason-lspconfig.nvim",
@@ -37,8 +37,6 @@ return {
         {
             "mason-org/mason.nvim",
             version = "^1.0.0",
-            opts = {
-            },
         },
         "neovim/nvim-lspconfig"
     }

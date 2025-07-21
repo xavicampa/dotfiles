@@ -1,4 +1,21 @@
 return {
+    {
+        "mason-org/mason.nvim",
+        version = "^1.0.0",
+        opts = {},
+    },
+    {
+        "mfussenegger/nvim-dap",
+        keys = {
+            { '<leader>db', '<cmd>DapToggleBreakpoint<CR>' },
+            { '<leader>dn', '<cmd>DapNew<CR>' },
+            { '<leader>dc', '<cmd>DapContinue<CR>' },
+            { '<leader>dt', '<cmd>DapTerminate<CR>' },
+            { '<leader>dl', '<cmd>DapStepInto<CR>' },
+            { '<leader>dh', '<cmd>DapStepOut<CR>' },
+            { '<leader>dj', '<cmd>DapStepOver<CR>' },
+        },
+    },
     "folke/which-key.nvim",
     {
         "saghen/blink.cmp",
@@ -24,9 +41,9 @@ return {
     },
     {
         "phaazon/hop.nvim",
-        init = function()
-            vim.api.nvim_set_keymap('', 's', "<cmd>lua require'hop'.hint_char1()<cr>", {})
-        end,
+        keys = {
+            { "s", "<cmd>lua require'hop'.hint_char1()<CR>" },
+        },
         opts = {},
     },
     "kdheepak/lazygit.nvim",
