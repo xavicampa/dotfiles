@@ -208,7 +208,7 @@
 
   programs.firefox = {
     enable = true;
-    # package = pkgs.firefox-bin;
+    package = pkgs.firefox-bin;
   };
 
   programs.waybar.enable = true;
@@ -223,7 +223,7 @@
       blueman
       bruno
       busybox # killall
-      cachix
+      # cachix
       ddcutil
       discord
       docker-compose
