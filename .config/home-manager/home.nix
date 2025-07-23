@@ -51,6 +51,7 @@ in
     # nodePackages."@angular/cli"
     pkgs.awscli2
     pkgs.cargo
+    pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
     (
       if macos then

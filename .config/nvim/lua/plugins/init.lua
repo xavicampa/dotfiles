@@ -48,10 +48,6 @@ return {
     },
     "kdheepak/lazygit.nvim",
     {
-        "https://git.sr.ht/~whynothugo/lsp_lines.nvim",
-        opts = {},
-    },
-    {
         "folke/which-key.nvim",
         event = "VeryLazy",
         init = function()
@@ -68,7 +64,7 @@ return {
         "folke/trouble.nvim",
         opts = {},
     },
-    "stevearc/dressing.nvim",
+    -- "stevearc/dressing.nvim",
     {
         'MeanderingProgrammer/render-markdown.nvim',
         opts = {
@@ -80,6 +76,6 @@ return {
         dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' }, -- if you prefer nvim-web-devicons
     },
     'direnv/direnv.vim',
-    'psliwka/vim-smoothie',
+    -- 'psliwka/vim-smoothie',
     'mfussenegger/nvim-dap',
 }
