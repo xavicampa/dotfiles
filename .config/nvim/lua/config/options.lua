@@ -19,7 +19,7 @@ vim.opt.shiftwidth = 0
 vim.opt.expandtab = true
 vim.opt.autoindent = true
 vim.opt.smartindent = true
--- vim.o.winborder = 'rounded'
+vim.opt.winborder = 'rounded'
 -- vim.opt.spell = true
 
 -- Mouse
@@ -31,14 +31,11 @@ vim.opt.clipboard = 'unnamed,unnamedplus'
 -- Folding
 vim.opt.foldmethod = 'expr'
 vim.opt.foldexpr = 'nvim_treesitter#foldexpr()'
-vim.opt.completeopt = 'menu,menuone,noselect'
+-- vim.opt.completeopt = 'menu,menuone,noselect'
 vim.opt.foldlevelstart = 2
 
 -- Diagnostics
 vim.diagnostic.config({
-    float = {
-        border = 'rounded'
-    },
     signs = {
         text = {
             [vim.diagnostic.severity.ERROR] = '',
@@ -50,6 +47,3 @@ vim.diagnostic.config({
     severity_sort = true,
     virtual_lines = true,
 })
-
--- nerdtree workaround
--- vim.g.NERDTreeMinimalMenu = 1

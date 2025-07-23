@@ -7,7 +7,6 @@ return {
     opts = {
         animation = {},
         dashboard = {},
-        dim = {},
         indent = {},
         lazygit = {},
         scroll = {},

@@ -7,7 +7,6 @@ return {
         require("mason-lspconfig").setup_handlers({
             function(server_name) -- default handler (optional)
                 require("lspconfig")[server_name].setup({})
-                -- vim.lsp.enable(server_name)
             end,
             ["omnisharp"] = function()
                 require("lspconfig")["omnisharp"].setup(
@@ -19,13 +18,23 @@ return {
                         },
                     }
                 )
-                -- vim.lsp.enable("omnisharp")
-            end
+            end,
+            ["lua_ls"] = function()
+                require("lspconfig")["lua_ls"].setup(
+                    {
+                        settings = {
+                            Lua = {
+                                diagnostics = { enable = true, globals = { "vim" } },
+                                telemetry = { enable = false },
+                            },
+                        }
+                    }
+                )
+            end,
         })
     end,
     opts = {
         ensure_installed = {
-            -- "jdtls", nvim-java
             "lua_ls",
             "omnisharp",
             "pyright",
