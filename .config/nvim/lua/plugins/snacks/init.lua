@@ -21,6 +21,10 @@ return {
             sources = {
                 explorer = {
                     auto_close = true,
+                    win = {
+                        input = { keys = { ["<C-t>"] = { "tab", mode = { "n", "i" } }, }, },
+                        list = { keys = { ["<C-t>"] = { "tab", mode = { "n", "i" } }, }, },
+                    },
                 }
             }
         },
