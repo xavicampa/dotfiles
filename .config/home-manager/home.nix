@@ -66,9 +66,11 @@ in
           })
     )
     # pkgs.btop
+    pkgs.ghostscript
     pkgs.go
     pkgs.graph-easy
     pkgs.git-remote-codecommit
+    pkgs.imagemagick
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch

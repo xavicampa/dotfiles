@@ -24,7 +24,7 @@ return {
                     {
                         settings = {
                             Lua = {
-                                diagnostics = { enable = true, globals = { "vim" } },
+                                diagnostics = { enable = true, globals = { "vim", "Snacks" } },
                                 telemetry = { enable = false },
                             },
                         }

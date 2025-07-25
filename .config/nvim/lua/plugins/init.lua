@@ -34,6 +34,7 @@ return {
     {
         "nvim-telescope/telescope.nvim",
         dependencies = { "nvim-lua/plenary.nvim" },
+        opts = {}
     },
     {
         "lewis6991/gitsigns.nvim",
@@ -64,7 +65,6 @@ return {
         "folke/trouble.nvim",
         opts = {},
     },
-    -- "stevearc/dressing.nvim",
     {
         'MeanderingProgrammer/render-markdown.nvim',
         opts = {
@@ -76,6 +76,4 @@ return {
         dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' }, -- if you prefer nvim-web-devicons
     },
     'direnv/direnv.vim',
-    -- 'psliwka/vim-smoothie',
-    'mfussenegger/nvim-dap',
 }
