@@ -13,14 +13,17 @@ return {
     opts = {
         animation = {},
         dashboard = {},
-        explorer = {
-            auto_close = true,
-        },
         image = {},
         indent = {},
         lazygit = {},
         notifier = {},
-        picker = {},
+        picker = {
+            sources = {
+                explorer = {
+                    auto_close = true,
+                }
+            }
+        },
         scroll = {},
         terminal = {},
     },
