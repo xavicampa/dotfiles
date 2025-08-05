@@ -6,7 +6,12 @@ return {
             settings = {
                 Lua = {
                     runtime = { version = "LuaJIT" },
-                    diagnostics = { enable = true },
+                    diagnostics = {
+                        enable = true,
+                        globals = {
+                            "vim"
+                        },
+                    },
                     telemetry = { enable = false },
                     workspace = {
                         library = { vim.env.VIMRUNTIME },
