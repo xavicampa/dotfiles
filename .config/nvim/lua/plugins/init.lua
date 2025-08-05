@@ -3,11 +3,6 @@ return {
         "klen/nvim-config-local",
         opts = {},
     },
-    -- {
-    --     "mason-org/mason.nvim",
-    --     version = "^1.0.0",
-    --     opts = {},
-    -- },
     {
         "mfussenegger/nvim-dap",
         keys = {
@@ -20,10 +15,9 @@ return {
             { '<leader>dj', '<cmd>DapStepOver<CR>' },
         },
     },
-    "folke/which-key.nvim",
     {
         "saghen/blink.cmp",
-        version = '1.*',
+        -- version = '1.*',
         opts = {}
     },
     "onsails/lspkind.nvim",
@@ -33,7 +27,7 @@ return {
         dependencies = {
             "nvim-tree/nvim-web-devicons",
         },
-        opts = {}
+        opts = {},
     },
     {
         "nvim-telescope/telescope.nvim",
@@ -55,15 +49,7 @@ return {
     {
         "folke/which-key.nvim",
         event = "VeryLazy",
-        init = function()
-            vim.o.timeout = true
-            vim.o.timeoutlen = 300
-        end,
-        opts = {
-            -- your configuration comes here
-            -- or leave it empty to use the default settings
-            -- refer to the configuration section below
-        }
+        opts = {}
     },
     {
         "folke/trouble.nvim",
@@ -75,8 +61,6 @@ return {
             file_types = { "markdown", "Avante" },
         },
         ft = { "markdown", "Avante" },
-        -- dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.nvim' }, -- if you use the mini.nvim suite
-        -- dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.icons' }, -- if you use standalone mini plugins
         dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' }, -- if you prefer nvim-web-devicons
     },
     'direnv/direnv.vim',

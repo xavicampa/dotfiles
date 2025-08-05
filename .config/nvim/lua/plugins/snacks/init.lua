@@ -12,7 +12,6 @@ return {
     lazy = false,
     opts = {
         animation = {},
-        -- dashboard = {},
         image = {},
         indent = {},
         lazygit = {},
