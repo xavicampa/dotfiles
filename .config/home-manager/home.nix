@@ -84,6 +84,7 @@ in
     pkgs.nodePackages.prettier
     pkgs.p7zip
     pkgs.ripgrep
+    pkgs.nixd
     pkgs.shell-gpt
     pkgs.slides
     pkgs.unzip
