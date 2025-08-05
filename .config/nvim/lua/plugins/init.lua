@@ -3,11 +3,11 @@ return {
         "klen/nvim-config-local",
         opts = {},
     },
-    {
-        "mason-org/mason.nvim",
-        version = "^1.0.0",
-        opts = {},
-    },
+    -- {
+    --     "mason-org/mason.nvim",
+    --     version = "^1.0.0",
+    --     opts = {},
+    -- },
     {
         "mfussenegger/nvim-dap",
         keys = {
