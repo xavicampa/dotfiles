@@ -1,5 +1,9 @@
 return {
     {
+        "klen/nvim-config-local",
+        opts = {},
+    },
+    {
         "mason-org/mason.nvim",
         version = "^1.0.0",
         opts = {},
