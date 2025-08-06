@@ -17,7 +17,7 @@ return {
     },
     {
         "saghen/blink.cmp",
-        -- version = '1.*',
+        version = '1.*',
         opts = {}
     },
     "onsails/lspkind.nvim",
