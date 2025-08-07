@@ -88,6 +88,8 @@ in
     pkgs.shell-gpt
     pkgs.slides
     pkgs.unzip
+    pkgs.vscode-langservers-extracted
+    pkgs.yaml-language-server
     pkgs.wget
     pythonEnv
   ];

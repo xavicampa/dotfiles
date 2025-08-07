@@ -38,12 +38,21 @@ return {
                 }
             }
         })
+        vim.lsp.config("yamlls", {
+            settings = {
+                yaml = {
+                    validate = false;   -- conflicts with CloudFormation cfn-lint
+                }
+            }
+        })
 
         -- Enable LSPs
         vim.lsp.enable(
             {
+                "jsonls",
                 "nixd",
                 "lua_ls",
+                "yamlls",
             }
         )
     end,
