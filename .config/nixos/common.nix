@@ -1,8 +1,8 @@
 { pkgs, config, ... }:
 
-# let
-#   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-# in
+let
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+in
 
 {
   # imports =
@@ -64,8 +64,9 @@
   # ollama
   services.ollama = {
     enable = true;
-    environmentVariables = { OLLAMA_MAX_LOADED_MODELS = "5"; OLLAMA_KEEP_ALIVE = "1h"; };
-    # package = unstable.ollama;
+    # environmentVariables = { OLLAMA_MAX_LOADED_MODELS = "5"; OLLAMA_KEEP_ALIVE = "1h"; };
+    package = unstable.ollama;
+    acceleration = "cuda";
   };
 
   # keyring
