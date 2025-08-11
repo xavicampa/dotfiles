@@ -82,6 +82,7 @@ in
     # pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     pkgs.nodePackages.prettier
+    pkgs.opencode
     pkgs.p7zip
     pkgs.ripgrep
     pkgs.nixd
