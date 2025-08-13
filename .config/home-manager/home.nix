@@ -6,9 +6,9 @@ let
   #   inherit pkgs;
   # };
 
-  # unstable = import <nixpkgs-unstable> {
-  #   config.allowUnfree = true;
-  # };
+  unstable = import <nixpkgs-unstable> {
+    config.allowUnfree = true;
+  };
 
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
@@ -77,12 +77,13 @@ in
     pkgs.nerd-fonts.jetbrains-mono
     pkgs.newman
     # pkgs.nix-du
+    pkgs.nixfmt-classic
     pkgs.node2nix
     # pkgs.nodePackages.aws-cdk
     # pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     pkgs.nodePackages.prettier
-    pkgs.opencode
+    unstable.opencode
     pkgs.p7zip
     pkgs.ripgrep
     pkgs.nixd

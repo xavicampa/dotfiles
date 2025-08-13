@@ -8,14 +8,13 @@
         "baseURL": "http://localhost:11434/v1"
       },
       "models": {
-        "qwen3": {
-          "name": "qwen3"
+        "qwen3-ctx": {
+          "name": "qwen3-ctx"
         },
         "gpt-oss": {
           "name": "gpt-oss"
         }
       }
     }
-  },
-  "model": "ollama/gpt-oss"
+  }
 }
