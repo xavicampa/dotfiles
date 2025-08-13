@@ -8,8 +8,8 @@
         "baseURL": "http://localhost:11434/v1"
       },
       "models": {
-        "qwen3-ctx": {
-          "name": "qwen3-ctx"
+        "qwen3": {
+          "name": "qwen3"
         },
         "gpt-oss": {
           "name": "gpt-oss"
