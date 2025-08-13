@@ -1,10 +1,8 @@
 { pkgs, config, ... }:
 
-let
-  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-in
+let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
-{
+in {
   # imports =
   #   [
   #     # Include the results of the hardware scan.
@@ -23,9 +21,7 @@ in
   nix.optimise.automatic = true;
   nix.settings = {
     auto-optimise-store = false;
-    substituters = [
-      "https://nix-community.cachix.org"
-    ];
+    substituters = [ "https://nix-community.cachix.org" ];
     trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
     ];
@@ -33,7 +29,8 @@ in
 
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
+  networking.networkmanager.enable =
+    true; # Easiest to use and most distros use this by default.
   # networking.firewall.trustedInterfaces = [ "docker0" ];
 
   # Set your time zone.
@@ -64,7 +61,10 @@ in
   # ollama
   services.ollama = {
     enable = true;
-    # environmentVariables = { OLLAMA_MAX_LOADED_MODELS = "5"; OLLAMA_KEEP_ALIVE = "1h"; };
+    environmentVariables = {
+      OLLAMA_FLASH_ATTENTION = "1";
+      OLLAMA_KV_CACHE_TYPE = "q8_0";
+    };
     package = unstable.ollama;
     acceleration = "cuda";
   };
@@ -75,9 +75,9 @@ in
   # Enable the OpenSSH daemon.
   # services.openssh.enable = true;
 
-  /* services.kmscon = { */
-  /*   enable = true; */
-  /* }; */
+  # services.kmscon = {
+  # enable = true;
+  # };
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
@@ -115,8 +115,10 @@ in
   # javi home section
   #
   environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
-  environment.etc."hypr/hypr.conf".source = "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
-  environment.etc."waybar/config.jsonc".source = "${config.users.users.javi.home}/.config/waybar/${config.networking.hostName}.jsonc";
+  environment.etc."hypr/hypr.conf".source =
+    "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
+  environment.etc."waybar/config.jsonc".source =
+    "${config.users.users.javi.home}/.config/waybar/${config.networking.hostName}.jsonc";
 
   i18n = {
     defaultLocale = "nb_NO.UTF-8";
@@ -130,9 +132,7 @@ in
   # programs.regreet.enable = true;
   services.xserver = {
     xkb.layout = "no";
-    displayManager = {
-      gdm.enable = true;
-    };
+    displayManager = { gdm.enable = true; };
   };
 
   programs.hyprland = {
@@ -141,13 +141,9 @@ in
     withUWSM = true;
   };
 
-  programs.hyprlock = {
-    enable = true;
-  };
+  programs.hyprlock = { enable = true; };
 
-  programs.ssh = {
-    enableAskPassword = false;
-  };
+  programs.ssh = { enableAskPassword = false; };
 
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
@@ -155,23 +151,15 @@ in
     GIT_ASKPASS = "";
   };
 
-  services.libinput = {
-    enable = true;
-  };
+  services.libinput = { enable = true; };
 
   # virtualisation.docker.enable = true;
   virtualisation = {
     containers.enable = true;
     podman = {
-      defaultNetwork = {
-        settings = {
-          dns_enabled = true;
-        };
-      };
+      defaultNetwork = { settings = { dns_enabled = true; }; };
       dockerCompat = true;
-      dockerSocket = {
-        enable = true;
-      };
+      dockerSocket = { enable = true; };
       enable = true;
     };
   };
@@ -182,9 +170,7 @@ in
   # programs.nix-ld.enable = true;
   programs.nix-ld = {
     enable = true;
-    libraries = with pkgs; [
-      stdenv.cc.cc.lib
-    ];
+    libraries = with pkgs; [ stdenv.cc.cc.lib ];
   };
   # environment.variables = {
   #   NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
@@ -194,13 +180,11 @@ in
   #   NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
   # };
 
-  /* programs.thunar.plugins = with pkgs.xfce; [ */
-  /*   thunar-archive-plugin */
-  /* ]; */
+  # programs.thunar.plugins = with pkgs.xfce; [
+  # thunar-archive-plugin
+  # ];
 
-  programs.appgate-sdp = {
-    enable = true;
-  };
+  programs.appgate-sdp = { enable = true; };
 
   programs._1password-gui = {
     enable = true;
@@ -217,7 +201,8 @@ in
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
-    extraGroups = [ "wheel" "i2c" "input" "podman" "video" ]; # Enable ‘sudo’ for the user.
+    extraGroups =
+      [ "wheel" "i2c" "input" "podman" "video" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       apple-cursor
       autotiling
@@ -258,9 +243,7 @@ in
 
   xdg.portal = {
     enable = true;
-    extraPortals = [
-      pkgs.xdg-desktop-portal-gtk
-    ];
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
     wlr.enable = true;
   };
 
