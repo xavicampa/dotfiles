@@ -66,14 +66,10 @@ in {
       OLLAMA_KV_CACHE_TYPE = "q8_0";
     };
     package = unstable.ollama;
-    acceleration = "cuda";
   };
 
   # keyring
   services.gnome.gnome-keyring.enable = true;
-
-  # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
 
   # services.kmscon = {
   # enable = true;

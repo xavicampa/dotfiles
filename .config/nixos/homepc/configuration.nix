@@ -91,7 +91,7 @@
     # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus 
     # Only available from driver 515.43.04+
     # Currently alpha-quality/buggy, so false is currently the recommended setting.
-    open = false;
+    open = true;
 
     # Enable the Nvidia settings menu,
     # accessible via `nvidia-settings`.
@@ -132,7 +132,7 @@
   # };
 
   # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
+  services.openssh.enable = true;
 
   services.xserver = { videoDrivers = [ "nvidia" ]; };
 
@@ -199,9 +199,19 @@
     AllowSuspendThenHibernate=no
   '';
 
-  users.users.javi.packages = with pkgs; [
-    # unstable.nvidia_oc
-    nvidia_oc
-    nvtopPackages.nvidia
-  ];
+  services.ollama = { acceleration = "cuda"; };
+
+  systemd.services.nvidia_oc = {
+    enable = true;
+    description = "NVidia overclock settings";
+    serviceConfig = {
+      ExecStart =
+        "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 2000 --freq-offset 400";
+      ExecStop =
+        "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0";
+      RemainAfterExit = true;
+    };
+  };
+
+  environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
 }
