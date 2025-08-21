@@ -65,6 +65,8 @@ in {
       OLLAMA_FLASH_ATTENTION = "1";
       OLLAMA_KV_CACHE_TYPE = "q8_0";
     };
+    host = "0.0.0.0";
+    openFirewall = true;
     package = unstable.ollama;
   };
 
@@ -128,7 +130,6 @@ in {
   # programs.regreet.enable = true;
   services.xserver = {
     xkb.layout = "no";
-    displayManager = { gdm.enable = true; };
   };
 
   programs.hyprland = {
