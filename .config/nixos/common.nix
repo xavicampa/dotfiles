@@ -62,6 +62,7 @@ in {
   services.ollama = {
     enable = true;
     environmentVariables = {
+      OLLAMA_DEBUG = "1";
       OLLAMA_FLASH_ATTENTION = "1";
       OLLAMA_KV_CACHE_TYPE = "q8_0";
     };
@@ -129,6 +130,7 @@ in {
 
   # programs.regreet.enable = true;
   services.xserver = {
+    displayManager = { gdm.enable = true; };
     xkb.layout = "no";
   };
 
