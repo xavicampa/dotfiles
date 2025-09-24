@@ -205,12 +205,12 @@ in {
     packages = with pkgs; [
       apple-cursor
       autotiling
+      baobab  # windirstat equivalent
       blueman
       bruno
       busybox # killall
       # cachix
       ddcutil
-      discord
       docker-compose
       egl-wayland
       feh
@@ -229,7 +229,6 @@ in {
       rofi-wayland
       rofimoji
       slack
-      spotify
       stow
       vscode
       wl-clipboard
