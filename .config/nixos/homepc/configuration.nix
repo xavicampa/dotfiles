@@ -3,9 +3,9 @@
 # to /etc/nixos/configuration.nix instead.
 { config, lib, pkgs, modulesPath, ... }:
 
-# let
-#   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-# in
+let
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+in
 
 {
   networking.hostName = "homepc"; # Define your hostname.
@@ -19,6 +19,8 @@
       google-chrome = prev.google-chrome.override {
         commandLineArgs =
           "--enable-features=AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoDecodeLinuxGL,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs";
+      };
+      lm-studio = prev.lm-studio.override {
       };
     })
   ];
@@ -214,4 +216,7 @@
   };
 
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
+
+  users.users.javi = { packages = with pkgs; [ unstable.lmstudio ]; };
+
 }
