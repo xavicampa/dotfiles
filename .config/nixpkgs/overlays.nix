@@ -5,11 +5,11 @@
       pythonOverlay = pythonFinal: pythonPrev: {
         cfn-lint = pythonPrev.buildPythonPackage rec {
           pname = "cfn_lint";
-          version = "1.34.2";
+          version = "1.40.2";
           format = "wheel";
           src = pythonPrev.fetchPypi rec {
             inherit pname version format;
-            sha256 = "sha256-tSnh91ZFWn1F890FhNA1qPswzzC4qVpJLRGig05oJnM=";
+            sha256 = "sha256-+kSjEBvY1/ZEvBRrip5j0PorZM1hyKdn5lxGkgZGJ3w=";
             dist = python;
             python = "py3";
           };
