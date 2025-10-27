@@ -7,6 +7,29 @@
       "options": {
         "baseURL": "http://localhost:1234/v1"
       },
+      "models": {
+        "qwen/qwen3-4b-2507": {
+          "name": "qwen3"
+        },
+        "qwen3/qwen3-4b-2507-thinking": {
+          "name": "qwen3-thinking"
+        },
+      }
+    },
+    "lmstudio-homepc": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio (home-pc)",
+      "options": {
+        "baseURL": "http://172.16.99.120:1234/v1"
+      },
+      "models": {
+        "qwen/qwen3-4b-2507": {
+          "name": "qwen3"
+        },
+        "qwen3/qwen3-4b-2507-thinking": {
+          "name": "qwen3-thinking"
+        },
+      }
     },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
