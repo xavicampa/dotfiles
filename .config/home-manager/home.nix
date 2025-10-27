@@ -10,7 +10,7 @@ let
     config.allowUnfree = true;
   };
 
-  pythonEnv = pkgs.python3.withPackages (ppkgs: [
+  pythonEnv = unstable.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
     ppkgs.cfn-lint
