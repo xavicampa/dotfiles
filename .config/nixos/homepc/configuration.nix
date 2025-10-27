@@ -218,5 +218,9 @@ in
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
 
   users.users.javi = { packages = with pkgs; [ unstable.lmstudio ]; };
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [ 1234 ];
+  };
 
 }
