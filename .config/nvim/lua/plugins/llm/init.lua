@@ -1,13 +1,15 @@
 return {
     'huggingface/llm.nvim',
     opts = {
+
         -- backend = "ollama",
         backend = "openai",
 
         accept_keymap = "<S-Tab>",
 
         -- url = "http://localhost:11434",
-        url = "http://172.16.99.120:1234/v1",
+        url = "http://172.16.99.120:1234",
+        api_token = nil,
 
         -- model = "codellama:7b-code",
         -- fim = {
@@ -20,7 +22,7 @@ return {
         -- tokens_to_clear = { "<EOT>" },
 
         -- model = "qwen2.5-coder:1.5b-base",
-        model = "qwen/qwen2.5-coder:7b",
+        model = "qwen2.5-coder-7b-instruct",
         fim = {
             enabled = true,
             prefix = "<|fim_prefix|>",
