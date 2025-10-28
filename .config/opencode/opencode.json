@@ -9,10 +9,8 @@
       },
       "models": {
         "qwen/qwen3-4b-2507": {
-          "name": "qwen3"
         },
-        "qwen3/qwen3-4b-2507-thinking": {
-          "name": "qwen3-thinking"
+        "qwen/qwen3-4b-thinking-2507": {
         },
       }
     },
@@ -25,7 +23,7 @@
       "models": {
         "qwen/qwen3-4b-2507": {
         },
-        "qwen3/qwen3-4b-2507-thinking": {
+        "qwen/qwen3-4b-thinking-2507": {
         },
       }
     },
@@ -37,10 +35,8 @@
       },
       "models": {
         "qwen3": {
-          "name": "qwen3"
         },
         "gpt-oss": {
-          "name": "gpt-oss"
         }
       }
     }
