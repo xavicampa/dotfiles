@@ -1,14 +1,16 @@
 return {
     'huggingface/llm.nvim',
     opts = {
-
-        -- backend = "ollama",
-        backend = "openai",
-
         accept_keymap = "<S-Tab>",
 
+        -- backend = "ollama",
         -- url = "http://localhost:11434",
+
+        backend = "openai",
         url = "http://172.16.99.120:1234",
+        context_window = 32000,
+        -- url = "http://localhost:1234",
+        -- context_window = 8000,
         api_token = nil,
 
         -- model = "codellama:7b-code",
@@ -18,10 +20,10 @@ return {
         --     middle = " <MID>",
         --     suffix = " <SUF>",
         -- },
-        -- context_window = 4096,
         -- tokens_to_clear = { "<EOT>" },
 
         -- model = "qwen2.5-coder:1.5b-base",
+        -- model = "qwen2.5-coder-1.5b-instruct",
         model = "qwen2.5-coder-7b-instruct",
         fim = {
             enabled = true,
@@ -29,11 +31,6 @@ return {
             middle = "<|fim_middle|>",
             suffix = "<|fim_suffix|>",
         },
-        context_window = 32000,
-
-        -- tokenizer = {
-        --     repository = "Qwen/Qwen2.5-Coder-1.5B"
-        -- },
 
         -- model = "deepseek-coder-v2:16b-lite-base-q4_0",
         -- fim = {
@@ -42,6 +39,9 @@ return {
         --     middle = "<｜fim▁end｜>",
         --     suffix = "<｜fim▁hole｜>",
         -- },
-        -- context_window = 4096,
+
+        -- tokenizer = {
+        --     repository = "Qwen/Qwen2.5-Coder-1.5B"
+        -- },
     }
 }

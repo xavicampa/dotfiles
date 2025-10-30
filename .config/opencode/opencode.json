@@ -12,6 +12,8 @@
         },
         "qwen/qwen3-4b-thinking-2507": {
         },
+        "openai/gpt-oss-20b": {
+        },
       }
     },
     "lmstudio-homepc": {
