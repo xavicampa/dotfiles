@@ -36,9 +36,7 @@
         "baseURL": "http://localhost:11434/v1"
       },
       "models": {
-        "qwen3": {
-        },
-        "gpt-oss": {
+        "qwen3:8b": {
         }
       }
     }
