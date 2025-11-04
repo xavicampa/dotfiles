@@ -1,8 +1,7 @@
 return {
         "David-Kunz/gen.nvim",
         opts = {
-            model = "llama3.2",
-            -- model = "deepseek-r1:14b",
+            model = "qwen3:8b",
         },
         init = function()
             require("gen").prompts["Generate"] = {
