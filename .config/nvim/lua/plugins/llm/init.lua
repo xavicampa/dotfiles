@@ -3,11 +3,11 @@ return {
     opts = {
         accept_keymap = "<S-Tab>",
 
-        -- backend = "ollama",
-        -- url = "http://localhost:11434",
+        backend = "ollama",
+        url = "http://localhost:11434",
 
-        backend = "openai",
-        url = "http://172.16.99.120:1234",
+        -- backend = "openai",
+        -- url = "http://172.16.99.120:1234",
         context_window = 32000,
         -- url = "http://localhost:1234",
         -- context_window = 8000,
@@ -23,8 +23,7 @@ return {
         -- tokens_to_clear = { "<EOT>" },
 
         -- model = "qwen2.5-coder:1.5b-base",
-        -- model = "qwen2.5-coder-1.5b-instruct",
-        model = "qwen2.5-coder-7b-instruct",
+        model = "qwen2.5-coder:3b-base",
         fim = {
             enabled = true,
             prefix = "<|fim_prefix|>",
