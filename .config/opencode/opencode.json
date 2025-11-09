@@ -29,15 +29,34 @@
         },
       }
     },
+    "vllm-homepc": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "vLLM (homepc)",
+      "options": {
+        "baseURL": "http://homepc:8000/v1"
+      },
+      "models": {
+        "nvidia/Qwen3-8B-FP4": {
+          "limit": {
+            "context": 32000,
+            "output": 8000
+          }
+        },
+      }
+    },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (local)",
+      "name": "Ollama (homepc)",
       "options": {
-        "baseURL": "http://localhost:11434/v1"
+        "baseURL": "http://homepc:11434/v1"
       },
       "models": {
         "qwen3:8b": {
-        }
+        },
+        "gpt-oss:20b": {
+        },
+        "granite4": {
+        },
       }
     }
   }
