@@ -244,6 +244,10 @@ in
       oh-my-zsh = {
         enable = true;
         plugins = [ "aws" "git" "brew" "podman" "npm" "pip" ];
+        extraConfig = ''
+          zstyle ':omz:update' mode disabled
+          DISABLE_UPDATE_PROMPT=true
+        '';
         /* theme = "robbyrussell"; */
       };
     };
