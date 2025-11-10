@@ -14,6 +14,7 @@ return {
         animation = {},
         image = {},
         indent = {},
+        input = {},
         lazygit = {},
         notifier = {},
         picker = {
