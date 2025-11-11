@@ -8,12 +8,9 @@
         "baseURL": "http://localhost:1234/v1"
       },
       "models": {
-        "qwen/qwen3-4b-2507": {
-        },
-        "qwen/qwen3-4b-thinking-2507": {
-        },
-        "openai/gpt-oss-20b": {
-        },
+        "qwen/qwen3-4b-2507": {},
+        "qwen/qwen3-4b-thinking-2507": {},
+        "openai/gpt-oss-20b": {}
       }
     },
     "lmstudio-homepc": {
@@ -23,10 +20,8 @@
         "baseURL": "http://172.16.99.120:1234/v1"
       },
       "models": {
-        "qwen/qwen3-4b-2507": {
-        },
-        "qwen/qwen3-4b-thinking-2507": {
-        },
+        "qwen/qwen3-4b-2507": {},
+        "qwen/qwen3-4b-thinking-2507": {}
       }
     },
     "vllm-homepc": {
@@ -41,10 +36,32 @@
             "context": 32000,
             "output": 8000
           }
-        },
+        }
       }
     },
     "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3:1.7b": {
+          "limit": {
+            "context": 32000,
+            "output": 8000
+          },
+          "options": {
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0
+          }
+        },
+        "gpt-oss:20b": {}
+      }
+    },
+    "ollama-homepc": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (homepc)",
       "options": {
@@ -52,11 +69,18 @@
       },
       "models": {
         "qwen3:8b": {
+          "limit": {
+            "context": 32000,
+            "output": 8000
+          },
+          "options": {
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0
+          }
         },
-        "gpt-oss:20b": {
-        },
-        "granite4": {
-        },
+        "gpt-oss:20b": {}
       }
     }
   }
