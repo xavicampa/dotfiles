@@ -27,17 +27,7 @@ in {
     ];
   };
 
-  # Pick only one of the below networking options.
-  networking.wireless = {
-    enable = true;  # Enables wireless support via wpa_supplicant.
-    networks = {
-      "Telenor0258rad-5GHz" = {
-        pskRaw = "51258baabe2a5081f2be373cee68a93c35ddc60dcb8cff772116b7e6ba564b2a";
-      };
-    };
-  };
-  # networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
-  # networking.firewall.trustedInterfaces = [ "docker0" ];
+  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
   # Set your time zone.
   time = {
@@ -136,7 +126,7 @@ in {
 
   # programs.regreet.enable = true;
   services.xserver = {
-    displayManager = { gdm.enable = true; };
+    # displayManager = { gdm.enable = true; };
     xkb.layout = "no";
   };
 
@@ -201,7 +191,7 @@ in {
     package = pkgs.firefox-bin;
   };
 
-  programs.waybar.enable = true;
+  # programs.waybar.enable = true;
 
   users.users.javi = {
     shell = pkgs.zsh;
@@ -242,6 +232,7 @@ in {
       xdg-user-dirs
       xdg-utils
       xfce.thunar
+      waybar
     ];
   };
 

@@ -3,9 +3,9 @@
 # to /etc/nixos/configuration.nix instead.
 { config, lib, pkgs, modulesPath, ... }:
 
-let
-  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-in
+# let
+#   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+# in
 
 {
   networking.hostName = "homepc"; # Define your hostname.
@@ -20,8 +20,6 @@ in
         commandLineArgs =
           "--enable-features=AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoDecodeLinuxGL,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs";
       };
-      lm-studio = prev.lm-studio.override {
-      };
     })
   ];
 
@@ -34,13 +32,13 @@ in
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   # boot.extraModulePackages = [ ];
-  boot.loader.systemd-boot.consoleMode = "max";
-  boot.kernelParams = [
+  # boot.loader.systemd-boot.consoleMode = "max";
+  # boot.kernelParams = [
     # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
     # "nvidia.NVreg_EnableGpuFirmware=0"
     # "nvidia-drm.modeset=1"
     # "nvidia-drm.fbdev=1"
-  ];
+  # ];
 
   fileSystems."/" = {
     device = "/dev/disk/by-label/NIXROOT";
@@ -56,18 +54,17 @@ in
     device = "/swapfile";
     size = 32 * 1024; # 32GB
   }];
-  boot.kernel.sysctl."vm.swappiness" = 0;
+  boot.kernel.sysctl."vm.swappiness" = 10;
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
   # (the default) this is the recommended approach. When using systemd-networkd it's
   # still possible to use this option, but it's recommended to use it in conjunction
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
-  # networking.interfaces.enp0s31f6.useDHCP = lib.mkDefault true;
-  # networking.interfaces.enp3s0.useDHCP = lib.mkDefault true;
   networking.interfaces.enp3s0.mtu = 9000;
-  networking.wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
-  # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
+
+  # networking.wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
+  # networking.networkmanager.enable = false;
 
   # powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
   services.thermald.enable = true;
@@ -218,10 +215,10 @@ in
 
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
 
-  users.users.javi = { packages = with pkgs; [ unstable.lmstudio ]; };
-  networking.firewall = {
-    enable = true;
-    allowedTCPPorts = [ 1234 ];
-  };
+  # users.users.javi = { packages = with pkgs; [ unstable.lmstudio ]; };
+  # networking.firewall = {
+  #   enable = true;
+  #   allowedTCPPorts = [ 1234 ];
+  # };
 
 }
