@@ -23,8 +23,8 @@ return {
       -- },
       -- tokens_to_clear = { "<EOT>" },
 
-      model = "qwen2.5-coder:1.5b-base",
-      -- model = "qwen2.5-coder:3b-base",
+      -- model = "qwen2.5-coder:1.5b-base",
+      model = "qwen2.5-coder:3b-base",
       fim = {
         enabled = true,
         prefix = "<|fim_prefix|>",

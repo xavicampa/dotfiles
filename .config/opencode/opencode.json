@@ -80,7 +80,13 @@
             "min_p": 0
           }
         },
-        "gpt-oss:20b": {}
+        "gpt-oss:20b": {},
+        "granite4": {
+          "limit": {
+            "context": 128000,
+            "output": 32000
+          },
+        }
       }
     }
   }

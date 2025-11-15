@@ -21,7 +21,8 @@ vim.keymap.set("n", "<leader>fb", ":Telescope buffers<CR>", opts)
 vim.keymap.set("n", "<leader>fh", ":Telescope help_tags<CR>", opts)
 
 -- opencode.nvim: select text in normal or visual mode for LLM interaction
-vim.keymap.set({ 'n', 'v' }, '<leader>o', function() require("opencode").select() end, opts)
+vim.keymap.set({ "n", "x" }, "<leader>oo", function() require("opencode").select() end, opts)
+vim.keymap.set({ "n", "x" }, "<leader>oa", function() require("opencode").ask("@buffer: ", {submit = true}) end, opts)
 
 -- trouble: toggle diagnostics, symbols, LSP references, etc.
 vim.keymap.set("n", "<leader>xx", "<cmd>Trouble diagnostics toggle focus=true<cr>", opts)
