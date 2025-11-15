@@ -14,14 +14,14 @@
     [ ../common.nix (modulesPath + "/installer/scan/not-detected.nix") ];
 
   # commandLineArgs for chrome video acceleration
-  nixpkgs.overlays = [
-    (final: prev: {
-      google-chrome = prev.google-chrome.override {
-        commandLineArgs =
-          "--enable-features=AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoDecodeLinuxGL,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs";
-      };
-    })
-  ];
+  # nixpkgs.overlays = [
+  #   (final: prev: {
+  #     google-chrome = prev.google-chrome.override {
+  #       commandLineArgs =
+  #         "--enable-features=AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoDecodeLinuxGL,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs";
+  #     };
+  #   })
+  # ];
 
   nixpkgs.config.cudaSupport = true;
 
