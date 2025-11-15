@@ -1,8 +1,8 @@
 { pkgs, config, ... }:
 
-let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+# let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
-in {
+# in {
   # imports =
   #   [
   #     # Include the results of the hardware scan.
@@ -10,6 +10,7 @@ in {
   #     # ./sentinel.nix
   #   ];
 
+{
   nixpkgs.config.allowUnfree = true;
 
   # Use the systemd-boot EFI boot loader.
@@ -28,6 +29,7 @@ in {
   };
 
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
+  networking.enableIPv6 = false;
 
   # Set your time zone.
   time = {
@@ -64,7 +66,7 @@ in {
     };
     host = "0.0.0.0";
     openFirewall = true;
-    package = unstable.ollama;
+    # package = unstable.ollama;
   };
 
   # keyring
@@ -191,7 +193,7 @@ in {
     package = pkgs.firefox-bin;
   };
 
-  # programs.waybar.enable = true;
+  programs.waybar.enable = true;
 
   users.users.javi = {
     shell = pkgs.zsh;
@@ -222,17 +224,18 @@ in {
       pamixer
       pasystray
       pavucontrol
-      rofi-wayland
+      # rofi-wayland
+      rofi
       rofimoji
       slack
       stow
-      vscode
+      # vscode
       wl-clipboard
       wtype
       xdg-user-dirs
       xdg-utils
       xfce.thunar
-      waybar
+      # waybar
     ];
   };
 

@@ -32,7 +32,7 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   # boot.extraModulePackages = [ ];
-  # boot.loader.systemd-boot.consoleMode = "max";
+  boot.loader.systemd-boot.consoleMode = "max";
   # boot.kernelParams = [
     # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
     # "nvidia.NVreg_EnableGpuFirmware=0"
@@ -62,6 +62,7 @@
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
   networking.interfaces.enp3s0.mtu = 9000;
+  networking.networkmanager.wifi.powersave = false;
 
   # networking.wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
   # networking.networkmanager.enable = false;

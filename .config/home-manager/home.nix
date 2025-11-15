@@ -6,11 +6,11 @@ let
   #   inherit pkgs;
   # };
 
-  unstable = import <nixpkgs-unstable> {
+  stable = import <nixpkgs-stable> {
     config.allowUnfree = true;
   };
-
-  pythonEnv = unstable.python3.withPackages (ppkgs: [
+  
+  pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
     ppkgs.cfn-lint
@@ -50,6 +50,7 @@ in
     # nodePackages."@aws-amplify/cli"
     # nodePackages."@angular/cli"
     pkgs.awscli2
+    stable.aws-sam-cli
     pkgs.cargo
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
@@ -83,7 +84,6 @@ in
     # pkgs.nodePackages.create-react-app
     pkgs.nodePackages.typescript
     pkgs.nodePackages.prettier
-    unstable.opencode
     pkgs.p7zip
     pkgs.ripgrep
     pkgs.nixd
@@ -193,27 +193,15 @@ in
         pkgs.nodePackages.typescript-language-server
         pkgs.pyright
         # pkgs.rnix-lsp
-        pkgs.sumneko-lua-language-server
+        pkgs.lua-language-server
         pkgs.tree-sitter
       ];
     };
 
-    /* tmux = { */
-    /*   enable = true; */
-    /*  */
-    /*   baseIndex = 1; */
-    /*   escapeTime = 10; */
-    /*   keyMode = "vi"; */
-    /*   plugins = with pkgs.tmuxPlugins; [ */
-    /*     gruvbox */
-    /*     yank */
-    /*   ]; */
-    /*   terminal = "xterm-kitty"; */
-    /*  */
-    /*   extraConfig = '' */
-    /*     set-option -g mouse on */
-    /*   ''; */
-    /* }; */
+    opencode = {
+      enable = true;
+      # package = unstable.opencode;
+    };
 
     starship = {
       enable = true;
