@@ -26,7 +26,7 @@
   nixpkgs.config.cudaSupport = true;
 
   # boot.kernelPackages = pkgs.linuxPackages_6_13;
-  # boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.initrd.availableKernelModules =
     [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
@@ -69,6 +69,7 @@
 
   # powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
   services.thermald.enable = true;
+  hardware.enableRedistributableFirmware = true;
   hardware.cpu.intel.updateMicrocode =
     lib.mkDefault config.hardware.enableRedistributableFirmware;
   hardware.nvidia = {

@@ -28,8 +28,21 @@
     ];
   };
 
-  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
-  networking.enableIPv6 = false;
+  networking = {
+    networkmanager = {
+      enable = true; # Easiest to use and most distros use this by default.
+      wifi.backend = "iwd";
+    };
+    enableIPv6 = false;
+    wireless.iwd.settings = {
+      Network = {
+        EnableIPv6 = false;
+      };
+      Settings = {
+        AutoConnect = true;
+      };
+    };
+  };
 
   # Set your time zone.
   time = {
