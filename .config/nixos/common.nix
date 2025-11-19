@@ -31,17 +31,8 @@
   networking = {
     networkmanager = {
       enable = true; # Easiest to use and most distros use this by default.
-      wifi.backend = "iwd";
     };
     enableIPv6 = false;
-    wireless.iwd.settings = {
-      Network = {
-        EnableIPv6 = false;
-      };
-      Settings = {
-        AutoConnect = true;
-      };
-    };
   };
 
   # Set your time zone.
@@ -212,7 +203,7 @@
     shell = pkgs.zsh;
     isNormalUser = true;
     extraGroups =
-      [ "wheel" "i2c" "input" "podman" "video" ]; # Enable ‘sudo’ for the user.
+      [ "wheel" "i2c" "input" "podman" "video" "networkmanager" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       apple-cursor
       autotiling

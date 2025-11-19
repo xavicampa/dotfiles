@@ -62,13 +62,14 @@
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
   networking.interfaces.enp3s0.mtu = 9000;
-  networking.networkmanager.wifi.powersave = false;
 
-  # networking.wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
+  # networking.networkmanager.wifi.powersave = false;
+  networking.wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
   # networking.networkmanager.enable = false;
 
   # powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
   services.thermald.enable = true;
+
   hardware.enableRedistributableFirmware = true;
   hardware.cpu.intel.updateMicrocode =
     lib.mkDefault config.hardware.enableRedistributableFirmware;
