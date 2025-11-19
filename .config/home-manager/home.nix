@@ -75,6 +75,7 @@ in
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
+    pkgs.kiro
     pkgs.nerd-fonts.jetbrains-mono
     pkgs.newman
     # pkgs.nix-du
