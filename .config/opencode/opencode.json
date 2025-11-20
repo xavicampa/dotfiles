@@ -58,7 +58,13 @@
             "min_p": 0
           }
         },
-        "gpt-oss:20b": {}
+        "gpt-oss:20b": {
+          "options": {
+            "extraBody": {
+              "think": "high"
+            }
+          }
+        }
       }
     },
     "ollama-homepc": {
@@ -80,14 +86,113 @@
             "min_p": 0
           }
         },
-        "gpt-oss:20b": {},
+        "gpt-oss:20b": {
+          "limit": {
+            "context": 80000,
+            "output": 16000
+          },
+          "options": {
+            "extraBody": {
+              "think": "high"
+            }
+          }
+        },
         "granite4": {
           "limit": {
             "context": 128000,
             "output": 32000
-          },
+          }
         }
       }
     }
+  },
+  "mcp": {
+    "brave-mcp": {
+      "type": "local",
+      "command": [
+        "podman",
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "BRAVE_API_KEY",
+        "docker.io/mcp/brave-search"
+      ],
+      "environment": {
+        "BRAVE_API_KEY": "XXX"
+      }
+    },
+    "aws-docs-mcp": {
+      "type": "local",
+      "command": [
+        "podman",
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "FASTMCP_LOG_LEVEL=ERROR",
+        "-e",
+        "AWS_DOCUMENTATION_PARTITION=aws",
+        "public.ecr.aws/awslabs-mcp/awslabs/aws-documentation-mcp-server:latest"
+      ],
+      "environment": {}
+    },
+    "aws-cfn-mcp": {
+      "type": "local",
+      "command": [
+        "podman",
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/home/javi/.aws:/app/.aws:U",
+        "-v",
+        "/home/javi/javier-campa-dotfiles/dot-aws:/app/javier-campa-dotfiles/dot-aws:U",
+        "-e",
+        "AWS_PROFILE=javier",
+        "public.ecr.aws/awslabs-mcp/awslabs/cfn-mcp-server:latest",
+        "--readonly"
+      ],
+      "environment": {}
+    },
+    "aws-pricing-mcp": {
+      "type": "local",
+      "command": [
+        "podman",
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/home/javi/.aws:/app/.aws:U",
+        "-v",
+        "/home/javi/javier-campa-dotfiles/dot-aws:/app/javier-campa-dotfiles/dot-aws:U",
+        "-e",
+        "AWS_PROFILE=javier",
+        "public.ecr.aws/awslabs-mcp/awslabs/aws-pricing-mcp-server:latest",
+      ],
+      "environment": {}
+    },
+    "aws-diagram-mcp": {
+      "type": "local",
+      "command": [
+        "podman",
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/home/javi/.aws:/app/.aws:U",
+        "-v",
+        "/home/javi/javier-campa-dotfiles/dot-aws:/app/javier-campa-dotfiles/dot-aws:U",
+        "-v",
+        "/tmp:/tmp",
+        "-e",
+        "AWS_PROFILE=javier",
+        "public.ecr.aws/awslabs-mcp/awslabs/aws-diagram-mcp-server:latest",
+      ],
+      "environment": {}
+    }
+  },
+  "permission": {
+    "webfetch": "deny"
   }
 }
