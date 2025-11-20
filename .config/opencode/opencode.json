@@ -88,8 +88,8 @@
         },
         "gpt-oss:20b": {
           "limit": {
-            "context": 80000,
-            "output": 16000
+            "context": 64000,
+            "output": 8000
           },
           "options": {
             "extraBody": {
@@ -119,7 +119,7 @@
         "docker.io/mcp/brave-search"
       ],
       "environment": {
-        "BRAVE_API_KEY": "XXX"
+        "BRAVE_API_KEY": "BSAU00S2STZsTQmOkeBr5Mg87nNu834"
       }
     },
     "aws-docs-mcp": {
