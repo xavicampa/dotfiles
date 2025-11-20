@@ -219,8 +219,11 @@ in
       enable = true;
       enableCompletion = true;
       initContent = ''
-        export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/opt/openssl/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
-        export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
+        export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/opt/openssl/bin:$PATH
+        export PATH=$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH
+
+        npm set prefix ~/.npm-global
+        export PATH=$HOME/.npm-global/bin:$PATH
       '';
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
