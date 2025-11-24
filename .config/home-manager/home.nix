@@ -70,6 +70,7 @@ in
     pkgs.ghostscript
     pkgs.go
     pkgs.graph-easy
+    pkgs.graphviz
     pkgs.git-remote-codecommit
     pkgs.imagemagick
     pkgs.kitty-themes
@@ -93,6 +94,7 @@ in
     pkgs.unzip
     pkgs.vscode-langservers-extracted
     pkgs.yaml-language-server
+    pkgs.uv
     pkgs.wget
     pythonEnv
   ];
