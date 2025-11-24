@@ -218,7 +218,7 @@
 
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
 
-  # users.users.javi = { packages = with pkgs; [ unstable.lmstudio ]; };
+  users.users.javi = { packages = with pkgs; [ lmstudio ]; };
   # networking.firewall = {
   #   enable = true;
   #   allowedTCPPorts = [ 1234 ];
