@@ -17,11 +17,23 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "LM Studio (home-pc)",
       "options": {
-        "baseURL": "http://172.16.99.120:1234/v1"
+        "baseURL": "http://homepc:1234/v1"
       },
       "models": {
-        "qwen/qwen3-4b-2507": {},
-        "qwen/qwen3-4b-thinking-2507": {}
+        "openai/gpt-oss": {
+          "limit": {
+            "context": 32000,
+            "output": 8000
+          },
+          "options": {
+            "temperature": 1,
+            "top_p": 1.0,
+            "top_k": 0,
+            "extraBody": {
+              "think": "high"
+            }
+          }
+        }
       }
     },
     "vllm-homepc": {
@@ -60,6 +72,9 @@
         },
         "gpt-oss:20b": {
           "options": {
+            "temperature": 1,
+            "top_p": 1.0,
+            "top_k": 0,
             "extraBody": {
               "think": "high"
             }
@@ -86,21 +101,18 @@
             "min_p": 0
           }
         },
-        "gpt-oss:20b": {
+        "gpt-oss": {
           "limit": {
             "context": 64000,
             "output": 8000
           },
           "options": {
+            "temperature": 1,
+            "top_p": 1.0,
+            "top_k": 0,
             "extraBody": {
               "think": "high"
             }
-          }
-        },
-        "granite4": {
-          "limit": {
-            "context": 128000,
-            "output": 32000
           }
         }
       }
@@ -168,31 +180,35 @@
         "/home/javi/javier-campa-dotfiles/dot-aws:/app/javier-campa-dotfiles/dot-aws:U",
         "-e",
         "AWS_PROFILE=javier",
-        "public.ecr.aws/awslabs-mcp/awslabs/aws-pricing-mcp-server:latest",
+        "public.ecr.aws/awslabs-mcp/awslabs/aws-pricing-mcp-server:latest"
       ],
       "environment": {}
     },
     "aws-diagram-mcp": {
       "type": "local",
       "command": [
+        "uvx",
+        "awslabs.aws-diagram-mcp-server",
+      ],
+      "environment": {
+        "FAST_MCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "context7": {
+      "type": "local",
+      "command": [
         "podman",
         "run",
         "-i",
         "--rm",
-        "-v",
-        "/home/javi/.aws:/app/.aws:U",
-        "-v",
-        "/home/javi/javier-campa-dotfiles/dot-aws:/app/javier-campa-dotfiles/dot-aws:U",
-        "-v",
-        "/tmp:/tmp",
         "-e",
-        "AWS_PROFILE=javier",
-        "public.ecr.aws/awslabs-mcp/awslabs/aws-diagram-mcp-server:latest",
+        "MCP_TRANSPORT=stdio",
+        "mcp/context7"
       ],
       "environment": {}
     }
   },
   "permission": {
-    "webfetch": "deny"
+    "external_directory": "ask"
   }
 }
