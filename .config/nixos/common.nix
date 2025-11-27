@@ -61,24 +61,32 @@
   #   ];
 
   # ollama
-  services.ollama = {
-    enable = true;
-    environmentVariables = {
-      OLLAMA_DEBUG = "1";
-      OLLAMA_FLASH_ATTENTION = "1";
-      OLLAMA_KV_CACHE_TYPE = "q8_0";
-      OLLAMA_NUM_PARALLEL = "1";
-    };
-    host = "0.0.0.0";
-    openFirewall = true;
-    # package = unstable.ollama;
-  };
+  # services.ollama = {
+  #   enable = true;
+  #   environmentVariables = {
+  #     OLLAMA_DEBUG = "1";
+  #     OLLAMA_FLASH_ATTENTION = "1";
+  #     OLLAMA_KV_CACHE_TYPE = "q8_0";
+  #     OLLAMA_NUM_PARALLEL = "1";
+  #   };
+  #   host = "0.0.0.0";
+  #   openFirewall = true;
+  #   # package = unstable.ollama;
+  # };
 
   # keyring
   services.gnome.gnome-keyring.enable = true;
 
-  # services.kmscon = {
-  # enable = true;
+  services.kmscon = {
+    enable = false;
+    extraConfig = "font-dpi=144";
+    # extraOptions = "--no-drm";
+    hwRender = true;
+    useXkbConfig = true;
+  };
+
+  # services.seatd = {
+  #   enable = true;
   # };
 
   # Open ports in the firewall.
@@ -187,10 +195,13 @@
   # ];
 
   programs.appgate-sdp = { enable = true; };
-
   programs._1password-gui = {
     enable = true;
-    # package = unstable._1password-gui;
+    polkitPolicyOwners = [ "javi" ];
+    package = pkgs._1password-gui-beta;
+  };
+  programs._1password = {
+    enable = true;
   };
 
   programs.firefox = {

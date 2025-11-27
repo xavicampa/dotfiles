@@ -34,10 +34,10 @@
   # boot.extraModulePackages = [ ];
   boot.loader.systemd-boot.consoleMode = "max";
   # boot.kernelParams = [
-    # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-    # "nvidia.NVreg_EnableGpuFirmware=0"
-    # "nvidia-drm.modeset=1"
-    # "nvidia-drm.fbdev=1"
+  # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
+  # "nvidia.NVreg_EnableGpuFirmware=0"
+  # "nvidia-drm.modeset=1"
+  # "nvidia-drm.fbdev=1"
   # ];
 
   fileSystems."/" = {
@@ -64,7 +64,8 @@
   networking.interfaces.enp3s0.mtu = 9000;
 
   # networking.networkmanager.wifi.powersave = false;
-  networking.wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
+  networking.wireless.enable =
+    lib.mkForce false; # Enables wireless support via wpa_supplicant.
   # networking.networkmanager.enable = false;
 
   # powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
@@ -202,7 +203,13 @@
     AllowSuspendThenHibernate=no
   '';
 
-  services.ollama = { acceleration = "cuda"; };
+  # services.ollama = { acceleration = "cuda"; };
+
+  # services.llama-cpp = {
+  #   enable = true;
+  #   openFirewall = true;
+  #   model = "/home/javi/llm-models/ggml-org_gpt-oss-20b-GGUF_gpt-oss-20b-mxfp4.gguf";
+  # };
 
   systemd.services.nvidia_oc = {
     enable = true;
@@ -219,9 +226,41 @@
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
 
   users.users.javi = { packages = with pkgs; [ lmstudio ]; };
+
   # networking.firewall = {
-  #   enable = true;
-  #   allowedTCPPorts = [ 1234 ];
+  #   enable = false;
+  #   # allowedTCPPorts = [ 8080 ];
   # };
 
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers = {
+      fim = {
+        autoStart = false;
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+        cmd = [ "--fim-qwen-1.5b-default" ];
+        ports = [ "8012:8012" ];
+        devices = [ "nvidia.com/gpu=all" ];
+        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+      };
+      gpt = {
+        autoStart = false;
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+        cmd = [
+          "-hf"
+          "ggml-org/gpt-oss-20b-GGUF"
+          "--jinja"
+          "-ub"
+          "2048,4096"
+          "-b"
+          "4096"
+          "--ctx-size"
+          "32000"
+        ];
+        ports = [ "8080:8080" ];
+        devices = [ "nvidia.com/gpu=all" ];
+        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+      };
+    };
+  };
 }

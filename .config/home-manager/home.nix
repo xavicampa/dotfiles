@@ -6,10 +6,8 @@ let
   #   inherit pkgs;
   # };
 
-  stable = import <nixpkgs-stable> {
-    config.allowUnfree = true;
-  };
-  
+  stable = import <nixpkgs-stable> { config.allowUnfree = true; };
+
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
@@ -22,8 +20,7 @@ let
   # flag on macos
   macos = builtins.pathExists "/Users/javi";
 
-in
-{
+in {
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
@@ -37,10 +34,11 @@ in
     NIXPKGS_ALLOW_UNFREE = 1;
   };
 
-  home.file =
-    if macos then {
-      "Library/Application Support/lazygit/".source = config.lib.file.mkOutOfStoreSymlink "/Users/javi/.config/lazygit/";
-    } else { };
+  home.file = if macos then {
+    "Library/Application Support/lazygit/".source =
+      config.lib.file.mkOutOfStoreSymlink "/Users/javi/.config/lazygit/";
+  } else
+    { };
 
   nix.package = pkgs.nixVersions.latest;
 
@@ -54,18 +52,16 @@ in
     pkgs.cargo
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
-    (
-      if macos then
-        pkgs.btop
-      else
-        pkgs.btop.overrideAttrs
-          (oldAttrs: {
-            nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ pkgs.addDriverRunpath ];
-            postFixup = ''
-              addDriverRunpath $out/bin/btop
-            '';
-          })
-    )
+    (if macos then
+      pkgs.btop
+    else
+      pkgs.btop.overrideAttrs (oldAttrs: {
+        nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ])
+          ++ [ pkgs.addDriverRunpath ];
+        postFixup = ''
+          addDriverRunpath $out/bin/btop
+        '';
+      }))
     # pkgs.btop
     pkgs.ghostscript
     pkgs.go
@@ -91,6 +87,7 @@ in
     pkgs.nixd
     pkgs.shell-gpt
     pkgs.slides
+    pkgs.starship
     pkgs.unzip
     pkgs.vscode-langservers-extracted
     pkgs.yaml-language-server
@@ -111,9 +108,7 @@ in
 
   fonts.fontconfig.enable = lib.mkForce true;
 
-  services.dunst = {
-    enable = if macos then false else true;
-  };
+  services.dunst = { enable = if macos then false else true; };
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
@@ -127,14 +122,10 @@ in
 
     direnv = {
       enable = true;
-      nix-direnv = {
-        enable = true;
-      };
+      nix-direnv = { enable = true; };
     };
 
-    eza = {
-      enable = true;
-    };
+    eza = { enable = true; };
 
     # ghostty = {
     #     enable = true;
@@ -143,12 +134,13 @@ in
     kitty = {
       enable = true;
       font = {
-        name = if macos then "JetBrainsMono Nerd Font Mono" else "JetBrainsMono Nerd Font";
+        name = if macos then
+          "JetBrainsMono Nerd Font Mono"
+        else
+          "JetBrainsMono Nerd Font";
         size = if macos then 16 else 12;
       };
-      keybindings = {
-        "ctrl+shift+h" = "previous_window";
-      };
+      keybindings = { "ctrl+shift+h" = "previous_window"; };
       settings = {
         macos_quit_when_last_window_closed = "yes";
         remember_window_size = "no";
@@ -158,33 +150,24 @@ in
         # background_blur = 24;
         tab_bar_style = "powerline";
         # tab_powerline_style = "slanted";
-        tab_title_template = "{fmt.bold}{tab.active_wd.rsplit('/', 1)[-1]}{fmt.nobold} [{tab.active_exe}]";
+        tab_title_template =
+          "{fmt.bold}{tab.active_wd.rsplit('/', 1)[-1]}{fmt.nobold} [{tab.active_exe}]";
         hide_window_decorations = if macos then "no" else "titlebar-only";
       };
-      /* theme = "Gruvbox Dark"; */
+      # theme = "Gruvbox Dark";
       # theme = "Catppuccin-Macchiato";
       themeFile = "Dracula";
     };
-
-    # neovide = {
-    #   enable = true;
-    #   settings = {
-    #     font = {
-    #       normal = [ "JetBrainsMono Nerd Font" ];
-    #       size = 14.0;
-    #     };
-    #   };
-    # };
 
     neovim = {
       defaultEditor = true;
       enable = true;
       extraLuaConfig = ''
-        vim.g.python3_host_prog='${pythonEnv}/bin/python3'
-        vim.g.python_host_prog='${pythonEnv}/bin/python'
-        require("config.options")
-      	require("config.lazy")
-        require("config.remap")
+          vim.g.python3_host_prog='${pythonEnv}/bin/python3'
+          vim.g.python_host_prog='${pythonEnv}/bin/python'
+          require("config.options")
+        	require("config.lazy")
+          require("config.remap")
       '';
       extraPackages = [
         pkgs.gcc
@@ -203,21 +186,10 @@ in
 
     opencode = {
       enable = true;
-      # package = unstable.opencode;
-    };
-
-    starship = {
-      enable = true;
-      # package = unstable.starship;
-      # settings = {
-      #   add_newline = false;
-      # };
     };
 
     zsh = {
-      autosuggestion = {
-        enable = true;
-      };
+      autosuggestion = { enable = true; };
       enable = true;
       enableCompletion = true;
       initContent = ''
@@ -226,14 +198,21 @@ in
 
         npm set prefix ~/.npm-global
         export PATH=$HOME/.npm-global/bin:$PATH
+
+        # only starship in kitty
+        if [[ $TERM = *"kitty"* ]]; then
+          eval "$(${pkgs.starship}/bin/starship init zsh)"
+        fi
       '';
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
-        /* ls = "${pkgs.exa}/bin/exa --icons"; */
         ll = "${pkgs.eza}/bin/eza -l --icons";
-        /* la = "${pkgs.exa}/bin/exa -a --icons"; */
-        /* lt = "${pkgs.exa}/bin/exa --tree --icons"; */
-        /* lla = "${pkgs.exa}/bin/exa -la --icons"; */
+      };
+      siteFunctions = {
+        envop = ''
+          # import shell secrets from 1password
+          export BRAVE_API_KEY=$(op read op://dev/BRAVE_API_KEY/credential)
+        '';
       };
       oh-my-zsh = {
         enable = true;
@@ -242,8 +221,10 @@ in
           zstyle ':omz:update' mode disabled
           DISABLE_UPDATE_PROMPT=true
         '';
-        /* theme = "robbyrussell"; */
+        # theme = "robbyrussell";
       };
     };
   };
+
+  xdg.enable = true;
 }
