@@ -129,10 +129,7 @@
         "-e",
         "BRAVE_API_KEY",
         "docker.io/mcp/brave-search"
-      ],
-      "environment": {
-        "BRAVE_API_KEY": "BSAU00S2STZsTQmOkeBr5Mg87nNu834"
-      }
+      ]
     },
     "aws-docs-mcp": {
       "type": "local",
@@ -150,6 +147,7 @@
       "environment": {}
     },
     "aws-cfn-mcp": {
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
@@ -168,6 +166,7 @@
       "environment": {}
     },
     "aws-pricing-mcp": {
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
@@ -185,6 +184,7 @@
       "environment": {}
     },
     "aws-diagram-mcp": {
+      "enabled": false,
       "type": "local",
       "command": [
         "uvx",
@@ -195,6 +195,7 @@
       }
     },
     "context7": {
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
