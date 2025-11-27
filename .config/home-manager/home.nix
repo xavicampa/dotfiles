@@ -72,7 +72,7 @@ in {
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
-    pkgs.kiro
+    # pkgs.kiro
     pkgs.nerd-fonts.jetbrains-mono
     pkgs.newman
     # pkgs.nix-du
@@ -199,6 +199,12 @@ in {
         npm set prefix ~/.npm-global
         export PATH=$HOME/.npm-global/bin:$PATH
 
+        # import shell secrets from 1password
+        envop(){
+          export BRAVE_API_KEY=$(op read op://dev/BRAVE_API_KEY/credential)
+        }
+        autoload -Uz envop
+
         # only starship in kitty
         if [[ $TERM = *"kitty"* ]]; then
           eval "$(${pkgs.starship}/bin/starship init zsh)"
@@ -207,12 +213,6 @@ in {
       shellAliases = {
         dotfiles = "git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME";
         ll = "${pkgs.eza}/bin/eza -l --icons";
-      };
-      siteFunctions = {
-        envop = ''
-          # import shell secrets from 1password
-          export BRAVE_API_KEY=$(op read op://dev/BRAVE_API_KEY/credential)
-        '';
       };
       oh-my-zsh = {
         enable = true;
