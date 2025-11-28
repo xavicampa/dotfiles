@@ -48,6 +48,17 @@
             "context": 32000,
             "output": 8000
           }
+        },
+        "openai/gpt-oss-20B": {
+          "limit": {
+            "context": 4000,
+            "output": 1000
+          },
+          "options": {
+            "temperature": 1,
+            "top_p": 1.0,
+            "top_k": 0,
+          }
         }
       }
     },
@@ -116,10 +127,34 @@
           }
         }
       }
+    },
+    "llamacpp-homepc": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "llama.cpp (homepc)",
+      "options": {
+        "baseURL": "http://homepc:8080/v1"
+      },
+      "models": {
+        "gpt-oss": {
+          "limit": {
+            "context": 32000,
+            "output": 8000
+          },
+          "options": {
+            "temperature": 1,
+            "top_p": 1.0,
+            "top_k": 0,
+            "extraBody": {
+              "think": "high"
+            }
+          }
+        }
+      }
     }
   },
   "mcp": {
     "brave-mcp": {
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
@@ -132,6 +167,7 @@
       ]
     },
     "aws-docs-mcp": {
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
