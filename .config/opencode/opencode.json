@@ -128,11 +128,11 @@
         }
       }
     },
-    "llamacpp-homepc": {
+    "llamacpp-gpt": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "llama.cpp (homepc)",
+      "name": "llama.cpp gpt",
       "options": {
-        "baseURL": "http://homepc:8080/v1"
+        "baseURL": "http://localhost:8080/v1"
       },
       "models": {
         "gpt-oss": {
@@ -148,13 +148,28 @@
               "think": "high"
             }
           }
-        }
+        },
+      }
+    },
+    "llamacpp-qwen3-coder": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "llama.cpp qwen3-coder",
+      "options": {
+        "baseURL": "http://localhost:8082/v1"
+      },
+      "models": {
+        "qwen3-coder": {
+          "limit": {
+            "context": 40000,
+            "output": 8000
+          }
+        },
       }
     }
   },
   "mcp": {
     "brave-mcp": {
-      "enabled": false,
+      "enabled": true,
       "type": "local",
       "command": [
         "podman",
@@ -167,7 +182,7 @@
       ]
     },
     "aws-docs-mcp": {
-      "enabled": false,
+      "enabled": true,
       "type": "local",
       "command": [
         "podman",
@@ -231,7 +246,7 @@
       }
     },
     "context7": {
-      "enabled": false,
+      "enabled": true,
       "type": "local",
       "command": [
         "podman",
@@ -244,8 +259,5 @@
       ],
       "environment": {}
     }
-  },
-  "permission": {
-    "external_directory": "ask"
   }
 }
