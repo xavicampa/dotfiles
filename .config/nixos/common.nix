@@ -17,6 +17,7 @@
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  boot.plymouth.enable = true;
 
   # Store optimize and garbage clean up
   nix.gc.automatic = true;
@@ -141,6 +142,10 @@
   };
 
   # programs.regreet.enable = true;
+  services.displayManager = {
+    enable = true;
+    lemurs.enable = true;
+  };
   services.xserver = {
     # displayManager = { gdm.enable = true; };
     xkb.layout = "no";
@@ -216,7 +221,7 @@
     shell = pkgs.zsh;
     isNormalUser = true;
     extraGroups =
-      [ "wheel" "i2c" "input" "podman" "video" "networkmanager" "video" "render" ]; # Enable ‘sudo’ for the user.
+      [ "wheel" "i2c" "input" "podman" "video" "networkmanager" "video" "render" "seat" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       apple-cursor
       autotiling

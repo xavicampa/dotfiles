@@ -30,15 +30,23 @@
   boot.initrd.availableKernelModules =
     [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
+  boot.initrd.systemd.enable = true;
+  boot.initrd.verbose = false;
   boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
   # boot.extraModulePackages = [ ];
   boot.loader.systemd-boot.consoleMode = "max";
-  # boot.kernelParams = [
+  boot.loader.timeout = 0;
+  boot.kernelParams = [
+    "quiet"
+    "splash"
+    "boot.shell_on_fail"
+    "rd.systemd.show_status=auto"
+    "udev.log_priority=3"
   # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
   # "nvidia.NVreg_EnableGpuFirmware=0"
   # "nvidia-drm.modeset=1"
   # "nvidia-drm.fbdev=1"
-  # ];
+  ];
 
   fileSystems."/" = {
     device = "/dev/disk/by-label/NIXROOT";
