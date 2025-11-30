@@ -260,10 +260,10 @@
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
         cmd = [
           "-hf"
-          "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
+          "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q2_K_XL"
           "--jinja"
           "--ctx-size"
-          "32000"
+          "40000"
           "--temp"
           "0.7"
           "--min-p"
@@ -276,8 +276,6 @@
           "1.05"
           "--port"
           "8082"
-          "--n-cpu-moe"
-          "16"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
