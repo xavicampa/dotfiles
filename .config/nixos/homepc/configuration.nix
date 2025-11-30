@@ -114,8 +114,15 @@
   };
 
   # opengl
-  hardware.graphics.enable = true;
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [ intel-media-driver ];
+  };
   hardware.nvidia-container-toolkit.enable = true;
+  hardware.nvidia.prime = {
+    intelBusId = "PCI:0:2:0";
+    nvidiaBusId = "PCI:1:0:0";
+  };
 
   # bluetooth
   hardware.i2c.enable = true;
@@ -138,7 +145,12 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  services.xserver = { videoDrivers = [ "nvidia" ]; };
+  services.xserver = {
+    videoDrivers = [ 
+      "nvidia" 
+      "modesetting"
+    ];
+  };
 
   services.pipewire = {
     enable = true;
@@ -235,11 +247,39 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
-      fim = {
+      qwen25-coder = {
         autoStart = false;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-        cmd = [ "--fim-qwen-1.5b-default" ];
+        cmd = [ "--fim-qwen-3b-default" ];
         ports = [ "8012:8012" ];
+        devices = [ "nvidia.com/gpu=all" ];
+        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+      };
+      qwen3-coder = {
+        autoStart = false;
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+        cmd = [
+          "-hf"
+          "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
+          "--jinja"
+          "--ctx-size"
+          "32000"
+          "--temp"
+          "0.7"
+          "--min-p"
+          "0.0"
+          "--top-p"
+          "0.80"
+          "--top-k"
+          "20"
+          "--repeat-penalty"
+          "1.05"
+          "--port"
+          "8082"
+          "--n-cpu-moe"
+          "16"
+        ];
+        ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
       };
@@ -251,7 +291,7 @@
           "ggml-org/gpt-oss-20b-GGUF"
           "--jinja"
           "-ub"
-          "2048,4096"
+          "4096"
           "-b"
           "4096"
           "--ctx-size"

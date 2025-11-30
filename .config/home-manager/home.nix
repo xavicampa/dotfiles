@@ -202,6 +202,7 @@ in {
         # import shell secrets from 1password
         envop(){
           export BRAVE_API_KEY=$(op read op://dev/BRAVE_API_KEY/credential)
+          export HF_TOKEN=$(op read op://dev/HF_TOKEN/credential)
         }
         autoload -Uz envop
 

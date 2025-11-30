@@ -12,6 +12,7 @@
 
 {
   nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.nvidia.acceptLicense = true;
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
@@ -215,7 +216,7 @@
     shell = pkgs.zsh;
     isNormalUser = true;
     extraGroups =
-      [ "wheel" "i2c" "input" "podman" "video" "networkmanager" ]; # Enable ‘sudo’ for the user.
+      [ "wheel" "i2c" "input" "podman" "video" "networkmanager" "video" "render" ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       apple-cursor
       autotiling
