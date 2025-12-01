@@ -3,12 +3,12 @@
 # let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
 # in {
-  # imports =
-  #   [
-  #     # Include the results of the hardware scan.
-  #     ./hardware-configuration.nix
-  #     # ./sentinel.nix
-  #   ];
+# imports =
+#   [
+#     # Include the results of the hardware scan.
+#     ./hardware-configuration.nix
+#     # ./sentinel.nix
+#   ];
 
 {
   nixpkgs.config.allowUnfree = true;
@@ -43,8 +43,39 @@
     timeZone = "Europe/Oslo";
   };
 
+  # Firmware for some devices
+  hardware.enableAllFirmware = true;
+
+  # Polkit
+  security.polkit = {
+    enable = true;
+    extraConfig = ''
+      polkit.addRule(function(action, subject) {
+        if (
+          subject.isInGroup("users")
+            && (
+              action.id == "org.freedesktop.login1.reboot" ||
+              action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+              action.id == "org.freedesktop.login1.power-off" ||
+              action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+              action.id == "org.freedesktop.login1.suspend"
+            )
+          )
+        {
+          return polkit.Result.YES;
+        }
+      });
+    '';
+  };
+
   # bluetooth
   services.blueman.enable = true;
+
+  # fstrim
+  services.fstrim = {
+    enable = true;
+    interval = "daily";
+  };
 
   # nixpkgs.overlays =
   #   [
@@ -206,9 +237,7 @@
     polkitPolicyOwners = [ "javi" ];
     package = pkgs._1password-gui-beta;
   };
-  programs._1password = {
-    enable = true;
-  };
+  programs._1password = { enable = true; };
 
   programs.firefox = {
     enable = true;
@@ -220,12 +249,22 @@
   users.users.javi = {
     shell = pkgs.zsh;
     isNormalUser = true;
-    extraGroups =
-      [ "wheel" "i2c" "input" "podman" "video" "networkmanager" "video" "render" "seat" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [
+      "wheel"
+      "i2c"
+      "input"
+      "podman"
+      "video"
+      "networkmanager"
+      "render"
+      "seat"
+      "audio"
+      "users"
+    ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       apple-cursor
       autotiling
-      baobab  # windirstat equivalent
+      baobab # windirstat equivalent
       blueman
       bruno
       busybox # killall

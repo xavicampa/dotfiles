@@ -51,6 +51,7 @@
   fileSystems."/" = {
     device = "/dev/disk/by-label/NIXROOT";
     fsType = "ext4";
+    options = [ "noatime" ];
   };
 
   fileSystems."/boot" = {
@@ -62,7 +63,7 @@
     device = "/swapfile";
     size = 32 * 1024; # 32GB
   }];
-  boot.kernel.sysctl."vm.swappiness" = 10;
+  # boot.kernel.sysctl."vm.swappiness" = 10;
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
   # (the default) this is the recommended approach. When using systemd-networkd it's
@@ -245,7 +246,7 @@
 
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
 
-  users.users.javi = { packages = with pkgs; [ lmstudio ]; };
+  # users.users.javi = { packages = with pkgs; [ lmstudio ]; };
 
   # networking.firewall = {
   #   enable = false;
@@ -255,14 +256,14 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
-      qwen25-coder = {
-        autoStart = false;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-        cmd = [ "--fim-qwen-3b-default" ];
-        ports = [ "8012:8012" ];
-        devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
-      };
+      # qwen25-coder = {
+      #   autoStart = false;
+      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+      #   cmd = [ "--fim-qwen-3b-default" ];
+      #   ports = [ "8012:8012" ];
+      #   devices = [ "nvidia.com/gpu=all" ];
+      #   volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+      # };
       qwen3-coder = {
         autoStart = false;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
@@ -289,24 +290,24 @@
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
       };
-      gpt = {
-        autoStart = false;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-        cmd = [
-          "-hf"
-          "ggml-org/gpt-oss-20b-GGUF"
-          "--jinja"
-          "-ub"
-          "4096"
-          "-b"
-          "4096"
-          "--ctx-size"
-          "32000"
-        ];
-        ports = [ "8080:8080" ];
-        devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
-      };
+      # gpt = {
+      #   autoStart = false;
+      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+      #   cmd = [
+      #     "-hf"
+      #     "ggml-org/gpt-oss-20b-GGUF"
+      #     "--jinja"
+      #     "-ub"
+      #     "4096"
+      #     "-b"
+      #     "4096"
+      #     "--ctx-size"
+      #     "32000"
+      #   ];
+      #   ports = [ "8080:8080" ];
+      #   devices = [ "nvidia.com/gpu=all" ];
+      #   volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+      # };
     };
   };
 }
