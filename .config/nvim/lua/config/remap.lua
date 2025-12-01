@@ -33,17 +33,16 @@ vim.keymap.set("n", "<leader>xL", "<cmd>Trouble loclist toggle<cr>", opts)
 vim.keymap.set("n", "<leader>xQ", "<cmd>Trouble qflist toggle<cr>", opts)
 
 -- llm.nvim (copilot): custom Tab behavior for LLM completions
-vim.keymap.set("i", "<Tab>", function()
-    local llm = require('llm.completion')
-
-    -- If there's an LLM suggestion visible, accept it
-    if llm.shown_suggestion ~= nil then
-      llm.complete()
-    else
-      -- Otherwise, insert a regular Tab character
-      local keys = vim.api.nvim_replace_termcodes('<Tab>', true, false, true)
-      vim.api.nvim_feedkeys(keys, 'n', false)
-    end
-  end,
-  { noremap = true, silent = true })
-
+-- vim.keymap.set("i", "<Tab>", function()
+--     local llm = require('llm.completion')
+--
+--     -- If there's an LLM suggestion visible, accept it
+--     if llm.shown_suggestion ~= nil then
+--       llm.complete()
+--     else
+--       -- Otherwise, insert a regular Tab character
+--       local keys = vim.api.nvim_replace_termcodes('<Tab>', true, false, true)
+--       vim.api.nvim_feedkeys(keys, 'n', false)
+--     end
+--   end,
+--   { noremap = true, silent = true })
