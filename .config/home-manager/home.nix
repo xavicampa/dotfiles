@@ -6,7 +6,7 @@ let
   #   inherit pkgs;
   # };
 
-  stable = import <nixpkgs-stable> { config.allowUnfree = true; };
+  # stable = import <nixpkgs-stable> { config.allowUnfree = true; };
 
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
@@ -48,7 +48,7 @@ in {
     # nodePackages."@aws-amplify/cli"
     # nodePackages."@angular/cli"
     pkgs.awscli2
-    stable.aws-sam-cli
+    # pkgs.aws-sam-cli
     pkgs.cargo
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
