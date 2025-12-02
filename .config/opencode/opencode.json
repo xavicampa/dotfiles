@@ -169,7 +169,7 @@
   },
   "mcp": {
     "brave-mcp": {
-      "enabled": true,
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
@@ -182,7 +182,7 @@
       ]
     },
     "aws-docs-mcp": {
-      "enabled": true,
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
@@ -246,7 +246,7 @@
       }
     },
     "context7": {
-      "enabled": true,
+      "enabled": false,
       "type": "local",
       "command": [
         "podman",
