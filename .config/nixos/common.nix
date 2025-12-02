@@ -1,8 +1,10 @@
 { pkgs, config, ... }:
 
-# let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
-# in {
+in {
+# {
+
 # imports =
 #   [
 #     # Include the results of the hardware scan.
@@ -10,7 +12,6 @@
 #     # ./sentinel.nix
 #   ];
 
-{
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.nvidia.acceptLicense = true;
 
@@ -58,7 +59,8 @@
               action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
               action.id == "org.freedesktop.login1.power-off" ||
               action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
-              action.id == "org.freedesktop.login1.suspend"
+              action.id == "org.freedesktop.login1.suspend" ||
+              action.id == "org.freedesktop.systemd1.manage-units"
             )
           )
         {
@@ -182,6 +184,11 @@
     xkb.layout = "no";
   };
 
+  # programs.atop = { 
+  #   enable = true;
+    # atopgpu.enable = true;
+  # };
+
   programs.hyprland = {
     enable = true;
     xwayland.enable = true;
@@ -235,7 +242,7 @@
   programs._1password-gui = {
     enable = true;
     polkitPolicyOwners = [ "javi" ];
-    package = pkgs._1password-gui-beta;
+    package = unstable._1password-gui;
   };
   programs._1password = { enable = true; };
 
@@ -279,6 +286,7 @@
       google-chrome
       hypridle
       hyprpaper
+      hyprpolkitagent
       hyprshot
       # nodejs_18
       nix-du
