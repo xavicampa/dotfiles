@@ -22,9 +22,9 @@ in {
 
   # Store optimize and garbage clean up
   nix.gc.automatic = true;
-  nix.optimise.automatic = true;
+  # nix.optimise.automatic = true;
   nix.settings = {
-    auto-optimise-store = false;
+    auto-optimise-store = true;
     substituters = [ "https://nix-community.cachix.org" ];
     trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
@@ -68,6 +68,15 @@ in {
         }
       });
     '';
+  };
+  security.wrappers = {
+    btop = {
+      enable = true;
+      owner = "root";
+      group = "root";
+      source = "${pkgs.btop}/bin/btop";
+      capabilities = "cap_perfmon=ep";
+    };
   };
 
   # bluetooth
@@ -270,10 +279,12 @@ in {
     ]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       apple-cursor
+      atop
       autotiling
       baobab # windirstat equivalent
       blueman
       bruno
+      btop
       busybox # killall
       # cachix
       ddcutil

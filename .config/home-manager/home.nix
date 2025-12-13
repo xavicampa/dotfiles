@@ -6,7 +6,7 @@ let
   #   inherit pkgs;
   # };
 
-  # stable = import <nixpkgs-stable> { config.allowUnfree = true; };
+  # unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
   pythonEnv = pkgs.python3.withPackages (ppkgs: [
     ppkgs.python
@@ -52,17 +52,6 @@ in {
     pkgs.cargo
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
-    (if macos then
-      pkgs.btop
-    else
-      pkgs.btop.overrideAttrs (oldAttrs: {
-        nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ])
-          ++ [ pkgs.addDriverRunpath ];
-        postFixup = ''
-          addDriverRunpath $out/bin/btop
-        '';
-      }))
-    # pkgs.btop
     pkgs.ghostscript
     pkgs.go
     pkgs.graph-easy
@@ -138,7 +127,7 @@ in {
           "JetBrainsMono Nerd Font Mono"
         else
           "JetBrainsMono Nerd Font";
-        size = if macos then 16 else 12;
+        size = if macos then 16 else 11;
       };
       keybindings = { "ctrl+shift+h" = "previous_window"; };
       settings = {
