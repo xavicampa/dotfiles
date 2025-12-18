@@ -1,178 +1,29 @@
 { pkgs, config, ... }:
 
 let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-
 in {
-# {
+  # {
 
-# imports =
-#   [
-#     # Include the results of the hardware scan.
-#     ./hardware-configuration.nix
-#     # ./sentinel.nix
-#   ];
-
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.nvidia.acceptLicense = true;
-
-  # Use the systemd-boot EFI boot loader.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.plymouth.enable = true;
-
-  # Store optimize and garbage clean up
-  nix.gc.automatic = true;
-  # nix.optimise.automatic = true;
-  nix.settings = {
-    auto-optimise-store = true;
-    substituters = [ "https://nix-community.cachix.org" ];
-    trusted-public-keys = [
-      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-    ];
+  boot = {
+    loader.systemd-boot.enable = true;
+    loader.efi.canTouchEfiVariables = true;
+    plymouth.enable = true;
   };
 
-  networking = {
-    networkmanager = {
-      enable = true; # Easiest to use and most distros use this by default.
-    };
-    enableIPv6 = false;
-  };
-
-  # Set your time zone.
-  time = {
-    hardwareClockInLocalTime = true;
-    timeZone = "Europe/Oslo";
-  };
-
-  # Firmware for some devices
-  hardware.enableAllFirmware = true;
-
-  # Polkit
-  security.polkit = {
-    enable = true;
-    extraConfig = ''
-      polkit.addRule(function(action, subject) {
-        if (
-          subject.isInGroup("users")
-            && (
-              action.id == "org.freedesktop.login1.reboot" ||
-              action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
-              action.id == "org.freedesktop.login1.power-off" ||
-              action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
-              action.id == "org.freedesktop.login1.suspend" ||
-              action.id == "org.freedesktop.systemd1.manage-units"
-            )
-          )
-        {
-          return polkit.Result.YES;
-        }
-      });
-    '';
-  };
-  security.wrappers = {
-    btop = {
-      enable = true;
-      owner = "root";
-      group = "root";
-      source = "${pkgs.btop}/bin/btop";
-      capabilities = "cap_perfmon=ep";
+  environment = {
+    etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
+    etc."hypr/hypr.conf".source =
+      "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
+    etc."waybar/config.jsonc".source =
+      "${config.users.users.javi.home}/.config/waybar/${config.networking.hostName}.jsonc";
+    sessionVariables = {
+      NIXOS_OZONE_WL = "1";
+      ELECTRON_OZONE_PLATFORM_HINT = "auto";
+      GIT_ASKPASS = "";
     };
   };
 
-  # bluetooth
-  services.blueman.enable = true;
-
-  # fstrim
-  services.fstrim = {
-    enable = true;
-    interval = "daily";
-  };
-
-  # nixpkgs.overlays =
-  #   [
-  #     (self: super:
-  #       {
-  #         ollama = super.ollama.overrideAttrs (old: {
-  #           src = super.fetchFromGitHub {
-  #             owner = "ollama";
-  #             repo = "ollama";
-  #             rev = "v0.3.1";
-  #             hash = "sha256-ctz9xh1wisG0YUxglygKHIvU9bMgMLkGqDoknb8qSAU=";
-  #             fetchSubmodules = true;
-  #           };
-  #         });
-  #       })
-  #   ];
-
-  # ollama
-  # services.ollama = {
-  #   enable = true;
-  #   environmentVariables = {
-  #     OLLAMA_DEBUG = "1";
-  #     OLLAMA_FLASH_ATTENTION = "1";
-  #     OLLAMA_KV_CACHE_TYPE = "q8_0";
-  #     OLLAMA_NUM_PARALLEL = "1";
-  #   };
-  #   host = "0.0.0.0";
-  #   openFirewall = true;
-  #   # package = unstable.ollama;
-  # };
-
-  # keyring
-  services.gnome.gnome-keyring.enable = true;
-
-  services.kmscon = {
-    enable = false;
-    extraConfig = "font-dpi=144";
-    # extraOptions = "--no-drm";
-    hwRender = true;
-    useXkbConfig = true;
-  };
-
-  # services.seatd = {
-  #   enable = true;
-  # };
-
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
-
-  # Copy the NixOS configuration file and link it from the resulting system
-  # (/run/current-system/configuration.nix). This is useful in case you
-  # accidentally delete configuration.nix.
-  # system.copySystemConfiguration = true;
-
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "22.11"; # Did you read the comment?
-
-  # Auto-upgrade (not sure how it works, disabling for now)
-  # system.autoUpgrade = {
-  #   enable = true;
-  #   allowReboot = false;
-  # };
-
-  # environment.systemPackages = with pkgs; [
-  #   hyprland
-  #   swww # for wallpapers
-  #   xdg-desktop-portal-gtk
-  #   xdg-desktop-portal-hyprland
-  #   xwayland
-  # ];  
-
-  # javi home section
-  #
-  environment.etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
-  environment.etc."hypr/hypr.conf".source =
-    "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
-  environment.etc."waybar/config.jsonc".source =
-    "${config.users.users.javi.home}/.config/waybar/${config.networking.hostName}.jsonc";
+  hardware = { enableAllFirmware = true; };
 
   i18n = {
     defaultLocale = "nb_NO.UTF-8";
@@ -183,40 +34,168 @@ in {
     };
   };
 
-  # programs.regreet.enable = true;
-  services.displayManager = {
-    enable = true;
-    lemurs.enable = true;
-  };
-  services.xserver = {
-    # displayManager = { gdm.enable = true; };
-    xkb.layout = "no";
+  networking = {
+    networkmanager = {
+      enable = true; # Easiest to use and most distros use this by default.
+    };
+    enableIPv6 = false;
   };
 
-  # programs.atop = { 
-  #   enable = true;
-    # atopgpu.enable = true;
-  # };
-
-  programs.hyprland = {
-    enable = true;
-    xwayland.enable = true;
-    withUWSM = true;
+  nix = {
+    gc.automatic = true;
+    settings = {
+      auto-optimise-store = true;
+      substituters = [ "https://nix-community.cachix.org" ];
+      trusted-public-keys = [
+        "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      ];
+    };
   };
 
-  programs.hyprlock = { enable = true; };
+  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.nvidia.acceptLicense = true;
 
-  programs.ssh = { enableAskPassword = false; };
-
-  environment.sessionVariables = {
-    NIXOS_OZONE_WL = "1";
-    ELECTRON_OZONE_PLATFORM_HINT = "auto";
-    GIT_ASKPASS = "";
+  programs = {
+    _1password = { enable = true; };
+    _1password-gui = {
+      enable = true;
+      polkitPolicyOwners = [ "javi" ];
+      package = unstable._1password-gui;
+    };
+    appgate-sdp = { enable = true; };
+    firefox = {
+      enable = true;
+      package = pkgs.firefox-bin;
+    };
+    hyprland = {
+      enable = true;
+      xwayland.enable = true;
+      withUWSM = true;
+    };
+    hyprlock = { enable = true; };
+    nix-ld = {
+      enable = true;
+      libraries = with pkgs; [ stdenv.cc.cc.lib ];
+    };
+    ssh = { enableAskPassword = false; };
+    waybar.enable = true;
+    zsh.enable = true;
   };
 
-  services.libinput = { enable = true; };
+  security = {
+    polkit = {
+      enable = true;
+      extraConfig = ''
+        polkit.addRule(function(action, subject) {
+          if (
+            subject.isInGroup("users")
+              && (
+                action.id == "org.freedesktop.login1.reboot" ||
+                action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+                action.id == "org.freedesktop.login1.power-off" ||
+                action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+                action.id == "org.freedesktop.login1.suspend" ||
+                action.id == "org.freedesktop.systemd1.manage-units"
+              )
+            )
+          {
+            return polkit.Result.YES;
+          }
+        });
+      '';
+    };
+    wrappers = {
+      btop = {
+        enable = true;
+        owner = "root";
+        group = "root";
+        source = "${pkgs.btop}/bin/btop";
+        capabilities = "cap_perfmon=ep";
+      };
+    };
+  };
 
-  # virtualisation.docker.enable = true;
+  services = {
+    blueman.enable = true;
+    displayManager = {
+      enable = true;
+      lemurs.enable = true;
+    };
+    fstrim = {
+      enable = true;
+      interval = "daily";
+    };
+    gnome.gnome-keyring.enable = true;
+    kmscon = {
+      enable = false;
+      extraConfig = "font-dpi=144";
+      hwRender = true;
+      useXkbConfig = true;
+    };
+    libinput = { enable = true; };
+    xserver = { xkb.layout = "no"; };
+  };
+
+  system.stateVersion = "22.11";
+
+  time = {
+    hardwareClockInLocalTime = true;
+    timeZone = "Europe/Oslo";
+  };
+
+  users = {
+    users.javi = {
+      shell = pkgs.zsh;
+      isNormalUser = true;
+      extraGroups = [
+        "wheel"
+        "i2c"
+        "input"
+        "podman"
+        "video"
+        "networkmanager"
+        "render"
+        "seat"
+        "audio"
+        "users"
+      ];
+      packages = with pkgs; [
+        apple-cursor
+        atop
+        autotiling
+        baobab # windirstat equivalent
+        blueman
+        bruno
+        btop
+        busybox # killall
+        ddcutil
+        docker-compose
+        egl-wayland
+        feh
+        file-roller
+        git
+        google-chrome
+        hypridle
+        hyprpaper
+        hyprpolkitagent
+        hyprshot
+        nix-du
+        pamixer
+        pasystray
+        pavucontrol
+        rofi
+        rofimoji
+        slack
+        stow
+        wl-clipboard
+        wtype
+        xdg-user-dirs
+        xdg-utils
+        xfce.thunar
+      ];
+    };
+  };
+
   virtualisation = {
     containers.enable = true;
     podman = {
@@ -227,102 +206,9 @@ in {
     };
   };
 
-  programs.zsh.enable = true;
-
-  # This seems to make aws amplify work in nixos
-  # programs.nix-ld.enable = true;
-  programs.nix-ld = {
-    enable = true;
-    libraries = with pkgs; [ stdenv.cc.cc.lib ];
-  };
-  # environment.variables = {
-  #   NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
-  #     pkgs.stdenv.cc.cc
-  #     pkgs.openssl
-  #   ];
-  #   NIX_LD = lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
-  # };
-
-  # programs.thunar.plugins = with pkgs.xfce; [
-  # thunar-archive-plugin
-  # ];
-
-  programs.appgate-sdp = { enable = true; };
-  programs._1password-gui = {
-    enable = true;
-    polkitPolicyOwners = [ "javi" ];
-    package = unstable._1password-gui;
-  };
-  programs._1password = { enable = true; };
-
-  programs.firefox = {
-    enable = true;
-    package = pkgs.firefox-bin;
-  };
-
-  programs.waybar.enable = true;
-
-  users.users.javi = {
-    shell = pkgs.zsh;
-    isNormalUser = true;
-    extraGroups = [
-      "wheel"
-      "i2c"
-      "input"
-      "podman"
-      "video"
-      "networkmanager"
-      "render"
-      "seat"
-      "audio"
-      "users"
-    ]; # Enable ‘sudo’ for the user.
-    packages = with pkgs; [
-      apple-cursor
-      atop
-      autotiling
-      baobab # windirstat equivalent
-      blueman
-      bruno
-      btop
-      busybox # killall
-      # cachix
-      ddcutil
-      docker-compose
-      egl-wayland
-      feh
-      # unstable.file-roller
-      file-roller
-      git
-      google-chrome
-      hypridle
-      hyprpaper
-      hyprpolkitagent
-      hyprshot
-      # nodejs_18
-      nix-du
-      pamixer
-      pasystray
-      pavucontrol
-      # rofi-wayland
-      rofi
-      rofimoji
-      slack
-      stow
-      # vscode
-      wl-clipboard
-      wtype
-      xdg-user-dirs
-      xdg-utils
-      xfce.thunar
-      # waybar
-    ];
-  };
-
   xdg.portal = {
     enable = true;
     extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
     wlr.enable = true;
   };
-
 }

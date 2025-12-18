@@ -8,46 +8,88 @@
 # in
 
 {
-  networking.hostName = "homepc"; # Define your hostname.
+  # Hardware configuration
+  hardware = {
+    bluetooth.enable = true;
+    enableRedistributableFirmware = true;
+    graphics = {
+      enable = true;
+      extraPackages = with pkgs; [ intel-media-driver ];
+    };
+    i2c.enable = true;
+    nvidia = {
+      # Modesetting is required.
+      # modesetting.enable = true;
 
-  imports =
-    [ ../common.nix (modulesPath + "/installer/scan/not-detected.nix") ];
+      # Nvidia power management. Experimental, and can cause sleep/suspend to fail.
+      # Enable this if you have graphical corruption issues or application crashes after waking
+      # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead 
+      # of just the bare essentials.
+      powerManagement.enable = true;
 
-  # commandLineArgs for chrome video acceleration
-  # nixpkgs.overlays = [
-  #   (final: prev: {
-  #     google-chrome = prev.google-chrome.override {
-  #       commandLineArgs =
-  #         "--enable-features=AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoDecodeLinuxGL,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs";
-  #     };
-  #   })
-  # ];
+      # Fine-grained power management. Turns off GPU when not in use.
+      # Experimental and only works on modern Nvidia GPUs (Turing or newer).
+      powerManagement.finegrained = false;
 
-  nixpkgs.config.cudaSupport = true;
+      # Use the NVidia open source kernel module (not to be confused with the
+      # independent third-party "nouveau" open source driver).
+      # Support is limited to the Turing and later architectures. Full list of 
+      # supported GPUs is at: 
+      # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus 
+      # Only available from driver 515.43.04+
+      # Currently alpha-quality/buggy, so false is currently the recommended setting.
+      open = true;
 
-  # boot.kernelPackages = pkgs.linuxPackages_6_13;
-  # boot.kernelPackages = pkgs.linuxPackages_latest;
-  boot.initrd.availableKernelModules =
-    [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
-  boot.initrd.kernelModules = [ ];
-  boot.initrd.systemd.enable = true;
-  boot.initrd.verbose = false;
-  boot.kernelModules = [ "kvm-intel" "i2c-dev" ];
-  # boot.extraModulePackages = [ ];
-  boot.loader.systemd-boot.consoleMode = "max";
-  boot.loader.timeout = 0;
-  boot.kernelParams = [
-    "quiet"
-    "splash"
-    "boot.shell_on_fail"
-    "rd.systemd.show_status=auto"
-    "udev.log_priority=3"
-  # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-  # "nvidia.NVreg_EnableGpuFirmware=0"
-  # "nvidia-drm.modeset=1"
-  # "nvidia-drm.fbdev=1"
-  ];
+      # Enable the Nvidia settings menu,
+      # accessible via `nvidia-settings`.
+      nvidiaSettings = true;
 
+      # Optionally, you may need to select the appropriate driver version for your specific GPU.
+      # package = config.boot.kernelPackages.nvidiaPackages.latest;
+      # package = config.boot.kernelPackages.nvidiaPackages.stable;
+      # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
+      #   version = "570.124.04"; # use new 570 drivers
+      #   sha256_64bit = "sha256-G3hqS3Ei18QhbFiuQAdoik93jBlsFI2RkWOBXuENU8Q=";
+      #   openSha256 = "sha256-DuVNA63+pJ8IB7Tw2gM4HbwlOh1bcDg2AN2mbEU9VPE=";
+      #   settingsSha256 = "sha256-9rtqh64TyhDF5fFAYiWl3oDHzKJqyOW3abpcf2iNRT8=";
+      #   usePersistenced = false;
+      # };
+    };
+    nvidia-container-toolkit.enable = true;
+    nvidia.prime = {
+      intelBusId = "PCI:0:2:0";
+      nvidiaBusId = "PCI:1:0:0";
+    };
+    cpu.intel.updateMicrocode =
+      lib.mkDefault config.hardware.enableRedistributableFirmware;
+  };
+
+  # Boot configuration
+  boot = {
+    initrd.availableKernelModules =
+      [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
+    initrd.kernelModules = [ ];
+    initrd.systemd.enable = true;
+    initrd.verbose = false;
+    kernelModules = [ "kvm-intel" "i2c-dev" ];
+    # boot.extraModulePackages = [ ];
+    loader.systemd-boot.consoleMode = "max";
+    loader.timeout = 0;
+    kernelParams = [
+      "quiet"
+      "splash"
+      "boot.shell_on_fail"
+      "rd.systemd.show_status=auto"
+      "udev.log_priority=3"
+    # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
+    # "nvidia.NVreg_EnableGpuFirmware=0"
+    # "nvidia-drm.modeset=1"
+    # "nvidia-drm.fbdev=1"
+    ];
+    # kernelPackages = pkgs.linuxPackages_6_13;
+  };
+
+  # File systems
   fileSystems."/" = {
     device = "/dev/disk/by-label/NIXROOT";
     fsType = "ext4";
@@ -59,200 +101,119 @@
     fsType = "vfat";
   };
 
+  # Network configuration
+  networking = {
+    hostName = "homepc"; # Define your hostname.
+    useDHCP = lib.mkDefault true;
+    interfaces.enp3s0.mtu = 9000;
+    wireless.enable =
+      lib.mkForce false; # Enables wireless support via wpa_supplicant.
+  };
+
+  # Nix configuration
+  nixpkgs.config.cudaSupport = true;
+
+  # Security configuration
+  security.rtkit.enable = true;
+
+  # Services
+  services = {
+    openssh.enable = true;
+    pipewire = {
+      enable = true;
+      alsa.enable = true;
+      alsa.support32Bit = true;
+      pulse.enable = true;
+      # extraConfig.pipewire."91-combined-sinks" = {
+      #   "context.modules" = [
+      #     {
+      #       name = "libpipewire-module-combine-stream";
+      #       args = {
+      #         combine.mode = "sink";
+      #         node.name = "combined_sink";
+      #         node.description = "My Combined Sink";
+      #         combine.latency-compensate = false;
+      #         combine.props = {
+      #           audio.position = [ "FL" "FR" ];
+      #         };
+      #         stream.props = {
+      #           stream.dont-remix = true;
+      #         };
+      #         stream.rules = [
+      #           {
+      #             matches = [
+      #               {
+      #                 media.class = "Audio/Sink";
+      #                 node.name = "alsa_output.pci-0000_01_00.1.pro-output-3";
+      #               }
+      #             ];
+      #             actions = {
+      #               create-stream = {
+      #                 audio.position = [ "FL" "FR" ];
+      #                 combine.audio.position = [ "FL" "FR" ];
+      #               };
+      #             };
+      #           }
+      #           {
+      #             matches = [
+      #               {
+      #                 media.class = "Audio/Sink";
+      #                 node.name = "alsa_output.pci-0000_01_00.1.pro-output-7";
+      #               }
+      #             ];
+      #             actions = {
+      #               create-stream = {
+      #                 audio.position = [ "FL" "FR" ];
+      #                 combine.audio.position = [ "FL" "FR" ];
+      #               };
+      #             };
+      #           }
+      #         ];
+      #       };
+      #     }
+      #   ];
+      # };
+    };
+    thermald.enable = true;
+    xserver = {
+      videoDrivers = [ 
+        "nvidia" 
+        "modesetting"
+      ];
+    };
+  };
+
+  # Systemd configuration
+  systemd = {
+    sleep.extraConfig = ''
+      AllowSuspend=yes
+      AllowHibernation=no
+      AllowHybridSleep=no
+      AllowSuspendThenHibernate=no
+    '';
+    services.nvidia_oc = {
+      enable = true;
+      description = "NVidia overclock settings";
+      serviceConfig = {
+        ExecStart =
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 2000 --freq-offset 400";
+        ExecStop =
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0";
+        RemainAfterExit = true;
+      };
+    };
+  };
+
+  # Environment configuration
+  environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
+
+  # System configuration
   swapDevices = [{
     device = "/swapfile";
     size = 32 * 1024; # 32GB
   }];
-  # boot.kernel.sysctl."vm.swappiness" = 10;
 
-  # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
-  # (the default) this is the recommended approach. When using systemd-networkd it's
-  # still possible to use this option, but it's recommended to use it in conjunction
-  # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
-  networking.useDHCP = lib.mkDefault true;
-  networking.interfaces.enp3s0.mtu = 9000;
-
-  # networking.networkmanager.wifi.powersave = false;
-  networking.wireless.enable =
-    lib.mkForce false; # Enables wireless support via wpa_supplicant.
-  # networking.networkmanager.enable = false;
-
-  # powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
-  services.thermald.enable = true;
-
-  hardware.enableRedistributableFirmware = true;
-  hardware.cpu.intel.updateMicrocode =
-    lib.mkDefault config.hardware.enableRedistributableFirmware;
-  hardware.nvidia = {
-    # Modesetting is required.
-    # modesetting.enable = true;
-
-    # Nvidia power management. Experimental, and can cause sleep/suspend to fail.
-    # Enable this if you have graphical corruption issues or application crashes after waking
-    # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead 
-    # of just the bare essentials.
-    powerManagement.enable = true;
-
-    # Fine-grained power management. Turns off GPU when not in use.
-    # Experimental and only works on modern Nvidia GPUs (Turing or newer).
-    powerManagement.finegrained = false;
-
-    # Use the NVidia open source kernel module (not to be confused with the
-    # independent third-party "nouveau" open source driver).
-    # Support is limited to the Turing and later architectures. Full list of 
-    # supported GPUs is at: 
-    # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus 
-    # Only available from driver 515.43.04+
-    # Currently alpha-quality/buggy, so false is currently the recommended setting.
-    open = true;
-
-    # Enable the Nvidia settings menu,
-    # accessible via `nvidia-settings`.
-    nvidiaSettings = true;
-
-    # Optionally, you may need to select the appropriate driver version for your specific GPU.
-    # package = config.boot.kernelPackages.nvidiaPackages.latest;
-    # package = config.boot.kernelPackages.nvidiaPackages.stable;
-    # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
-    #   version = "570.124.04"; # use new 570 drivers
-    #   sha256_64bit = "sha256-G3hqS3Ei18QhbFiuQAdoik93jBlsFI2RkWOBXuENU8Q=";
-    #   openSha256 = "sha256-DuVNA63+pJ8IB7Tw2gM4HbwlOh1bcDg2AN2mbEU9VPE=";
-    #   settingsSha256 = "sha256-9rtqh64TyhDF5fFAYiWl3oDHzKJqyOW3abpcf2iNRT8=";
-    #   usePersistenced = false;
-    # };
-  };
-
-  # opengl
-  hardware.graphics = {
-    enable = true;
-    extraPackages = with pkgs; [ intel-media-driver ];
-  };
-  hardware.nvidia-container-toolkit.enable = true;
-  hardware.nvidia.prime = {
-    intelBusId = "PCI:0:2:0";
-    nvidiaBusId = "PCI:1:0:0";
-  };
-
-  # bluetooth
-  hardware.i2c.enable = true;
-  hardware.bluetooth.enable = true;
-
-  security.rtkit.enable = true;
-
-  # hardware.pulseaudio = {
-  #   enable = true;
-  #   extraConfig =
-  #     '' 
-  #       set-card-profile alsa_card.pci-0000_01_00.1 pro-audio
-  #       load-module module-combine-sink slaves=alsa_output.pci-0000_01_00.1.pro-output-3,alsa_output.pci-0000_01_00.1.pro-output-7
-  #       set-sink-volume alsa_output.pci-0000_01_00.1.pro-output-3 100%
-  #       set-sink-volume alsa_output.pci-0000_01_00.1.pro-output-7 85%
-  #       set-sink-volume combined 50%
-  #     '';
-  # };
-
-  # Enable the OpenSSH daemon.
-  services.openssh.enable = true;
-
-  services.xserver = {
-    videoDrivers = [ 
-      "nvidia" 
-      "modesetting"
-    ];
-  };
-
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-    # extraConfig.pipewire."91-combined-sinks" = {
-    #   "context.modules" = [
-    #     {
-    #       name = "libpipewire-module-combine-stream";
-    #       args = {
-    #         combine.mode = "sink";
-    #         node.name = "combined_sink";
-    #         node.description = "My Combined Sink";
-    #         combine.latency-compensate = false;
-    #         combine.props = {
-    #           audio.position = [ "FL" "FR" ];
-    #         };
-    #         stream.props = {
-    #           stream.dont-remix = true;
-    #         };
-    #         stream.rules = [
-    #           {
-    #             matches = [
-    #               {
-    #                 media.class = "Audio/Sink";
-    #                 node.name = "alsa_output.pci-0000_01_00.1.pro-output-3";
-    #               }
-    #             ];
-    #             actions = {
-    #               create-stream = {
-    #                 audio.position = [ "FL" "FR" ];
-    #                 combine.audio.position = [ "FL" "FR" ];
-    #               };
-    #             };
-    #           }
-    #           {
-    #             matches = [
-    #               {
-    #                 media.class = "Audio/Sink";
-    #                 node.name = "alsa_output.pci-0000_01_00.1.pro-output-7";
-    #               }
-    #             ];
-    #             actions = {
-    #               create-stream = {
-    #                 audio.position = [ "FL" "FR" ];
-    #                 combine.audio.position = [ "FL" "FR" ];
-    #               };
-    #             };
-    #           }
-    #         ];
-    #       };
-    #     }
-    #   ];
-    # };
-  };
-
-  systemd.sleep.extraConfig = ''
-    AllowSuspend=yes
-    AllowHibernation=no
-    AllowHybridSleep=no
-    AllowSuspendThenHibernate=no
-  '';
-
-  # services.ollama = { acceleration = "cuda"; };
-
-  # services.llama-cpp = {
-  #   enable = true;
-  #   openFirewall = true;
-  #   model = "/home/javi/llm-models/ggml-org_gpt-oss-20b-GGUF_gpt-oss-20b-mxfp4.gguf";
-  # };
-
-  systemd.services.nvidia_oc = {
-    enable = true;
-    description = "NVidia overclock settings";
-    serviceConfig = {
-      ExecStart =
-        "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 2000 --freq-offset 400";
-      ExecStop =
-        "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0";
-      RemainAfterExit = true;
-    };
-  };
-
-  environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
-
-  # users.users.javi = { packages = with pkgs; [ lmstudio ]; };
-
-  # networking.firewall = {
-  #   enable = false;
-  #   # allowedTCPPorts = [ 8080 ];
-  # };
-
+  # Virtualization configuration
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
@@ -310,4 +271,7 @@
       # };
     };
   };
+
+  imports =
+    [ ../common.nix (modulesPath + "/installer/scan/not-detected.nix") ];
 }
