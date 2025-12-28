@@ -2,7 +2,7 @@
 
 let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 in {
-  # {
+# {
 
   boot = {
     loader.systemd-boot.enable = true;
@@ -45,7 +45,8 @@ in {
     gc.automatic = true;
     settings = {
       auto-optimise-store = true;
-      substituters = [ "https://nix-community.cachix.org" ];
+      substituters =
+        [ "https://nix-community.cachix.org" "https://cache.nixos.org" ];
       trusted-public-keys = [
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       ];
@@ -69,6 +70,7 @@ in {
     };
     hyprland = {
       enable = true;
+      package = unstable.hyprland;
       xwayland.enable = true;
       withUWSM = true;
     };
@@ -178,8 +180,9 @@ in {
         hypridle
         hyprpaper
         hyprpolkitagent
-        hyprshot
-        nix-du
+        # hyprshot
+        unstable.hyprshot
+        # nix-du
         pamixer
         pasystray
         pavucontrol

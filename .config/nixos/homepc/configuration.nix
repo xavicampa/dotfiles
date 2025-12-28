@@ -91,6 +91,7 @@
     # "nvidia-drm.fbdev=1"
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
+    kernelPackages = pkgs.linuxPackages_latest;
   };
 
   # File systems
