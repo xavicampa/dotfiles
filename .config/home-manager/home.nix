@@ -40,7 +40,7 @@ in {
   } else
     { };
 
-  nix.package = pkgs.nixVersions.latest;
+  nix.package = pkgs.nixVersions.stable;
 
   home.packages = [
     config.nix.package
@@ -62,6 +62,7 @@ in {
     pkgs.marksman
     pkgs.fastfetch
     # pkgs.kiro
+    # pkgs.kiro-cli
     pkgs.nerd-fonts.jetbrains-mono
     pkgs.newman
     # pkgs.nix-du
@@ -187,6 +188,9 @@ in {
 
         npm set prefix ~/.npm-global
         export PATH=$HOME/.npm-global/bin:$PATH
+
+        # kiro-cli
+        # [[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
 
         # import shell secrets from 1password
         envop(){
