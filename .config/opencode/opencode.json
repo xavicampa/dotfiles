@@ -316,6 +316,36 @@
           }
         }
       }
+    },
+    "llamacpp-rnj": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "llama.cpp rnj",
+      "options": {
+        "baseURL": "http://localhost:8082/v1"
+      },
+      "models": {
+        "rnj": {
+          "limit": {
+            "context": 32768,
+            "output": 8000
+          }
+        },
+      }
+    },
+    "tensorrt": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "TensorRT",
+      "options": {
+        "baseURL": "http://homepc:8000/v1"
+      },
+      "models": {
+        "nvidia/Qwen3-8B-NVFP4": {
+          "limit": {
+            "context": 40000,
+            "output": 8000
+          }
+        },
+      }
     }
   },
   "mcp": {
