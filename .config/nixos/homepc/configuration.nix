@@ -56,14 +56,14 @@
       # };
     };
     nvidia-container-toolkit.enable = true;
-    # nvidia.prime = {
-    #   offload = {
-    #     enable = true;
-    #     enableOffloadCmd = true;
-    #   };
-    #   intelBusId = "PCI:0:2:0";
-    #   nvidiaBusId = "PCI:1:0:0";
-    # };
+    nvidia.prime = {
+      offload = {
+        enable = true;
+        enableOffloadCmd = true;
+      };
+      intelBusId = "PCI:0:2:0";
+      nvidiaBusId = "PCI:1:0:0";
+    };
     cpu.intel.updateMicrocode =
       lib.mkDefault config.hardware.enableRedistributableFirmware;
   };
@@ -256,24 +256,26 @@
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
       };
-      # gpt = {
-      #   autoStart = false;
-      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-      #   cmd = [
-      #     "-hf"
-      #     "ggml-org/gpt-oss-20b-GGUF"
-      #     "--jinja"
-      #     "-ub"
-      #     "4096"
-      #     "-b"
-      #     "4096"
-      #     "--ctx-size"
-      #     "32000"
-      #   ];
-      #   ports = [ "8080:8080" ];
-      #   devices = [ "nvidia.com/gpu=all" ];
-      #   volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
-      # };
+      gpt = {
+        autoStart = false;
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+        cmd = [
+          "-hf"
+          "ggml-org/gpt-oss-20b-GGUF"
+          "--jinja"
+          "-ub"
+          "4096"
+          "-b"
+          "4096"
+          "--ctx-size"
+          "32000"
+          "--port"
+          "8082"
+        ];
+        ports = [ "8080:8080" ];
+        devices = [ "nvidia.com/gpu=all" ];
+        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+      };
     };
   };
 

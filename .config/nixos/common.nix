@@ -1,4 +1,4 @@
-{ pkgs, config, ... }:
+{ pkgs, config, lib, ... }:
 
 let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 in {
@@ -25,14 +25,14 @@ in {
 
   hardware = { enableAllFirmware = true; };
 
-  i18n = {
-    defaultLocale = "nb_NO.UTF-8";
-    extraLocaleSettings = {
-      LC_ALL = "nb_NO.UTF-8";
-      LANG = "en_US.UTF-8";
-      LANGUAGE = "en_US.UTF-8";
-    };
-  };
+  # i18n = {
+  #   defaultLocale = "nb_NO.UTF-8";
+  #   extraLocaleSettings = {
+  #     LC_ALL = "nb_NO.UTF-8";
+  #     LANG = "en_US.UTF-8";
+  #     LANGUAGE = "en_US.UTF-8";
+  #   };
+  # };
 
   networking = {
     networkmanager = {
@@ -45,6 +45,7 @@ in {
     gc.automatic = true;
     settings = {
       auto-optimise-store = true;
+      experimental-features = [ "nix-command" "flakes" ];
       substituters =
         [ "https://nix-community.cachix.org" "https://cache.nixos.org" ];
       trusted-public-keys = [
@@ -64,6 +65,10 @@ in {
       package = unstable._1password-gui;
     };
     appgate-sdp = { enable = true; };
+    appimage = {
+      enable = true;
+      binfmt = true;
+    };
     firefox = {
       enable = true;
       package = pkgs.firefox-bin;
@@ -80,6 +85,13 @@ in {
       libraries = with pkgs; [ stdenv.cc.cc.lib ];
     };
     ssh = { enableAskPassword = false; };
+    uwsm = {
+      enable = true;
+      waylandCompositors.hyprland = {
+        binPath = lib.mkForce "${config.programs.hyprland.package}/bin/start-hyprland";
+        prettyName = "Hyprland";
+      };
+    };
     waybar.enable = true;
     zsh.enable = true;
   };
@@ -121,7 +133,7 @@ in {
     blueman.enable = true;
     displayManager = {
       enable = true;
-      lemurs.enable = true;
+      # lemurs.enable = true;
     };
     fstrim = {
       enable = true;
@@ -180,6 +192,7 @@ in {
         hypridle
         hyprpaper
         hyprpolkitagent
+        # unstable.kiro
         # hyprshot
         unstable.hyprshot
         # nix-du
