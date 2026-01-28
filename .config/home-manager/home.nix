@@ -129,7 +129,7 @@ in {
           "JetBrainsMono Nerd Font Mono"
         else
           "JetBrainsMono Nerd Font";
-        size = if macos then 16 else 11;
+        size = if macos then 16 else 12;
       };
       keybindings = { "ctrl+shift+h" = "previous_window"; };
       settings = {
