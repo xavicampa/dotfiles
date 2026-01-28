@@ -23,16 +23,7 @@ in {
     };
   };
 
-  hardware = { enableAllFirmware = true; };
-
-  # i18n = {
-  #   defaultLocale = "nb_NO.UTF-8";
-  #   extraLocaleSettings = {
-  #     LC_ALL = "nb_NO.UTF-8";
-  #     LANG = "en_US.UTF-8";
-  #     LANGUAGE = "en_US.UTF-8";
-  #   };
-  # };
+  hardware = { enableRedistributableFirmware = true; };
 
   networking = {
     networkmanager = {
@@ -75,7 +66,7 @@ in {
     };
     hyprland = {
       enable = true;
-      package = unstable.hyprland;
+      # package = unstable.hyprland;
       xwayland.enable = true;
       withUWSM = true;
     };
@@ -87,10 +78,10 @@ in {
     ssh = { enableAskPassword = false; };
     uwsm = {
       enable = true;
-      waylandCompositors.hyprland = {
-        binPath = lib.mkForce "${config.programs.hyprland.package}/bin/start-hyprland";
-        prettyName = "Hyprland";
-      };
+      # waylandCompositors.hyprland = {
+      #   binPath = lib.mkForce "${config.programs.hyprland.package}/bin/start-hyprland";
+      #   prettyName = "Hyprland";
+      # };
     };
     waybar.enable = true;
     zsh.enable = true;
@@ -103,14 +94,14 @@ in {
         polkit.addRule(function(action, subject) {
           if (
             subject.isInGroup("users")
-              && (
-                action.id == "org.freedesktop.login1.reboot" ||
-                action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
-                action.id == "org.freedesktop.login1.power-off" ||
-                action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
-                action.id == "org.freedesktop.login1.suspend" ||
-                action.id == "org.freedesktop.systemd1.manage-units"
-              )
+              # && (
+              #   action.id == "org.freedesktop.login1.reboot" ||
+              #   action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+              #   action.id == "org.freedesktop.login1.power-off" ||
+              #   action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+              #   action.id == "org.freedesktop.login1.suspend" ||
+              #   action.id == "org.freedesktop.systemd1.manage-units"
+              # )
             )
           {
             return polkit.Result.YES;
@@ -172,6 +163,7 @@ in {
         "seat"
         "audio"
         "users"
+        "disk"
       ];
       packages = with pkgs; [
         apple-cursor
@@ -193,14 +185,15 @@ in {
         hyprpaper
         hyprpolkitagent
         # unstable.kiro
-        # hyprshot
-        unstable.hyprshot
+        hyprshot
+        # unstable.hyprshot
         # nix-du
         pamixer
         pasystray
         pavucontrol
         rofi
         rofimoji
+        unstable.rpi-imager
         slack
         stow
         wl-clipboard
