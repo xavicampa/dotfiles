@@ -110,7 +110,7 @@
   networking = {
     hostName = "homepc"; # Define your hostname.
     useDHCP = lib.mkDefault true;
-    interfaces.enp3s0.mtu = 9000;
+    # interfaces.enp3s0.mtu = 9000;
     wireless.enable =
       lib.mkForce false; # Enables wireless support via wpa_supplicant.
   };
@@ -207,6 +207,9 @@
         RemainAfterExit = true;
       };
     };
+
+    # shows wattage in btop for intel cpus
+    tmpfiles.rules = ["Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -"];
   };
 
   # Environment configuration
@@ -235,7 +238,8 @@
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
         cmd = [
           "-hf"
-          "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q2_K_XL"
+          # "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q2_K_XL"
+          "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
           "--jinja"
           "--ctx-size"
           "40000"
@@ -251,6 +255,8 @@
           "1.05"
           "--port"
           "8082"
+          "--n-cpu-moe"
+          "18"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
@@ -267,12 +273,16 @@
           "4096"
           "-b"
           "4096"
-          "--ctx-size"
-          "32000"
           "--port"
           "8082"
+          "--n-cpu-moe"
+          "6"
+          "-fa"
+          "on"
+          "-c"
+          "131072"
         ];
-        ports = [ "8080:8080" ];
+        ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
       };
