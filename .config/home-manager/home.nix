@@ -172,6 +172,7 @@ in {
         # pkgs.rnix-lsp
         pkgs.lua-language-server
         pkgs.tree-sitter
+        pkgs.write-good
       ];
     };
 
