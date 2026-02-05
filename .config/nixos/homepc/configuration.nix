@@ -234,7 +234,7 @@
       #   volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
       # };
       qwen3-coder = {
-        autoStart = false;
+        autoStart = true;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
         cmd = [
           "-hf"
