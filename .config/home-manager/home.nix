@@ -161,6 +161,7 @@ in {
           require("config.remap")
       '';
       extraPackages = [
+        pkgs.checkstyle
         pkgs.gcc
         pkgs.lemminx
         # pkgs.llm-ls
