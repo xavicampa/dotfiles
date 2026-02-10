@@ -29,6 +29,15 @@
       # pythonPackagesExtensions = prev.pythonPackagesExtensions
       #   ++ [ pythonOverlay ];
 
+      # https://github.com/NixOS/nixpkgs/issues/488689
+      inetutils = prev.inetutils.overrideAttrs (old: {
+        version = "2.6";
+        src = prev.fetchurl {
+          url = "mirror://gnu/inetutils/inetutils-2.6.tar.gz";
+          hash = "sha256-zKolbg1kbffyhf8VijKR83zR/IOC83dNIvclQSdjXac=";
+        };
+      });
+
       # opencode =
       #   # REF: <https://github.com/NixOS/nixpkgs/issues/432051#issuecomment-3172569639>
       #   prev.opencode.overrideAttrs (o: {
