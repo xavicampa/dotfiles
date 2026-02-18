@@ -123,7 +123,6 @@ in {
     };
     fstrim = {
       enable = true;
-      interval = "daily";
     };
     gnome.gnome-keyring.enable = true;
     kmscon = {

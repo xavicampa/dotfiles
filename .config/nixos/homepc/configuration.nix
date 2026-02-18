@@ -98,7 +98,7 @@
   fileSystems."/" = {
     device = "/dev/disk/by-label/NIXROOT";
     fsType = "ext4";
-    options = [ "noatime" ];
+    options = [ "noatime" "discard" ];
   };
 
   fileSystems."/boot" = {
