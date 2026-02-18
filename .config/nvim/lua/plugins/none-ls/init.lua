@@ -7,7 +7,6 @@ return {
                 require("null-ls").builtins.code_actions.gitsigns,
                 require("null-ls").builtins.formatting.black,
                 require("null-ls").builtins.formatting.prettier,
-                require("null-ls").builtins.diagnostics.write_good,
                 require("null-ls").builtins.diagnostics.cfn_lint.with({
                     extra_args = {
                         -- '-i', 'W3002', -- Do not try to parse nested stack's TemplateURL
