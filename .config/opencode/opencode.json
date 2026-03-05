@@ -195,8 +195,6 @@
       },
       "models": {
         "qwen3-coder": {
-          "reasoning": true,
-          "tool_call": true,
           "limit": {
             "context": 65535,
             "output": 8192
