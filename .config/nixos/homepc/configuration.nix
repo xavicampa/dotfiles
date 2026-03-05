@@ -238,11 +238,9 @@
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
         cmd = [
           "-hf"
-          # "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q2_K_XL"
           "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
-          "--jinja"
-          "--ctx-size"
-          "40000"
+          "--port"
+          "8082"
           "--temp"
           "0.7"
           "--min-p"
@@ -253,14 +251,16 @@
           "20"
           "--repeat-penalty"
           "1.05"
-          "--port"
-          "8082"
+          "--jinja"
+          "--ctx-size"
+          "65535"
           "--n-cpu-moe"
-          "18"
+          "26"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+        pull = "newer";
       };
       gpt = {
         autoStart = false;
