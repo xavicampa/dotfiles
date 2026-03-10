@@ -2,7 +2,7 @@ return {
   {
     'huggingface/llm.nvim',
     opts = {
-      accept_keymap = "<S-Tab>",
+      accept_keymap = "<S-Cr>",
 
       -- backend = "ollama",
       -- url = "http://localhost:11434",
