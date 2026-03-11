@@ -50,6 +50,7 @@ in {
     pkgs.awscli2
     # pkgs.aws-sam-cli
     pkgs.cargo
+    unstable.crush
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
     pkgs.ghostscript
