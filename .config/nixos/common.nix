@@ -2,13 +2,15 @@
 
 let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 in {
-# {
+  # {
 
   boot = {
     loader.systemd-boot.enable = true;
     loader.efi.canTouchEfiVariables = true;
     plymouth.enable = true;
   };
+
+  console.keyMap = "no";
 
   environment = {
     etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
@@ -21,6 +23,7 @@ in {
       ELECTRON_OZONE_PLATFORM_HINT = "auto";
       GIT_ASKPASS = "";
     };
+    systemPackages = [ pkgs.spice-gtk ];
   };
 
   hardware = { enableRedistributableFirmware = true; };
@@ -62,7 +65,7 @@ in {
     };
     firefox = {
       enable = true;
-      package = pkgs.firefox-bin;
+      package = unstable.firefox-bin;
     };
     hyprland = {
       enable = true;
@@ -83,6 +86,7 @@ in {
       #   prettyName = "Hyprland";
       # };
     };
+    virt-manager = { enable = true; };
     waybar.enable = true;
     zsh.enable = true;
   };
@@ -121,9 +125,7 @@ in {
       enable = true;
       # lemurs.enable = true;
     };
-    fstrim = {
-      enable = true;
-    };
+    fstrim = { enable = true; };
     gnome.gnome-keyring.enable = true;
     kmscon = {
       enable = false;
@@ -132,7 +134,6 @@ in {
       useXkbConfig = true;
     };
     libinput = { enable = true; };
-    xserver = { xkb.layout = "no"; };
   };
 
   system.stateVersion = "22.11";
@@ -158,6 +159,7 @@ in {
         "audio"
         "users"
         "disk"
+        "libvirtd"
       ];
       packages = with pkgs; [
         apple-cursor
@@ -178,15 +180,15 @@ in {
         hypridle
         hyprpaper
         hyprpolkitagent
-        # unstable.kiro
         hyprshot
-        # unstable.hyprshot
         # nix-du
         pamixer
         pasystray
         pavucontrol
         rofi
         rofimoji
+        transmission_4-qt
+        unstable.kiro-cli
         unstable.rpi-imager
         slack
         stow
@@ -201,12 +203,16 @@ in {
 
   virtualisation = {
     containers.enable = true;
+    libvirtd = {
+      enable = true;
+    };
     podman = {
       defaultNetwork = { settings = { dns_enabled = true; }; };
       dockerCompat = true;
       dockerSocket = { enable = true; };
       enable = true;
     };
+    spiceUSBRedirection.enable = true;
   };
 
   xdg.portal = {
