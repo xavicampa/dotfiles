@@ -29,8 +29,10 @@ in {
   hardware = { enableRedistributableFirmware = true; };
 
   networking = {
+    nameservers = ["172.16.99.4"];
     networkmanager = {
       enable = true; # Easiest to use and most distros use this by default.
+      dns = "none";
     };
     enableIPv6 = false;
   };
@@ -69,7 +71,6 @@ in {
     };
     hyprland = {
       enable = true;
-      # package = unstable.hyprland;
       xwayland.enable = true;
       withUWSM = true;
     };
@@ -81,10 +82,6 @@ in {
     ssh = { enableAskPassword = false; };
     uwsm = {
       enable = true;
-      # waylandCompositors.hyprland = {
-      #   binPath = lib.mkForce "${config.programs.hyprland.package}/bin/start-hyprland";
-      #   prettyName = "Hyprland";
-      # };
     };
     virt-manager = { enable = true; };
     waybar.enable = true;
@@ -94,19 +91,19 @@ in {
   security = {
     polkit = {
       enable = true;
-      extraConfig = ''
-        polkit.addRule(function(action, subject) {
-          if (
-            subject.isInGroup("users")
-              && (
-                action.id == "org.freedesktop.systemd1.manage-units"
-              )
-            )
-          {
-            return polkit.Result.YES;
-          }
-        });
-      '';
+      # extraConfig = ''
+      #   polkit.addRule(function(action, subject) {
+      #     if (
+      #       subject.isInGroup("users")
+      #         && (
+      #           action.id == "org.freedesktop.systemd1.manage-units"
+      #         )
+      #       )
+      #     {
+      #       return polkit.Result.YES;
+      #     }
+      #   });
+      # '';
     };
     wrappers = {
       btop = {
@@ -121,19 +118,10 @@ in {
 
   services = {
     blueman.enable = true;
-    displayManager = {
-      enable = true;
-      # lemurs.enable = true;
-    };
     fstrim = { enable = true; };
     gnome.gnome-keyring.enable = true;
-    kmscon = {
-      enable = false;
-      extraConfig = "font-dpi=144";
-      hwRender = true;
-      useXkbConfig = true;
-    };
     libinput = { enable = true; };
+    resolved.enable = false;
   };
 
   system.stateVersion = "22.11";
