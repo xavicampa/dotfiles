@@ -63,6 +63,7 @@ in {
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
+    unstable.gemini-cli
     # pkgs.kiro
     # pkgs.kiro-cli
     pkgs.nerd-fonts.jetbrains-mono
@@ -200,6 +201,8 @@ in {
         envop(){
           export BRAVE_API_KEY=$(op read op://dev/BRAVE_API_KEY/credential)
           export HF_TOKEN=$(op read op://dev/HF_TOKEN/credential)
+          export GOOGLE_CLOUD_PROJECT=$(op read op://dev/GOOGLE_CLOUD_PROJECT/credential)
+          export GEMINI_API_KEY=$(op read op://dev/GEMINI_API_KEY/credential)
         }
         autoload -Uz envop
 
