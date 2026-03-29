@@ -248,7 +248,7 @@
       ],
       "environment": {}
     },
-    "aws-cfn-mcp": {
+    "aws-iac-mcp": {
       "enabled": false,
       "type": "local",
       "command": [
@@ -262,7 +262,7 @@
         "/home/javi/javier-campa-dotfiles/dot-aws:/app/javier-campa-dotfiles/dot-aws:U",
         "-e",
         "AWS_PROFILE=javier",
-        "public.ecr.aws/awslabs-mcp/awslabs/cfn-mcp-server:latest",
+        "public.ecr.aws/awslabs-mcp/awslabs/aws-iac-mcp-server:latest",
         "--readonly"
       ],
       "environment": {}
