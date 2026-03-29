@@ -259,7 +259,7 @@
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
         pull = "newer";
       };
       gpt = {
@@ -284,7 +284,7 @@
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
+        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
       };
     };
   };
