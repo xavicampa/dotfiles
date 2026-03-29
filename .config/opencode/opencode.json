@@ -267,6 +267,11 @@
       ],
       "environment": {}
     },
+    "aws-knowledge-mcp": {
+      "enabled": false,
+      "type": "remote",
+      "url" :"https://knowledge-mcp.global.api.aws"
+    },
     "aws-pricing-mcp": {
       "enabled": false,
       "type": "local",
@@ -284,14 +289,6 @@
         "public.ecr.aws/awslabs-mcp/awslabs/aws-pricing-mcp-server:latest"
       ],
       "environment": {}
-    },
-    "aws-diagram-mcp": {
-      "enabled": false,
-      "type": "local",
-      "command": ["uvx", "awslabs.aws-diagram-mcp-server"],
-      "environment": {
-        "FAST_MCP_LOG_LEVEL": "ERROR"
-      }
     },
     "context7": {
       "enabled": false,
