@@ -234,7 +234,7 @@
       #   volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
       # };
       qwen3-coder = {
-        autoStart = true;
+        autoStart = false;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
         cmd = [
           "-hf"
@@ -256,6 +256,32 @@
           "65535"
           "--n-cpu-moe"
           "26"
+        ];
+        ports = [ "8082:8082" ];
+        devices = [ "nvidia.com/gpu=all" ];
+        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
+        pull = "newer";
+      };
+      qwen3-coder-next = {
+        autoStart = true;
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+        cmd = [
+          "-hf"
+          "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"
+          "--port"
+          "8082"
+          "--temp"
+          "1.0"
+          "--min-p"
+          "0.01"
+          "--top-p"
+          "0.95"
+          "--top-k"
+          "40"
+          "--ctx-size"
+          "65535"
+          "--n-cpu-moe"
+          "28"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
