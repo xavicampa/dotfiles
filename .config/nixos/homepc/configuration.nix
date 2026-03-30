@@ -225,43 +225,6 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
-      # qwen25-coder = {
-      #   autoStart = false;
-      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-      #   cmd = [ "--fim-qwen-3b-default" ];
-      #   ports = [ "8012:8012" ];
-      #   devices = [ "nvidia.com/gpu=all" ];
-      #   volumes = [ "/home/javi/llm-models:/root/.cache/llama.cpp" ];
-      # };
-      qwen3-coder = {
-        autoStart = false;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-        cmd = [
-          "-hf"
-          "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
-          "--port"
-          "8082"
-          "--temp"
-          "0.7"
-          "--min-p"
-          "0.0"
-          "--top-p"
-          "0.80"
-          "--top-k"
-          "20"
-          "--repeat-penalty"
-          "1.05"
-          "--jinja"
-          "--ctx-size"
-          "65535"
-          "--n-cpu-moe"
-          "26"
-        ];
-        ports = [ "8082:8082" ];
-        devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
-        pull = "newer";
-      };
       qwen3-coder-next = {
         autoStart = true;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
@@ -281,7 +244,7 @@
           "--ctx-size"
           "65535"
           "--n-cpu-moe"
-          "26"
+          "30"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
