@@ -244,7 +244,7 @@
           "--ctx-size"
           "65535"
           "--n-cpu-moe"
-          "30"
+          "28"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
