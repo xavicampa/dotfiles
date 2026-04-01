@@ -227,7 +227,7 @@
     containers = {
       qwen3-coder-next = {
         autoStart = true;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
         cmd = [
           "-hf"
           "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"
@@ -245,6 +245,7 @@
           "65535"
           "--n-cpu-moe"
           "28"
+          "--no-mmap"
         ];
         ports = [ "8082:8082" ];
         devices = [ "nvidia.com/gpu=all" ];
