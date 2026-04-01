@@ -23,7 +23,7 @@ in {
       ELECTRON_OZONE_PLATFORM_HINT = "auto";
       GIT_ASKPASS = "";
     };
-    systemPackages = [ pkgs.spice-gtk ];
+    systemPackages = [ pkgs.spice-gtk pkgs.lsof ];
   };
 
   hardware = { enableRedistributableFirmware = true; };
@@ -154,7 +154,7 @@ in {
         blueman
         bruno
         btop
-        busybox # killall
+        # busybox # killall
         ddcutil
         docker-compose
         egl-wayland
