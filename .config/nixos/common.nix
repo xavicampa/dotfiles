@@ -73,7 +73,6 @@ in {
       enable = true;
       package = unstable.hyprland;
       xwayland.enable = true;
-      withUWSM = true;
     };
     hyprlock = { enable = true; };
     nix-ld = {
@@ -81,9 +80,6 @@ in {
       libraries = with pkgs; [ stdenv.cc.cc.lib ];
     };
     ssh = { enableAskPassword = false; };
-    uwsm = {
-      enable = true;
-    };
     virt-manager = { enable = true; };
     waybar.enable = true;
     zsh.enable = true;
