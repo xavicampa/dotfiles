@@ -93,6 +93,7 @@ in {
     gnome.gnome-keyring.enable = true;
     libinput = { enable = true; };
     resolved.enable = false;
+    udisks2.enable = true;
   };
 
   system.stateVersion = "22.11";
@@ -125,6 +126,7 @@ in {
         atop
         autotiling
         baobab # windirstat equivalent
+        bashmount
         blueman
         bruno
         unstable.btop-cuda
