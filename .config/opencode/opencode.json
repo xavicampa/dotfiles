@@ -164,37 +164,14 @@
         "rnj-1-instruct-mlx": {}
       }
     },
-    "llamacpp-gpt": {
+    "llamacpp": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "llama.cpp gpt",
+      "name": "llama.cpp",
       "options": {
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "gpt-oss": {
-          "limit": {
-            "context": 32000,
-            "output": 8000
-          },
-          "options": {
-            "temperature": 1,
-            "top_p": 1.0,
-            "top_k": 0,
-            "extraBody": {
-              "think": "high"
-            }
-          }
-        }
-      }
-    },
-    "llamacpp-qwen3-coder": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "llama.cpp qwen3-coder",
-      "options": {
-        "baseURL": "http://localhost:8082/v1"
-      },
-      "models": {
-        "qwen3-coder": {
+        "qwen3-coder-next": {
           "limit": {
             "context": 65535,
             "output": 8192
