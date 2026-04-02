@@ -3,9 +3,9 @@
 # to /etc/nixos/configuration.nix instead.
 { config, lib, pkgs, modulesPath, ... }:
 
-# let
-#   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-# in
+let
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+in
 
 {
   # Hardware configuration
@@ -128,7 +128,18 @@
   nixpkgs.config.cudaSupport = true;
 
   # Security configuration
-  security.rtkit.enable = true;
+  security = {
+    rtkit.enable = true;
+    wrappers = {
+      btop = {
+        enable = true;
+        owner = "root";
+        group = "root";
+        source = "${unstable.btop-cuda}/bin/btop";
+        capabilities = "cap_perfmon=ep";
+      };
+    };
+  };
 
   # Services
   services = {
@@ -222,7 +233,7 @@
   };
 
   # Environment configuration
-  environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia ];
+  environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia unstable.btop-cuda];
 
   # System configuration
   swapDevices = [{

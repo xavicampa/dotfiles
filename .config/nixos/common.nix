@@ -85,33 +85,7 @@ in {
     zsh.enable = true;
   };
 
-  security = {
-    polkit = {
-      enable = true;
-      # extraConfig = ''
-      #   polkit.addRule(function(action, subject) {
-      #     if (
-      #       subject.isInGroup("users")
-      #         && (
-      #           action.id == "org.freedesktop.systemd1.manage-units"
-      #         )
-      #       )
-      #     {
-      #       return polkit.Result.YES;
-      #     }
-      #   });
-      # '';
-    };
-    wrappers = {
-      btop = {
-        enable = true;
-        owner = "root";
-        group = "root";
-        source = "${pkgs.btop}/bin/btop";
-        capabilities = "cap_perfmon=ep";
-      };
-    };
-  };
+  security.polkit.enable = true;
 
   services = {
     blueman.enable = true;
@@ -153,7 +127,7 @@ in {
         baobab # windirstat equivalent
         blueman
         bruno
-        btop
+        unstable.btop-cuda
         # busybox # killall
         ddcutil
         docker-compose
