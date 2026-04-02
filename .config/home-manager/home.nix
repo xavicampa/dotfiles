@@ -162,6 +162,7 @@ in {
         	require("config.lazy")
           require("config.remap")
       '';
+      package = unstable.neovim-unwrapped;
       extraPackages = [
         pkgs.checkstyle
         pkgs.gcc
