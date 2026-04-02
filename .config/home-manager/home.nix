@@ -31,6 +31,7 @@ in {
     # EDITOR = "nvim";
     # SHELL = "${pkgs.zsh}/bin/zsh";
     # TERM = "xterm-256color";
+    SSH_AUTH_SOCK = if macos then "${config.home.homeDirectory}/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock" else "${config.home.homeDirectory}/.1password/agent.sock";
     NIXPKGS_ALLOW_UNFREE = 1;
   };
 
