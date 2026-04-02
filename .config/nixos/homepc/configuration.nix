@@ -96,13 +96,22 @@
 
   # File systems
   fileSystems."/" = {
-    device = "/dev/disk/by-label/NIXROOT";
-    fsType = "ext4";
-    options = [ "noatime" "discard" ];
+    device = "/dev/disk/by-uuid/93e624aa-5323-466d-9dc8-b395a78efef1";
+    fsType = "btrfs";
+    options = [ "subvol=root" "compress=zstd" ];
   };
-
+  fileSystems."/home" = {
+    device = "/dev/disk/by-uuid/93e624aa-5323-466d-9dc8-b395a78efef1";
+    fsType = "btrfs";
+    options = [ "subvol=home" "compress=lzo" ];
+  };
+  fileSystems."/nix" = {
+    device = "/dev/disk/by-uuid/93e624aa-5323-466d-9dc8-b395a78efef1";
+    fsType = "btrfs";
+    options = [ "subvol=nix" "compress=zstd" "noatime" ];
+  };
   fileSystems."/boot" = {
-    device = "/dev/disk/by-label/NIXBOOT";
+    device = "/dev/disk/by-uuid/36FE-D52D";
     fsType = "vfat";
   };
 
