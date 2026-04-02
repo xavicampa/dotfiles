@@ -252,7 +252,7 @@ in
           "-hf"
           "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"
           "--port"
-          "8082"
+          "8080"
           "--temp"
           "1.0"
           "--min-p"
@@ -263,38 +263,23 @@ in
           "40"
           "--ctx-size"
           "65535"
-          "--n-cpu-moe"
-          "28"
           "--no-mmap"
+          "--fit"
+          "on"
+          "--fit-ctx"
+          "65536"
+          "-ctk"
+          "q8_0"
+          "-ctv"
+          "q8_0"
+          "--jinja"
+          "--fit-target"
+          "128"
         ];
-        ports = [ "8082:8082" ];
+        ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
         pull = "newer";
-      };
-      gpt = {
-        autoStart = false;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-        cmd = [
-          "-hf"
-          "ggml-org/gpt-oss-20b-GGUF"
-          "--jinja"
-          "-ub"
-          "4096"
-          "-b"
-          "4096"
-          "--port"
-          "8082"
-          "--n-cpu-moe"
-          "6"
-          "-fa"
-          "on"
-          "-c"
-          "131072"
-        ];
-        ports = [ "8082:8082" ];
-        devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
       };
     };
   };
