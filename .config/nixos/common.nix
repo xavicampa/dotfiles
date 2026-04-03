@@ -71,8 +71,8 @@ in {
     };
     hyprland = {
       enable = true;
-      package = unstable.hyprland;
       xwayland.enable = true;
+      withUWSM = true;
     };
     hyprlock = { enable = true; };
     nix-ld = {
@@ -81,7 +81,10 @@ in {
     };
     ssh = { enableAskPassword = false; };
     virt-manager = { enable = true; };
-    waybar.enable = true;
+    uwsm.enable = true;
+    waybar = {
+      enable = true;
+    };
     zsh.enable = true;
   };
 
@@ -130,7 +133,6 @@ in {
         blueman
         bruno
         unstable.btop-cuda
-        # busybox # killall
         ddcutil
         docker-compose
         egl-wayland
@@ -146,6 +148,7 @@ in {
         pamixer
         pasystray
         pavucontrol
+        psmisc
         rofi
         rofimoji
         transmission_4-qt
