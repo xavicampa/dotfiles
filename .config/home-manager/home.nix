@@ -33,6 +33,8 @@ in {
     # TERM = "xterm-256color";
     SSH_AUTH_SOCK = if macos then "${config.home.homeDirectory}/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock" else "${config.home.homeDirectory}/.1password/agent.sock";
     NIXPKGS_ALLOW_UNFREE = 1;
+    ANTHROPIC_CONSOLE_KEY = "sk-1234";
+    ANTHROPIC_BASE_URL = "http://localhost:8080";
   };
 
   home.file = if macos then {
@@ -51,6 +53,7 @@ in {
     pkgs.awscli2
     # pkgs.aws-sam-cli
     pkgs.cargo
+    unstable.claude-code
     # unstable.crush
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
