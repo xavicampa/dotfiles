@@ -2,6 +2,18 @@
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-antigravity-auth@latest"],
   "provider": {
+    "omni":{
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "kiro",
+      "options": {
+        "baseURL": "http://rpi:20128/v1"
+      },
+      "models": {
+        "kr/claude-sonnet-4.5": {},
+        "kr/claude-haiku-4.5": {},
+        "homepc/unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS": {}
+      }
+    },
     "google": {
       "models": {
         "antigravity-gemini-3-pro": {
@@ -173,8 +185,8 @@
       "models": {
         "qwen3-coder-next": {
           "limit": {
-            "context": 65535,
-            "output": 8192
+            "context": 262140,
+            "output": 32768
           }
         }
       }
