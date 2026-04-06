@@ -12,6 +12,7 @@ return {
     lazy = false,
     opts = {
         animation = {},
+        explorer = {},
         image = {},
         indent = {},
         input = {},
