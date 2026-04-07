@@ -120,6 +120,7 @@ in {
     direnv = {
       enable = true;
       nix-direnv = { enable = true; };
+      package = unstable.direnv;
     };
 
     eza = { enable = true; };
