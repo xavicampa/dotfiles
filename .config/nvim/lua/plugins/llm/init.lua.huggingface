@@ -2,7 +2,7 @@ return {
   {
     'huggingface/llm.nvim',
     opts = {
-      accept_keymap = "<S-Cr>",
+      -- accept_keymap = "<S-Cr>",
 
       -- backend = "ollama",
       -- url = "http://localhost:11434",
@@ -23,7 +23,7 @@ return {
       -- },
       -- tokens_to_clear = { "<EOT>" },
 
-      model = "qwen2.5-coder-1.5b-instruct",
+      model = "qwen2.5-coder-1.5b",
       -- model = "qwen2.5-coder:3b-base",
       fim = {
         enabled = true,
