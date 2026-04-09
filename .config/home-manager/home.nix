@@ -153,8 +153,8 @@ in {
         hide_window_decorations = if macos then "no" else "titlebar-only";
       };
       # theme = "Gruvbox Dark";
-      # theme = "Catppuccin-Macchiato";
-      themeFile = "Dracula";
+      themeFile = "Catppuccin-Mocha";
+      # themeFile = "Dracula";
     };
 
     neovim = {
