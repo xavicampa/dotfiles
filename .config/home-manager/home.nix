@@ -154,7 +154,7 @@ in {
       };
       # theme = "Gruvbox Dark";
       # theme = "Catppuccin-Macchiato";
-      # themeFile = "Dracula";
+      themeFile = "Dracula";
     };
 
     neovim = {
@@ -164,6 +164,7 @@ in {
           vim.g.python3_host_prog='${pythonEnv}/bin/python3'
           vim.g.python_host_prog='${pythonEnv}/bin/python'
           require("config.options")
+          require("config.pack")
         	require("config.lazy")
           require("config.remap")
       '';
