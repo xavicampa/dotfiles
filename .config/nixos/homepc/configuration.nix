@@ -46,6 +46,7 @@ in
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
       # package = config.boot.kernelPackages.nvidiaPackages.latest;
+      package = unstable.linuxPackages_latest.nvidiaPackages.stable;
       # package = config.boot.kernelPackages.nvidiaPackages.stable;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
@@ -91,7 +92,7 @@ in
     # "nvidia-drm.fbdev=1"
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
-    # kernelPackages = pkgs.linuxPackages_latest;
+    kernelPackages = pkgs.linuxPackages_latest;
   };
 
   # File systems
