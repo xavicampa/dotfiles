@@ -136,7 +136,7 @@ in {
           "JetBrainsMono Nerd Font Mono"
         else
           "JetBrainsMono Nerd Font";
-        size = if macos then 16 else 10;
+        size = if macos then 16 else 12;
       };
       keybindings = { "ctrl+shift+h" = "previous_window"; };
       settings = {
@@ -153,8 +153,8 @@ in {
         hide_window_decorations = if macos then "no" else "titlebar-only";
       };
       # theme = "Gruvbox Dark";
-      themeFile = "Catppuccin-Mocha";
-      # themeFile = "Dracula";
+      # themeFile = "Catppuccin-Mocha";
+      themeFile = "Dracula";
     };
 
     neovim = {

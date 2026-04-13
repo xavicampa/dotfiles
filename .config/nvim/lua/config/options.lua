@@ -45,6 +45,3 @@ vim.diagnostic.config({
     severity_sort = true,
     virtual_lines = true,
 })
-
--- Color scheme
-vim.cmd('colorscheme catppuccin')
