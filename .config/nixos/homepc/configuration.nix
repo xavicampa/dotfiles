@@ -252,7 +252,6 @@ in
         cmd = [
           "-hf"
           "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"
-          # "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ4_XS"
           "--port"
           "8080"
           "--temp"
@@ -264,21 +263,17 @@ in
           "--top-k"
           "40"
           "--ctx-size"
-          "262140"
-          # "65535"
+          "65535"
           "--no-mmap"
           "--fit"
           "on"
           "--fit-ctx"
-          "262140"
-          # "65535"
+          "65535"
           "-ctk"
           "q8_0"
           "-ctv"
           "q8_0"
           "--jinja"
-          "--fit-target"
-          "128"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
