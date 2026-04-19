@@ -246,22 +246,59 @@ in
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
-      qwen3-coder-next = {
+      # qwen3-coder-next = {
+      #   autoStart = true;
+      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
+      #   cmd = [
+      #     "-hf"
+      #     # "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"
+      #     "unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL"
+      #     "--port"
+      #     "8080"
+      #     "--temp"
+      #     "1.0"
+      #     "--min-p"
+      #     "0.01"
+      #     "--top-p"
+      #     "0.95"
+      #     "--top-k"
+      #     "40"
+      #     "--ctx-size"
+      #     "65535"
+      #     "--no-mmap"
+      #     "--fit"
+      #     "on"
+      #     "--fit-ctx"
+      #     "65535"
+      #     "-ctk"
+      #     "q8_0"
+      #     "-ctv"
+      #     "q8_0"
+      #     "--jinja"
+      #     "--fit-target"
+      #     "3072"
+      #   ];
+      #   ports = [ "8080:8080" ];
+      #   devices = [ "nvidia.com/gpu=all" ];
+      #   volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
+      #   pull = "newer";
+      # };
+      qwen36 = {
         autoStart = true;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
         cmd = [
           "-hf"
-          "unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"
+          "unsloth/Qwen3.6-35B-A3B-GGUF:MXFP4_MOE"
           "--port"
           "8080"
           "--temp"
-          "1.0"
+          "0.6"
           "--min-p"
-          "0.01"
+          "0.00"
           "--top-p"
           "0.95"
           "--top-k"
-          "40"
+          "20"
           "--ctx-size"
           "65535"
           "--no-mmap"
@@ -274,12 +311,27 @@ in
           "-ctv"
           "q8_0"
           "--jinja"
+          # "--fit-target"
+          # "2048"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
         volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
         pull = "newer";
       };
+      # fim = {
+      #   autoStart = true;
+      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
+      #   cmd = [
+      #     "--fim-qwen-1.5b-default"
+      #     "-ngl"
+      #     "99"
+      #   ];
+      #   ports = [ "8012:8012" ];
+      #   devices = [ "nvidia.com/gpu=all" ];
+      #   volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
+      #   pull = "newer";
+      # };
     };
   };
 
