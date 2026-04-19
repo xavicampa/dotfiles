@@ -209,6 +209,7 @@ in {
           export HF_TOKEN=$(op read op://dev/HF_TOKEN/credential)
           export GOOGLE_CLOUD_PROJECT=$(op read op://dev/GOOGLE_CLOUD_PROJECT/credential)
           export GEMINI_API_KEY=$(op read op://dev/GEMINI_API_KEY/credential)
+          export GOOGLE_GENERATIVE_AI_API_KEY=$(op read op://dev/GEMINI_API_KEY/credential)
         }
         autoload -Uz envop
 
