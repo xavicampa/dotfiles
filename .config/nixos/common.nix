@@ -23,7 +23,10 @@ in {
       ELECTRON_OZONE_PLATFORM_HINT = "auto";
       GIT_ASKPASS = "";
     };
-    systemPackages = [ pkgs.spice-gtk pkgs.lsof ];
+    systemPackages = [ 
+      pkgs.spice-gtk 
+      pkgs.lsof 
+    ];
   };
 
   hardware = { enableRedistributableFirmware = true; };
@@ -143,7 +146,6 @@ in {
         google-chrome
         hypridle
         hyprpaper
-        hyprpolkitagent
         hyprshot
         # nix-du
         pamixer
