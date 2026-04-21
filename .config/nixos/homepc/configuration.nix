@@ -310,9 +310,8 @@ in
           "q8_0"
           "-ctv"
           "q8_0"
-          "--jinja"
-          # "--fit-target"
-          # "2048"
+          "--fit-target"
+          "1536"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
