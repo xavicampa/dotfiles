@@ -225,10 +225,10 @@
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL": {
+        "unsloth/Qwen3.6-35B-A3B-GGUF": {
           "limit": {
-            "context": 65535,
-            "output": 8192
+            "context": 262144,
+            "output": 32768
           }
         }
       }
