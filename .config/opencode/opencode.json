@@ -225,10 +225,10 @@
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "unsloth/Qwen3.6-35B-A3B-GGUF": {
+        "unsloth/Qwen3.6-27B-GGUF": {
           "limit": {
-            "context": 262144,
-            "output": 32768
+            "context": 65535,
+            "output": 8192
           }
         }
       }
