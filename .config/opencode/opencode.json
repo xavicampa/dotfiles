@@ -225,9 +225,9 @@
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "unsloth/Qwen3.6-27B-GGUF": {
+        "Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-GGUF": {
           "limit": {
-            "context": 65535,
+            "context": 98304,
             "output": 8192
           }
         }
@@ -245,7 +245,7 @@
             "context": 40000,
             "output": 8000
           }
-        },
+        }
       }
     }
   },

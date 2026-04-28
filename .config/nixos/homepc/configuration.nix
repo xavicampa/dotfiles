@@ -46,7 +46,7 @@ in
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
       # package = config.boot.kernelPackages.nvidiaPackages.latest;
-      package = unstable.linuxPackages_latest.nvidiaPackages.stable;
+      # package = unstable.linuxPackages_latest.nvidiaPackages.stable;
       # package = config.boot.kernelPackages.nvidiaPackages.stable;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
@@ -290,7 +290,9 @@ in
           "-hf"
           # "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q8_K_XL"
           # "unsloth/Qwen3.6-35B-A3B-GGUF:MXFP4_MOE"
-          "unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
+          # "unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
+          # "rico03/Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-GGUF:Q3_K_M"
+          "HauhauCS/Qwen3.6-27B-Uncensored-HauhauCS-Aggressive:IQ3_M"
           "--port"
           "8080"
           "--temp"
@@ -307,6 +309,7 @@ in
           "0.0"
           "--ctx-size"
           # "262144"
+          # "98304"
           "65535"
           "--no-mmap"
           "-ctk"
