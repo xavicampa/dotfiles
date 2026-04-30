@@ -11,7 +11,87 @@
       "models": {
         "kiro/claude-haiku-4.5": {},
         "kiro/claude-sonnet-4.5": {},
-        "kiro/auto": {}
+        "kiro/auto": {},
+        "gemini-cli/gemini-3.1-pro-preview": {
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-3.1-pro-preview-customtools": {
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-3-pro-preview": {
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-3.1-flash-lite-preview": {
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-3-flash-preview": {
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-2.5-pro": {
+          "limit": {
+            "context": 1048576,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-2.5-flash": {
+          "limit": {
+            "context": 1048576,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-2.5-flash-lite": {
+          "limit": {
+            "context": 1048576,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
       }
     },
     "google": {
@@ -98,6 +178,28 @@
           "limit": {
             "context": 32768,
             "output": 32768
+          },
+          "modalities": {
+            "input": ["text", "image", "pdf"],
+            "output": ["text"]
+          }
+        },
+        "gemini-3-pro": {
+          "name": "Gemini 3 Pro",
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": ["text", "image", "pdf"],
+            "output": ["text"]
+          }
+        },
+        "gemini-3-flash": {
+          "name": "Gemini 3 Flash",
+          "limit": {
+            "context": 1048576,
+            "output": 65536
           },
           "modalities": {
             "input": ["text", "image", "pdf"],
@@ -202,6 +304,90 @@
             "input": ["text", "image", "pdf"],
             "output": ["text"]
           }
+        },
+        "gemma-3-1b-it": {
+          "name": "Gemma 3 1B",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          }
+        },
+        "gemma-3-4b-it": {
+          "name": "Gemma 3 4B",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          }
+        },
+        "gemma-3-12b-it": {
+          "name": "Gemma 3 12B",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          }
+        },
+        "gemma-3-27b-it": {
+          "name": "Gemma 3 27B",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          }
+        },
+        "gemma-4-26b-a4b-it": {
+          "name": "Gemma 4 26B A4B IT",
+          "limit": {
+            "context": 262144,
+            "output": 32768
+          }
+        },
+        "gemma-4-31b-it": {
+          "name": "Gemma 4 31B IT",
+          "limit": {
+            "context": 262144,
+            "output": 32768
+          }
+        },
+        "deep-research-preview-04-2026": {
+          "name": "Deep Research Preview",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          }
+        },
+        "deep-research-max-preview-04-2026": {
+          "name": "Deep Research Max Preview",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          }
+        },
+        "gemini-2.5-computer-use-preview-10-2025": {
+          "name": "Gemini 2.5 Computer Use Preview",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          }
+        },
+        "gemini-robotics-er-1.6-preview": {
+          "name": "Gemini Robotics-ER 1.6 Preview",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          }
+        },
+        "imagen-4.0-generate-001": {
+          "name": "Imagen 4",
+          "limit": {
+            "context": 480,
+            "output": 8192
+          }
+        },
+        "veo-3.1-generate-preview": {
+          "name": "Veo 3.1",
+          "limit": {
+            "context": 480,
+            "output": 8192
+          }
         }
       }
     },
@@ -225,10 +411,14 @@
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-GGUF": {
+        "Qwen3.6-27B-GGUF": {
           "limit": {
             "context": 98304,
-            "output": 8192
+            "output": 32768
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
           }
         }
       }
