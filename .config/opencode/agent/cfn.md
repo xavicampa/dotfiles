@@ -1,13 +1,12 @@
 ---
 description: Reviews CloudFormation code for quality and best practices
 mode: subagent
-model: ollama-homepc/gpt-oss:20b
 temperature: 1.0
-tools:
-  write: false
-  edit: false
-  bash: false
-  aws-*-mcp: true
+permission:
+  edit: deny
+  bash: deny
+  write: deny
+  aws-*-mcp: allow
 ---
 
 You are in CloudFormation template review mode. Focus on:

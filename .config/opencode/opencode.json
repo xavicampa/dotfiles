@@ -413,8 +413,18 @@
       "models": {
         "Qwen3.6-35B-A3B-GGUF": {
           "limit": {
-            "context": 131072,
-            "output": 32768
+            "context": 65535,
+            "output": 16384
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "Qwen3.6-27B-GGUF": {
+          "limit": {
+            "context": 65535,
+            "output": 16384
           },
           "modalities": {
             "input": ["text", "image"],

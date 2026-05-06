@@ -283,57 +283,73 @@ in
       #   volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
       #   pull = "newer";
       # };
-      qwen36 = {
+      # qwen36 = {
+      #   autoStart = true;
+      #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
+      #   cmd = [
+      #     "-hf"
+      #     "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q8_K_XL"
+      #     # "unsloth/Qwen3.6-35B-A3B-GGUF:MXFP4_MOE"
+      #     # "unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
+      #     # "unsloth/Qwen3.6-27B-GGUF:UD-Q3_K_XL"
+      #     # "rico03/Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-GGUF:Q3_K_M"
+      #     # "HauhauCS/Qwen3.6-27B-Uncensored-HauhauCS-Aggressive:IQ3_M"
+      #     "--port"
+      #     "8080"
+      #     "--temp"
+      #     "0.6"
+      #     "--min-p"
+      #     "0.00"
+      #     "--top-p"
+      #     "0.95"
+      #     "--top-k"
+      #     "20"
+      #     "--repeat-penalty"
+      #     "1.0"
+      #     "--presence-penalty"
+      #     "0.0"
+      #     "--ctx-size"
+      #     # "262144"
+      #     "131072"
+      #     # "65535"
+      #     "--no-mmap"
+      #     "-ctk"
+      #     "q8_0"
+      #     "-ctv"
+      #     "q8_0"
+      #     # "--n-cpu-moe"
+      #     # "30"
+      #     "-fa"
+      #     "on"
+      #     # "-ngl"
+      #     # "99"
+      #     "--fit-target"
+      #     "2048"
+      #     "--fit"
+      #     "on"
+      #     # "--fit-ctx"
+      #     # "262144"
+      #     # "65535"
+      #   ];
+      #   ports = [ "8080:8080" ];
+      #   devices = [ "nvidia.com/gpu=all" ];
+      #   volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
+      #   pull = "newer";
+      # };
+      llama-swap = {
         autoStart = true;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
+        image = "ghcr.io/mostlygeek/llama-swap:cuda";
         cmd = [
-          "-hf"
-          "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q8_K_XL"
-          # "unsloth/Qwen3.6-35B-A3B-GGUF:MXFP4_MOE"
-          # "unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
-          # "unsloth/Qwen3.6-27B-GGUF:UD-Q3_K_XL"
-          # "rico03/Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-GGUF:Q3_K_M"
-          # "HauhauCS/Qwen3.6-27B-Uncensored-HauhauCS-Aggressive:IQ3_M"
-          "--port"
-          "8080"
-          "--temp"
-          "0.6"
-          "--min-p"
-          "0.00"
-          "--top-p"
-          "0.95"
-          "--top-k"
-          "20"
-          "--repeat-penalty"
-          "1.0"
-          "--presence-penalty"
-          "0.0"
-          "--ctx-size"
-          # "262144"
-          "131072"
-          # "65535"
-          "--no-mmap"
-          "-ctk"
-          "q8_0"
-          "-ctv"
-          "q8_0"
-          # "--n-cpu-moe"
-          # "30"
-          "-fa"
-          "on"
-          # "-ngl"
-          # "99"
-          "--fit-target"
-          "2048"
-          "--fit"
-          "on"
-          # "--fit-ctx"
-          # "262144"
-          # "65535"
+          "-config"
+          "/config/config.yaml"
+          "-watch-config"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
+        volumes = [
+          "/home/javi/.cache/huggingface:/root/.cache/huggingface"
+          "/home/javi/.config/llama-swap/:/config"
+        ];
         pull = "newer";
       };
       # fim = {
