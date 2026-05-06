@@ -33,13 +33,6 @@ return {
     "lewis6991/gitsigns.nvim",
     opts = {},
   },
-  {
-    "phaazon/hop.nvim",
-    keys = {
-      { "s", "<cmd>lua require'hop'.hint_char1()<CR>" },
-    },
-    opts = {},
-  },
   "kdheepak/lazygit.nvim",
   {
     "folke/which-key.nvim",
