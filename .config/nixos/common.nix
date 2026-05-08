@@ -26,6 +26,10 @@ in {
     systemPackages = [ 
       pkgs.spice-gtk 
       pkgs.lsof 
+      (pkgs.catppuccin-sddm.override {
+        flavor = "mocha";
+        accent = "mauve";
+      })
     ];
   };
 
@@ -96,6 +100,17 @@ in {
 
   services = {
     blueman.enable = true;
+    displayManager = {
+      # autoLogin = {
+      #   enable = true;
+      #   user = "javi";
+      # };
+      sddm = {
+        enable = true;
+        theme = "catppuccin-mocha-mauve";
+        wayland.enable = true;
+      };
+    };
     fstrim = { enable = true; };
     gnome.gnome-keyring.enable = true;
     libinput = { enable = true; };
