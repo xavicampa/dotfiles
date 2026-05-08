@@ -6,7 +6,8 @@ return {
       show_info = 0,
 
       endpoint_fim = "http://localhost:8080/upstream/Qwen3.6-35B-A3B-GGUF/infill",
-      endpoint_inst = "http://localhost:8080/v1/chat/completions",
+      -- endpoint_fim = "http://localhost:8080/upstream/Qwen2.5-Coder-14B-GGUF/infill",
+      endpoint_inst = "http://localhost:8080/upstream/Qwen3.6-35B-A3B-GGUF/v1/chat/completions",
     }
   end
 }
