@@ -1,0 +1,112 @@
+{
+  "providers": {
+    "local": {
+      "baseUrl": "http://localhost:8080/v1",
+      "api": "openai-completions",
+      "apiKey": "not-needed",
+      "compat": {
+        "supportsDeveloperRole": true,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "Qwen3.6-27B-GGUF",
+          "name": "Qwen 3.6 27B",
+          "contextWindow": 65535,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen3.6-35B-A3B-GGUF",
+          "name": "Qwen 3.6 35B",
+          "contextWindow": 65535,
+          "input": ["text", "image"]
+        }
+      ]
+    },
+    "rpi": {
+      "baseUrl": "http://rpi:20128/v1",
+      "api": "openai-completions",
+      "apiKey": "sk-c9886c14389ac861-b2bf08-374cb9fb",
+      "compat": {
+        "supportsDeveloperRole": true,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "gemini-cli/gemini-3-pro-preview",
+          "name": "Gemini 3 Pro Preview",
+          "contextWindow": 1048576,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "gemini-cli/gemini-3.1-pro-preview",
+          "name": "Gemini 3.1 Pro Preview",
+          "contextWindow": 1048576,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "gemini-cli/gemini-3.1-pro-preview-customtools",
+          "name": "Gemini 3.1 Pro Preview (Custom Tools)",
+          "contextWindow": 1048576,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "gemini-cli/gemini-3-flash-preview",
+          "name": "Gemini 3 Flash Preview",
+          "contextWindow": 1048576,
+          "input": ["text", "image"]
+        },
+        {
+          "id": "gemini-cli/gemini-3.1-flash-lite-preview",
+          "name": "Gemini 3.1 Flash Lite Preview",
+          "contextWindow": 1048576,
+          "input": ["text", "image"]
+        },
+        {
+          "id": "gemini-cli/gemini-2.5-pro",
+          "name": "Gemini 2.5 Pro",
+          "contextWindow": 1048576,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "gemini-cli/gemini-2.5-flash",
+          "name": "Gemini 2.5 Flash",
+          "contextWindow": 1048576,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "gemini-cli/gemini-2.5-flash-lite",
+          "name": "Gemini 2.5 Flash Lite",
+          "contextWindow": 1048576,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "kr/claude-sonnet-4.5",
+          "name": "Claude Sonnet 4.5",
+          "contextWindow": 200000,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "kr/claude-haiku-4.5",
+          "name": "Claude Haiku 4.5",
+          "contextWindow": 200000,
+          "input": ["text", "image"],
+          "reasoning": true
+        },
+        {
+          "id": "kr/auto",
+          "name": "Auto (Kiro Router)",
+          "input": ["text"],
+          "reasoning": true
+        }
+      ]
+    }
+  }
+}

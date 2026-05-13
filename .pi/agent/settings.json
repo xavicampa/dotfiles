@@ -1,0 +1,8 @@
+{
+  "lastChangelogVersion": "0.74.0",
+  "defaultThinkingLevel": "medium",
+  "enableInstallTelemetry": false,
+  "defaultProvider": "local",
+  "defaultModel": "Qwen3.6-27B-GGUF",
+  "hideThinkingBlock": false
+}

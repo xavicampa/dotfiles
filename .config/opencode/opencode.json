@@ -9,9 +9,46 @@
         "baseURL": "http://rpi:20128/v1"
       },
       "models": {
-        "kiro/claude-haiku-4.5": {},
-        "kiro/claude-sonnet-4.5": {},
-        "kiro/auto": {},
+        "kiro/claude-haiku-4.5": {
+          "limit": {
+            "context": 200000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "kiro/claude-sonnet-4.5": {
+          "limit": {
+            "context": 200000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "kiro/auto": {
+          "limit": {
+            "context": 200000,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "gemini-cli/gemini-3-pro-preview": {
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
         "gemini-cli/gemini-3.1-pro-preview": {
           "limit": {
             "context": 1048576,
@@ -32,17 +69,7 @@
             "output": ["text"]
           }
         },
-        "gemini-cli/gemini-3-pro-preview": {
-          "limit": {
-            "context": 1048576,
-            "output": 65535
-          },
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
-          }
-        },
-        "gemini-cli/gemini-3.1-flash-lite-preview": {
+        "gemini-cli/gemini-3-flash-preview": {
           "limit": {
             "context": 1048576,
             "output": 65536
@@ -52,7 +79,7 @@
             "output": ["text"]
           }
         },
-        "gemini-cli/gemini-3-flash-preview": {
+        "gemini-cli/gemini-3.1-flash-lite-preview": {
           "limit": {
             "context": 1048576,
             "output": 65536
