@@ -320,8 +320,6 @@ in
         image = "ghcr.io/ggml-org/llama.cpp:server-intel";
         cmd = [
           "--fim-qwen-1.5b-default"
-          "--ctx-size"
-          "16384"
         ];
         ports = [ "8012:8012" ];
         devices = [ "/dev/dri" ];
