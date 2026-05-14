@@ -24,6 +24,7 @@ in {
       GIT_ASKPASS = "";
     };
     systemPackages = [ 
+      pkgs.efibootmgr
       pkgs.spice-gtk 
       pkgs.lsof 
       (pkgs.catppuccin-sddm.override {
@@ -101,10 +102,6 @@ in {
   services = {
     blueman.enable = true;
     displayManager = {
-      # autoLogin = {
-      #   enable = true;
-      #   user = "javi";
-      # };
       sddm = {
         enable = true;
         theme = "catppuccin-mocha-mauve";
