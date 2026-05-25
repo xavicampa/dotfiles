@@ -46,8 +46,8 @@ in
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
       # package = config.boot.kernelPackages.nvidiaPackages.latest;
-      # package = unstable.linuxPackages_latest.nvidiaPackages.stable;
-      # package = config.boot.kernelPackages.nvidiaPackages.stable;
+      # package = unstable.linuxPackages.nvidiaPackages.latest;
+      # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
       #   sha256_64bit = "sha256-G3hqS3Ei18QhbFiuQAdoik93jBlsFI2RkWOBXuENU8Q=";
@@ -86,13 +86,17 @@ in
       "boot.shell_on_fail"
       "rd.systemd.show_status=auto"
       "udev.log_priority=3"
+      # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
+      # "pci=realloc"
+      # "pcie_aspm=off"
+      # "pcie_port_pm=off"
     # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-    # "nvidia.NVreg_EnableGpuFirmware=0"
+      # "nvidia.NVreg_EnableGpuFirmware=0"
     # "nvidia-drm.modeset=1"
     # "nvidia-drm.fbdev=1"
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
-    kernelPackages = pkgs.linuxPackages_latest;
+    # kernelPackages = pkgs.linuxPackages_latest;
   };
 
   # File systems
@@ -144,6 +148,7 @@ in
 
   # Services
   services = {
+    hardware.bolt.enable = true;
     openssh.enable = true;
     pipewire = {
       enable = true;
@@ -217,16 +222,33 @@ in
       AllowHybridSleep=no
       AllowSuspendThenHibernate=no
     '';
-    services.nvidia_oc = {
+    services.nvidia_oc_0 = {
       enable = true;
-      description = "NVidia overclock settings";
+      description = "NVidia overclock settings - Card 0";
       serviceConfig = {
-        ExecStart =
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 2000 --freq-offset 400";
-        ExecStop =
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0";
+        ExecStart = [
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 2000"
+        ];
+        ExecStop = [
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0"
+        ];
         RemainAfterExit = true;
       };
+      wantedBy = [ "multi-user.target" ];
+    };
+    services.nvidia_oc_1 = {
+      enable = true;
+      description = "NVidia overclock settings - Card 1";
+      serviceConfig = {
+        ExecStart = [
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 1000"
+        ];
+        ExecStop = [
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0"
+        ];
+        RemainAfterExit = true;
+      };
+      wantedBy = [ "multi-user.target" ];
     };
 
     # shows wattage in btop for intel cpus
@@ -251,12 +273,7 @@ in
       #   image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
       #   cmd = [
       #     "-hf"
-      #     "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q8_K_XL"
-      #     # "unsloth/Qwen3.6-35B-A3B-GGUF:MXFP4_MOE"
-      #     # "unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
-      #     # "unsloth/Qwen3.6-27B-GGUF:UD-Q3_K_XL"
-      #     # "rico03/Qwen3.6-27B-Claude-Opus-Reasoning-Distilled-GGUF:Q3_K_M"
-      #     # "HauhauCS/Qwen3.6-27B-Uncensored-HauhauCS-Aggressive:IQ3_M"
+      #     "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q6_K_XL"
       #     "--port"
       #     "8080"
       #     "--temp"
@@ -273,56 +290,73 @@ in
       #     "0.0"
       #     "--ctx-size"
       #     # "262144"
-      #     "131072"
-      #     # "65535"
+      #     # "131072"
+      #     # "98304"
+      #     "65535"
+      #     # "32768"
       #     "--no-mmap"
       #     "-ctk"
       #     "q8_0"
       #     "-ctv"
       #     "q8_0"
-      #     # "--n-cpu-moe"
-      #     # "30"
       #     "-fa"
       #     "on"
-      #     # "-ngl"
-      #     # "99"
-      #     "--fit-target"
-      #     "2048"
-      #     "--fit"
-      #     "on"
-      #     # "--fit-ctx"
-      #     # "262144"
-      #     # "65535"
+      #     "-ngl"
+      #     "16"
+      #     "--spec-type"
+      #     "draft-mtp"
+      #     "--spec-draft-n-max"
+      #     "3"
+      #     "--no-mmproj"
+      #     "--chat-template-kwargs"
+      #     "{\"preserve_thinking\": true}"
       #   ];
       #   ports = [ "8080:8080" ];
       #   devices = [ "nvidia.com/gpu=all" ];
       #   volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
       #   pull = "newer";
       # };
-      llama-swap = {
+      qwen36 = {
         autoStart = true;
-        image = "ghcr.io/mostlygeek/llama-swap:cuda";
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
         cmd = [
-          "-config"
-          "/config/config.yaml"
-          "-watch-config"
+          "-hf"
+          "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"
+          "--spec-type"
+          "draft-mtp"
+          "-fa"
+          "on"
+          "-ngl"
+          "99"
+          "--no-mmap"
+          "--spec-draft-n-max"
+          "3"
+          "--ctx-size"
+          "131072"
+          "-ts"
+          "24,13"
+          "-ctk"
+          "q8_0"
+          "-ctv"
+          "q8_0"
+          # "--no-mmproj"
+          "--temp"
+          "0.6"
+          "--min-p"
+          "0.00"
+          "--top-p"
+          "0.95"
+          "--top-k"
+          "20"
+          "--repeat-penalty"
+          "1.0"
+          "--presence-penalty"
+          "0.0"
+          "--chat-template-kwargs"
+          "{\"preserve_thinking\": true}"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
-        volumes = [
-          "/home/javi/.cache/huggingface:/root/.cache/huggingface"
-          "/home/javi/.config/llama-swap/:/config"
-        ];
-        pull = "newer";
-      };
-      fim = {
-        autoStart = true;
-        image = "ghcr.io/ggml-org/llama.cpp:server-intel";
-        cmd = [
-          "--fim-qwen-1.5b-default"
-        ];
-        ports = [ "8012:8012" ];
-        devices = [ "/dev/dri" ];
         volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
         pull = "newer";
       };

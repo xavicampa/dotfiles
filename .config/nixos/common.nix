@@ -1,6 +1,6 @@
 { pkgs, config, lib, ... }:
 
-let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
+let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; overlays = import /home/javi/.config/nixpkgs/overlays_unstable.nix; };
 in {
   # {
 
@@ -62,7 +62,10 @@ in {
   nixpkgs.config.nvidia.acceptLicense = true;
 
   programs = {
-    _1password = { enable = true; };
+    _1password = { 
+      enable = true;
+      package = unstable._1password-cli;
+    };
     _1password-gui = {
       enable = true;
       polkitPolicyOwners = [ "javi" ];
