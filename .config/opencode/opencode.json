@@ -438,19 +438,9 @@
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "Qwen3.6-35B-A3B-GGUF": {
+        "Qwen3.6-27B-MTP-GGUF": {
           "limit": {
-            "context": 65535,
-            "output": 16384
-          },
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
-          }
-        },
-        "Qwen3.6-27B-GGUF": {
-          "limit": {
-            "context": 65535,
+            "context": 131072,
             "output": 16384
           },
           "modalities": {

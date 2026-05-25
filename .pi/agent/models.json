@@ -10,16 +10,11 @@
       },
       "models": [
         {
-          "id": "Qwen3.6-27B-GGUF",
+          "id": "Qwen3.6-27B-MTP-GGUF",
           "name": "Qwen 3.6 27B",
-          "contextWindow": 65535,
+          "contextWindow": 131072,
+          "input": ["text", "image"],
           "reasoning": true
-        },
-        {
-          "id": "Qwen3.6-35B-A3B-GGUF",
-          "name": "Qwen 3.6 35B",
-          "contextWindow": 65535,
-          "input": ["text", "image"]
         }
       ]
     },
