@@ -3,6 +3,6 @@
   "defaultThinkingLevel": "medium",
   "enableInstallTelemetry": false,
   "defaultProvider": "local",
-  "defaultModel": "Qwen3.6-27B-MTP-GGUF",
+  "defaultModel": "unsloth/Qwen3.6-27B-MTP-GGUF:Q6_K_XL",
   "hideThinkingBlock": false
 }
