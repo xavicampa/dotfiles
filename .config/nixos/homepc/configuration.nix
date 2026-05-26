@@ -96,7 +96,7 @@ in
     # "nvidia-drm.fbdev=1"
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
-    # kernelPackages = pkgs.linuxPackages_latest;
+    kernelPackages = pkgs.linuxPackages_latest;
   };
 
   # File systems
@@ -320,8 +320,8 @@ in
         autoStart = true;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
         cmd = [
-          "-hf"
-          "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"
+          # "-hf"
+          # "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"
           "--spec-type"
           "draft-mtp"
           "-fa"
@@ -354,6 +354,8 @@ in
           "0.0"
           "--chat-template-kwargs"
           "{\"preserve_thinking\": true}"
+          "--models-max"
+          "1"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];

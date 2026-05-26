@@ -1,6 +1,9 @@
 { pkgs, config, lib, ... }:
 
-let unstable = import <nixpkgs-unstable> { config.allowUnfree = true; overlays = import /home/javi/.config/nixpkgs/overlays_unstable.nix; };
+let unstable = import <nixpkgs-unstable> { 
+  config.allowUnfree = true; 
+  # overlays = import /home/javi/.config/nixpkgs/overlays_unstable.nix; 
+};
 in {
   # {
 
