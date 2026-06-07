@@ -1,37 +1,5 @@
 {
   "providers": {
-    "local": {
-      "baseUrl": "http://localhost:8080/v1",
-      "api": "openai-completions",
-      "apiKey": "not-needed",
-      "compat": {
-        "supportsDeveloperRole": true,
-        "supportsReasoningEffort": false
-      },
-      "models": [
-        {
-          "id": "unsloth/Qwen3.6-27B-MTP-GGUF:Q6_K_XL",
-          "name": "Qwen 3.6 27B MTP",
-          "contextWindow": 131072,
-          "input": ["text", "image"],
-          "reasoning": true
-        },
-        {
-          "id": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q5_K_XL",
-          "name": "Qwen 3.6 35B A3B MTP",
-          "contextWindow": 131072,
-          "input": ["text", "image"],
-          "reasoning": true
-        },
-        {
-          "id": "Brian6145/Qwen3.6-27B-Claude-Opus-Sonnet-DistilledV2-MTP-GGUF:Q8_0",
-          "name": "Qwen 3.6 27B Claude Distilled",
-          "contextWindow": 131072,
-          "input": ["text"],
-          "reasoning": true
-        }
-      ]
-    },
     "rpi": {
       "baseUrl": "http://rpi:20128/v1",
       "api": "openai-completions",
