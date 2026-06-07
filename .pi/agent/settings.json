@@ -3,6 +3,6 @@
   "defaultThinkingLevel": "medium",
   "enableInstallTelemetry": false,
   "defaultProvider": "local",
-  "defaultModel": "Jackrong/Qwopus3.6-27B-v2-MTP-GGUF:Q8_0",
+  "defaultModel": "Jackrong/Qwopus3.6-27B-v2-MTP-GGUF:Q6_K",
   "hideThinkingBlock": false
 }

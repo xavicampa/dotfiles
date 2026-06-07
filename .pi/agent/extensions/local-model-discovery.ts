@@ -4,8 +4,40 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
 const BASE_URL = "http://localhost:8080/v1";
+
+interface ModelOverride {
+  reasoning?: boolean;
+  maxTokens?: number;
+  thinkingFormat?: "qwen-chat-template" | null;
+  supportsReasoningEffort?: boolean;
+}
+
+function loadModelOverrides(): Map<string, ModelOverride> {
+  const overrides = new Map<string, ModelOverride>();
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const configPath = resolve(__dirname, "local-models.json");
+
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    const parsed = JSON.parse(raw) as Record<string, ModelOverride>;
+    for (const [id, cfg] of Object.entries(parsed)) {
+      overrides.set(id, cfg);
+    }
+    console.log(`[local-model-discovery] Loaded overrides for ${overrides.size} models`);
+  } catch (err) {
+    // No config file — use defaults
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      console.error(`[local-model-discovery] Failed to read overrides:`, err);
+    }
+  }
+
+  return overrides;
+}
 
 function extractContextSize(status: Record<string, unknown>): number {
   // Try meta.n_ctx first (available for loaded models)
@@ -51,20 +83,30 @@ export default async function (pi: ExtensionAPI) {
       }>;
     };
 
-    const models = payload.data.map((model) => ({
-      id: model.id,
-      name: model.name ?? model.id,
-      reasoning: true, // all local models use Qwen-style thinking via chat_template_kwargs
-      input: extractInputTypes(model.architecture ?? {}),
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: extractContextSize(model.status ?? {}),
-      maxTokens: 16384,
-      compat: {
-        supportsDeveloperRole: true,
-        supportsReasoningEffort: false,
-        thinkingFormat: "qwen-chat-template" as const,
-      },
-    }));
+    const overrides = loadModelOverrides();
+
+    const models = payload.data.map((model) => {
+      const override = overrides.get(model.id) ?? {};
+      const reasoning = override.reasoning ?? true;
+      const maxTokens = override.maxTokens ?? 16384;
+      const thinkingFormat = override.thinkingFormat ?? "qwen-chat-template";
+      const supportsReasoningEffort = override.supportsReasoningEffort ?? false;
+
+      return {
+        id: model.id,
+        name: model.name ?? model.id,
+        reasoning,
+        input: extractInputTypes(model.architecture ?? {}),
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: extractContextSize(model.status ?? {}),
+        maxTokens,
+        compat: {
+          supportsDeveloperRole: true,
+          supportsReasoningEffort,
+          thinkingFormat: thinkingFormat ?? undefined,
+        },
+      };
+    });
 
     pi.registerProvider("local", {
       baseUrl: BASE_URL,

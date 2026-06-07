@@ -438,7 +438,47 @@
         "baseURL": "http://localhost:8080/v1"
       },
       "models": {
-        "Qwen3.6-27B-MTP-GGUF": {
+        "Brian6145/Qwen3.6-27B-Claude-Opus-Sonnet-DistilledV2-MTP-GGUF:Q8_0": {
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "Jackrong/Qwopus3.6-27B-v2-MTP-GGUF:Q6_K": {
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "ggml-org/Qwen2.5-Coder-3B-Q8_0-GGUF:Q8_0": {
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "unsloth/Qwen3.6-27B-MTP-GGUF:Q6_K_XL": {
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q5_K_XL": {
           "limit": {
             "context": 131072,
             "output": 16384

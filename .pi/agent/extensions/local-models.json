@@ -1,0 +1,38 @@
+{
+  "Brian6145/Qwen3.6-27B-Claude-Opus-Sonnet-DistilledV2-MTP-GGUF:Q8_0": {
+    "reasoning": true,
+    "maxTokens": 16384,
+    "thinkingFormat": "qwen-chat-template",
+    "supportsReasoningEffort": false
+  },
+  "Jackrong/Qwopus3.6-27B-v2-MTP-GGUF:Q6_K": {
+    "reasoning": true,
+    "maxTokens": 16384,
+    "thinkingFormat": "qwen-chat-template",
+    "supportsReasoningEffort": false
+  },
+  "Jackrong/Qwopus3.6-27B-v2-MTP-GGUF:Q8_0": {
+    "reasoning": true,
+    "maxTokens": 16384,
+    "thinkingFormat": "qwen-chat-template",
+    "supportsReasoningEffort": false
+  },
+  "ggml-org/Qwen2.5-Coder-3B-Q8_0-GGUF:Q8_0": {
+    "reasoning": true,
+    "maxTokens": 8192,
+    "thinkingFormat": "qwen-chat-template",
+    "supportsReasoningEffort": false
+  },
+  "unsloth/Qwen3.6-27B-MTP-GGUF:Q6_K_XL": {
+    "reasoning": true,
+    "maxTokens": 16384,
+    "thinkingFormat": "qwen-chat-template",
+    "supportsReasoningEffort": false
+  },
+  "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q5_K_XL": {
+    "reasoning": true,
+    "maxTokens": 16384,
+    "thinkingFormat": "qwen-chat-template",
+    "supportsReasoningEffort": false
+  }
+}
