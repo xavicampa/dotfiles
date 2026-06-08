@@ -47,6 +47,13 @@ function extractContextSize(status: Record<string, unknown>): number {
   // Fall back to parsing --ctx-size from status args
   const args = (status as any)?.args as string[] | undefined;
   if (Array.isArray(args)) {
+    // Handle --ctx-size=4096 (equals syntax)
+    const ctxSizeArg = args.find((a: string) => a.startsWith("--ctx-size="));
+    if (ctxSizeArg) {
+      const parsed = parseInt(ctxSizeArg.split("=")[1], 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    // Handle --ctx-size 4096 (space-separated syntax)
     const idx = args.indexOf("--ctx-size");
     if (idx >= 0 && idx + 1 < args.length) {
       const parsed = parseInt(args[idx + 1], 10);
@@ -65,62 +72,101 @@ function extractInputTypes(architecture: Record<string, unknown>): ("text" | "im
   return ["text"];
 }
 
-export default async function (pi: ExtensionAPI) {
-  try {
-    const response = await fetch(`${BASE_URL}/models`);
-    if (!response.ok) {
-      console.error(`[local-model-discovery] Failed to fetch models: ${response.status} ${response.statusText}`);
-      return;
-    }
+async function discoverAndRegister(pi: ExtensionAPI) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000;
 
-    const payload = (await response.json()) as {
-      data: Array<{
-        id: string;
-        name?: string;
-        status?: Record<string, unknown>;
-        architecture?: Record<string, unknown>;
-        meta?: Record<string, unknown>;
-      }>;
-    };
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(`${BASE_URL}/models`);
+      if (!response.ok) {
+        console.error(
+          `[local-model-discovery] Failed to fetch models (attempt ${attempt + 1}/${MAX_RETRIES}): ${response.status} ${response.statusText}`,
+        );
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+        continue;
+      }
 
-    const overrides = loadModelOverrides();
+      const payload = (await response.json()) as {
+        data: Array<{
+          id: string;
+          name?: string;
+          status?: Record<string, unknown>;
+          architecture?: Record<string, unknown>;
+          meta?: Record<string, unknown>;
+        }>;
+      };
 
-    const models = payload.data.map((model) => {
-      const override = overrides.get(model.id) ?? {};
-      const reasoning = override.reasoning ?? true;
-      const maxTokens = override.maxTokens ?? 16384;
-      const thinkingFormat = override.thinkingFormat ?? "qwen-chat-template";
-      const supportsReasoningEffort = override.supportsReasoningEffort ?? false;
+      const overrides = loadModelOverrides();
 
-      return {
-        id: model.id,
-        name: model.name ?? model.id,
-        reasoning,
-        input: extractInputTypes(model.architecture ?? {}),
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: extractContextSize(model.status ?? {}),
-        maxTokens,
+      const models = payload.data.map((model) => {
+        const override = overrides.get(model.id) ?? {};
+        const reasoning = override.reasoning ?? true;
+        const maxTokens = override.maxTokens ?? 16384;
+        const thinkingFormat = override.thinkingFormat;
+        const supportsReasoningEffort = override.supportsReasoningEffort ?? false;
+
+        return {
+          id: model.id,
+          name: model.name ?? model.id,
+          reasoning,
+          input: extractInputTypes(model.architecture ?? {}),
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: extractContextSize(model.status ?? {}),
+          maxTokens,
+          compat: {
+            supportsDeveloperRole: true,
+            supportsReasoningEffort,
+            ...(thinkingFormat !== undefined && { thinkingFormat }),
+          },
+        };
+      });
+
+      pi.registerProvider("local", {
+        baseUrl: BASE_URL,
+        apiKey: "not-needed",
+        api: "openai-completions",
         compat: {
           supportsDeveloperRole: true,
-          supportsReasoningEffort,
-          thinkingFormat: thinkingFormat ?? undefined,
+          supportsReasoningEffort: false,
         },
-      };
-    });
+        models,
+      });
 
-    pi.registerProvider("local", {
-      baseUrl: BASE_URL,
-      apiKey: "not-needed",
-      api: "openai-completions",
-      compat: {
-        supportsDeveloperRole: true,
-        supportsReasoningEffort: false,
-      },
-      models,
-    });
+      console.log(`[local-model-discovery] Registered ${models.length} models from ${BASE_URL}`);
+      return models.length;
+    } catch (err) {
+      console.error(
+        `[local-model-discovery] Error discovering models (attempt ${attempt + 1}/${MAX_RETRIES}):`,
+        err,
+      );
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+    }
+  }
 
-    console.log(`[local-model-discovery] Registered ${models.length} models from ${BASE_URL}`);
-  } catch (err) {
-    console.error(`[local-model-discovery] Error discovering models:`, err);
+  console.error(`[local-model-discovery] Failed after ${MAX_RETRIES} attempts`);
+  return -1;
+}
+
+export default async function (pi: ExtensionAPI) {
+  // Register a command to refresh the model list at runtime
+  pi.registerCommand("refresh-local-models", {
+    description: "Re-discover and refresh models from the local API",
+    handler: async (_args, ctx) => {
+      ctx.ui.setStatus("local-models", "Refreshing models...");
+      pi.unregisterProvider("local");
+      const count = await discoverAndRegister(pi);
+      if (count > 0) {
+        ctx.ui.notify(`Refreshed ${count} local models`, "info");
+      } else {
+        ctx.ui.notify("Failed to refresh local models", "error");
+      }
+      ctx.ui.setStatus("local-models", "");
+    },
+  });
+
+  const count = await discoverAndRegister(pi);
+  if (count < 0) {
+    console.error("[local-model-discovery] Startup failed");
   }
 }
