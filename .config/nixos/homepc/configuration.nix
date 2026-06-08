@@ -227,10 +227,12 @@ in
       description = "NVidia overclock settings - Card 0";
       serviceConfig = {
         ExecStart = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 4000 --freq-offset 200 --min-clock 0 --max-clock 2850"
+          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 4000 --freq-offset 200 --min-clock 0 --max-clock 2850"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 4000 --freq-offset 200"
         ];
         ExecStop = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0 --min-clock 0 --max-clock 3315"
+          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0 --min-clock 0 --max-clock 3315"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0"
         ];
         RemainAfterExit = true;
       };
@@ -241,10 +243,12 @@ in
       description = "NVidia overclock settings - Card 1";
       serviceConfig = {
         ExecStart = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 2000 --min-clock 0 --max-clock 2050 --freq-offset 100"
+          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 2000 --min-clock 0 --max-clock 2050 --freq-offset 100"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 2000 --freq-offset 150"
         ];
         ExecStop = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --min-clock 0 --max-clock 2220"
+          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --min-clock 0 --max-clock 2220"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0"
         ];
         RemainAfterExit = true;
       };
