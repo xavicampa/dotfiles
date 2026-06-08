@@ -227,10 +227,10 @@ in
       description = "NVidia overclock settings - Card 0";
       serviceConfig = {
         ExecStart = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 2000 --freq-offset 200"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 4000 --freq-offset 200 --min-clock 0 --max-clock 2850"
         ];
         ExecStop = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0 --min-clock 0 --max-clock 3315"
         ];
         RemainAfterExit = true;
       };
@@ -241,10 +241,10 @@ in
       description = "NVidia overclock settings - Card 1";
       serviceConfig = {
         ExecStart = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 500 --freq-offset 150"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 2000 --min-clock 0 --max-clock 2050 --freq-offset 100"
         ];
         ExecStop = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --freq-offset 0"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --min-clock 0 --max-clock 2220"
         ];
         RemainAfterExit = true;
       };
@@ -268,55 +268,7 @@ in
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
-      qwen36_35b = {
-        autoStart = false;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
-        cmd = [
-          "-hf"
-          "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL"
-          "--port"
-          "8080"
-          "--temp"
-          "0.6"
-          "--min-p"
-          "0.00"
-          "--top-p"
-          "0.95"
-          "--top-k"
-          "20"
-          "--repeat-penalty"
-          "1.0"
-          "--presence-penalty"
-          "0.0"
-          "--ctx-size"
-          # "262144"
-          # "131072"
-          # "98304"
-          "65535"
-          # "32768"
-          "--no-mmap"
-          "-ctk"
-          "q8_0"
-          "-ctv"
-          "q8_0"
-          "-fa"
-          "on"
-          "-ngl"
-          "16"
-          "--spec-type"
-          "draft-mtp"
-          "--spec-draft-n-max"
-          "3"
-          "--no-mmproj"
-          "--chat-template-kwargs"
-          "{\"preserve_thinking\": true}"
-        ];
-        ports = [ "8080:8080" ];
-        devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
-        pull = "newer";
-      };
-      qwen36 = {
+      llamacpp = {
         autoStart = true;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
         cmd = [
@@ -333,8 +285,6 @@ in
           "3"
           "--ctx-size"
           "131072"
-          "-ts"
-          "24,13"
           "-ctk"
           "q8_0"
           "-ctv"
@@ -356,6 +306,10 @@ in
           "{\"preserve_thinking\": true}"
           "--models-max"
           "1"
+          # "-sm"
+          # "tensor"
+          "-ts"
+          "24,13"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
