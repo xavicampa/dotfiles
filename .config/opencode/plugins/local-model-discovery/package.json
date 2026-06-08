@@ -1,0 +1,5 @@
+{
+  "name": "llamacpp-discovery",
+  "type": "module",
+  "main": "index.js"
+}
