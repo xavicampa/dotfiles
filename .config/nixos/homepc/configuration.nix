@@ -247,11 +247,11 @@ in
       description = "NVidia overclock settings - Card 1";
       serviceConfig = {
         ExecStart = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 275000 --mem-offset 2000 --freq-offset 150"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 275000 --mem-offset 2000 --freq-offset 100"
           # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 2000 --freq-offset 150"
         ];
         ExecStop = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --min-clock 210 --max-clock 2220 --freq-offset 0"
+          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --freq-offset 0 --min-clock 210 --max-clock 2220"
           # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0"
         ];
         RemainAfterExit = true;
@@ -280,48 +280,19 @@ in
         autoStart = true;
         image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
         cmd = [
-          # "-hf"
-          # "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"
-          "--spec-type"
-          "draft-mtp"
-          "-fa"
-          "on"
-          "-ngl"
-          "99"
-          "--no-mmap"
-          "--spec-draft-n-max"
-          "3"
-          "--ctx-size"
-          "131072"
-          "-ctk"
-          "q8_0"
-          "-ctv"
-          "q8_0"
-          # "--no-mmproj"
-          "--temp"
-          "0.6"
-          "--min-p"
-          "0.00"
-          "--top-p"
-          "0.95"
-          "--top-k"
-          "20"
-          "--repeat-penalty"
-          "1.0"
-          "--presence-penalty"
-          "0.0"
-          "--chat-template-kwargs"
-          "{\"preserve_thinking\": true}"
+          "--models-preset"
+          "/app/llama-preset.ini"
           "--models-max"
           "1"
-          # "-sm"
-          # "tensor"
           "-ts"
           "24,13"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
-        volumes = [ "/home/javi/.cache/huggingface:/root/.cache/huggingface" ];
+        volumes = [
+          "/home/javi/.cache/huggingface:/root/.cache/huggingface"
+          "/home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro"
+        ];
         pull = "newer";
       };
     };
