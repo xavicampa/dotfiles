@@ -284,8 +284,8 @@ in
           "/app/llama-preset.ini"
           "--models-max"
           "1"
-          "-ts"
-          "24,13"
+          # "-ts"
+          # "24,13"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
