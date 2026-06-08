@@ -278,7 +278,7 @@ in
     containers = {
       llamacpp = {
         autoStart = true;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda13";
+        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
         cmd = [
           "--models-preset"
           "/app/llama-preset.ini"
