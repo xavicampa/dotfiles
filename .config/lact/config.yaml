@@ -43,9 +43,11 @@ profiles:
           spindown_delay_ms: 5000
           change_threshold: 2
           auto_threshold: 0
-        power_cap: 480.0
+        power_cap: 300.0
+        min_core_clock: 210
+        max_core_clock: 2048
         gpu_clock_offsets:
-          0: 100
+          0: 146
         mem_clock_offsets:
           0: 2000
       10DE:2C05-19DA:2765-0000:01:00.0:
