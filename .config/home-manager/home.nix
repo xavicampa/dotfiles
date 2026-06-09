@@ -73,12 +73,11 @@ in {
     pkgs.nerd-fonts.jetbrains-mono
     pkgs.newman
     # pkgs.nix-du
-    pkgs.nixfmt-classic
-    pkgs.node2nix
+    pkgs.nixfmt
     # pkgs.nodePackages.aws-cdk
     # pkgs.nodePackages.create-react-app
-    pkgs.nodePackages.typescript
-    pkgs.nodePackages.prettier
+    pkgs.typescript
+    pkgs.prettier
     pkgs.p7zip
     pkgs.ripgrep
     pkgs.nixd
@@ -161,7 +160,7 @@ in {
     neovim = {
       defaultEditor = true;
       enable = true;
-      extraLuaConfig = ''
+      initLua = ''
           vim.g.python3_host_prog='${pythonEnv}/bin/python3'
           vim.g.python_host_prog='${pythonEnv}/bin/python'
           require("config.options")
@@ -177,12 +176,14 @@ in {
         pkgs.nixd
         pkgs.nixpkgs-fmt
         # pkgs.nodePackages.prettier
-        pkgs.nodePackages.typescript-language-server
+        pkgs.typescript-language-server
         pkgs.pyright
         # pkgs.rnix-lsp
         pkgs.lua-language-server
         pkgs.tree-sitter
       ];
+      withPython3 = false;
+      withRuby = false;
     };
 
     opencode = {
