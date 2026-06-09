@@ -159,55 +159,6 @@ in
       alsa.enable = true;
       alsa.support32Bit = true;
       pulse.enable = true;
-      # extraConfig.pipewire."91-combined-sinks" = {
-      #   "context.modules" = [
-      #     {
-      #       name = "libpipewire-module-combine-stream";
-      #       args = {
-      #         combine.mode = "sink";
-      #         node.name = "combined_sink";
-      #         node.description = "My Combined Sink";
-      #         combine.latency-compensate = false;
-      #         combine.props = {
-      #           audio.position = [ "FL" "FR" ];
-      #         };
-      #         stream.props = {
-      #           stream.dont-remix = true;
-      #         };
-      #         stream.rules = [
-      #           {
-      #             matches = [
-      #               {
-      #                 media.class = "Audio/Sink";
-      #                 node.name = "alsa_output.pci-0000_01_00.1.pro-output-3";
-      #               }
-      #             ];
-      #             actions = {
-      #               create-stream = {
-      #                 audio.position = [ "FL" "FR" ];
-      #                 combine.audio.position = [ "FL" "FR" ];
-      #               };
-      #             };
-      #           }
-      #           {
-      #             matches = [
-      #               {
-      #                 media.class = "Audio/Sink";
-      #                 node.name = "alsa_output.pci-0000_01_00.1.pro-output-7";
-      #               }
-      #             ];
-      #             actions = {
-      #               create-stream = {
-      #                 audio.position = [ "FL" "FR" ];
-      #                 combine.audio.position = [ "FL" "FR" ];
-      #               };
-      #             };
-      #           }
-      #         ];
-      #       };
-      #     }
-      #   ];
-      # };
     };
     thermald.enable = true;
     xserver = {
@@ -226,38 +177,6 @@ in
       AllowHybridSleep=no
       AllowSuspendThenHibernate=no
     '';
-    services.nvidia_oc_0 = {
-      enable = true;
-      description = "NVidia overclock settings - Card 0";
-      serviceConfig = {
-        ExecStart = [
-          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 4000 --freq-offset 200 --min-clock 0 --max-clock 2850"
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 4000 --freq-offset 200"
-        ];
-        ExecStop = [
-          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0 --min-clock 0 --max-clock 3315"
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 0 --mem-offset 0 --freq-offset 0"
-        ];
-        RemainAfterExit = true;
-      };
-      wantedBy = [ "multi-user.target" ];
-    };
-    services.nvidia_oc_1 = {
-      enable = true;
-      description = "NVidia overclock settings - Card 1";
-      serviceConfig = {
-        ExecStart = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 275000 --mem-offset 2000 --freq-offset 100"
-          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 330000 --mem-offset 2000 --freq-offset 150"
-        ];
-        ExecStop = [
-          "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0 --freq-offset 0 --min-clock 210 --max-clock 2220"
-          # "${pkgs.nvidia_oc}/bin/nvidia_oc set --index 1 --power-limit 480000 --mem-offset 0"
-        ];
-        RemainAfterExit = true;
-      };
-      wantedBy = [ "multi-user.target" ];
-    };
 
     # shows wattage in btop for intel cpus
     tmpfiles.rules = ["Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -"];
@@ -265,6 +184,8 @@ in
 
   # Environment configuration
   environment.systemPackages = [ pkgs.nvidia_oc pkgs.nvtopPackages.nvidia unstable.btop-cuda];
+  environment.etc."lact/config.yaml".source =
+      "${config.users.users.javi.home}/.config/lact/config.yaml";
 
   # System configuration
   swapDevices = [{
@@ -284,8 +205,6 @@ in
           "/app/llama-preset.ini"
           "--models-max"
           "1"
-          # "-ts"
-          # "24,13"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
