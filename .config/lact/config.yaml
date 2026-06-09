@@ -1,0 +1,58 @@
+version: 5
+daemon:
+  log_level: info
+  admin_group: wheel
+  disable_clocks_cleanup: false
+apply_settings_timer: 5
+gpus:
+  10DE:2203-1458:40A6-0000:0c:00.0:
+    fan_control_enabled: false
+    fan_control_settings:
+      mode: curve
+      static_speed: 0.85
+      temperature_key: edge
+      interval_ms: 500
+      curve:
+        40: 0.45
+        60: 0.5
+        70: 0.6
+        80: 0.8
+        83: 1.0
+      spindown_delay_ms: 5000
+      change_threshold: 2
+      auto_threshold: 0
+    power_cap: 480.0
+  10DE:2C05-19DA:2765-0000:01:00.0:
+    fan_control_enabled: false
+profiles:
+  LLM:
+    gpus:
+      10DE:2203-1458:40A6-0000:0c:00.0:
+        fan_control_enabled: false
+        fan_control_settings:
+          mode: curve
+          static_speed: 0.85
+          temperature_key: edge
+          interval_ms: 500
+          curve:
+            40: 0.45
+            60: 0.5
+            70: 0.6
+            80: 0.8
+            83: 1.0
+          spindown_delay_ms: 5000
+          change_threshold: 2
+          auto_threshold: 0
+        power_cap: 480.0
+        gpu_clock_offsets:
+          0: 100
+        mem_clock_offsets:
+          0: 2000
+      10DE:2C05-19DA:2765-0000:01:00.0:
+        fan_control_enabled: false
+        gpu_clock_offsets:
+          0: 200
+        mem_clock_offsets:
+          0: 4000
+current_profile: LLM
+auto_switch_profiles: false
