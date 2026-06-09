@@ -11,7 +11,6 @@ in
   # Hardware configuration
   hardware = {
     bluetooth.enable = true;
-    enableRedistributableFirmware = true;
     graphics = {
       enable = true;
       extraPackages = with pkgs; [ intel-media-driver ];
@@ -171,12 +170,12 @@ in
 
   # Systemd configuration
   systemd = {
-    sleep.extraConfig = ''
-      AllowSuspend=yes
-      AllowHibernation=no
-      AllowHybridSleep=no
-      AllowSuspendThenHibernate=no
-    '';
+    sleep.settings.Sleep = {
+      AllowSuspend=true;
+      AllowHibernation=false;
+      AllowHybridSleep=false;
+      AllowSuspendThenHibernate=false;
+    };
 
     # shows wattage in btop for intel cpus
     tmpfiles.rules = ["Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -"];

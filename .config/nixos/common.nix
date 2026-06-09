@@ -44,6 +44,9 @@ in {
     networkmanager = {
       enable = true; # Easiest to use and most distros use this by default.
       dns = "none";
+      wifi = {
+        backend = "iwd";
+      };
     };
     enableIPv6 = false;
   };
@@ -181,7 +184,7 @@ in {
         wtype
         xdg-user-dirs
         xdg-utils
-        xfce.thunar
+        pkgs.thunar
       ];
     };
   };
