@@ -28,7 +28,9 @@ function loadModelOverrides(): Map<string, ModelOverride> {
     for (const [id, cfg] of Object.entries(parsed)) {
       overrides.set(id, cfg);
     }
-    console.log(`[local-model-discovery] Loaded overrides for ${overrides.size} models`);
+    if (overrides.size > 0) {
+      console.log(`[local-model-discovery] Loaded overrides for ${overrides.size} models`);
+    }
   } catch (err) {
     // No config file — use defaults
     if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
