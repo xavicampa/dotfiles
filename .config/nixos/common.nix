@@ -1,10 +1,17 @@
-{ pkgs, config, lib, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  ...
+}:
 
-let unstable = import <nixpkgs-unstable> { 
-  config.allowUnfree = true; 
-  # overlays = import /home/javi/.config/nixpkgs/overlays_unstable.nix; 
-};
-in {
+let
+  unstable = import <nixpkgs-unstable> {
+    config.allowUnfree = true;
+    # overlays = import /home/javi/.config/nixpkgs/overlays_unstable.nix;
+  };
+in
+{
   # {
 
   boot = {
@@ -26,10 +33,10 @@ in {
       ELECTRON_OZONE_PLATFORM_HINT = "auto";
       GIT_ASKPASS = "";
     };
-    systemPackages = [ 
+    systemPackages = [
       pkgs.efibootmgr
-      pkgs.spice-gtk 
-      pkgs.lsof 
+      pkgs.spice-gtk
+      pkgs.lsof
       (pkgs.catppuccin-sddm.override {
         flavor = "mocha";
         accent = "mauve";
@@ -37,10 +44,12 @@ in {
     ];
   };
 
-  hardware = { enableRedistributableFirmware = true; };
+  hardware = {
+    enableRedistributableFirmware = true;
+  };
 
   networking = {
-    nameservers = ["172.16.99.4"];
+    nameservers = [ "172.16.99.4" ];
     networkmanager = {
       enable = true; # Easiest to use and most distros use this by default.
       dns = "none";
@@ -55,9 +64,14 @@ in {
     gc.automatic = true;
     settings = {
       auto-optimise-store = true;
-      experimental-features = [ "nix-command" "flakes" ];
-      substituters =
-        [ "https://nix-community.cachix.org" "https://cache.nixos.org" ];
+      experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
+      substituters = [
+        "https://nix-community.cachix.org"
+        "https://cache.nixos.org"
+      ];
       trusted-public-keys = [
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       ];
@@ -68,7 +82,7 @@ in {
   nixpkgs.config.nvidia.acceptLicense = true;
 
   programs = {
-    _1password = { 
+    _1password = {
       enable = true;
       package = unstable._1password-cli;
     };
@@ -77,10 +91,27 @@ in {
       polkitPolicyOwners = [ "javi" ];
       package = unstable._1password-gui;
     };
-    appgate-sdp = { enable = true; };
+    appgate-sdp = {
+      enable = true;
+    };
     appimage = {
       enable = true;
       binfmt = true;
+    };
+    dconf = {
+      enable = true;
+      profiles = {
+        user.databases = [
+          {
+            settings = {
+              "org/gnome/desktop/interface" = {
+                gtk-enable-primary-paste = true;
+                color-scheme = "prefer-dark";
+              };
+            };
+          }
+        ];
+      };
     };
     firefox = {
       enable = true;
@@ -92,13 +123,19 @@ in {
       xwayland.enable = true;
       withUWSM = true;
     };
-    hyprlock = { enable = true; };
+    hyprlock = {
+      enable = true;
+    };
     nix-ld = {
       enable = true;
       libraries = with pkgs; [ stdenv.cc.cc.lib ];
     };
-    ssh = { enableAskPassword = false; };
-    virt-manager = { enable = true; };
+    ssh = {
+      enableAskPassword = false;
+    };
+    virt-manager = {
+      enable = true;
+    };
     uwsm.enable = true;
     waybar = {
       enable = true;
@@ -117,9 +154,13 @@ in {
         wayland.enable = true;
       };
     };
-    fstrim = { enable = true; };
+    fstrim = {
+      enable = true;
+    };
     gnome.gnome-keyring.enable = true;
-    libinput = { enable = true; };
+    libinput = {
+      enable = true;
+    };
     resolved.enable = false;
     udisks2.enable = true;
   };
@@ -127,7 +168,6 @@ in {
   system.stateVersion = "22.11";
 
   time = {
-    hardwareClockInLocalTime = true;
     timeZone = "Europe/Oslo";
   };
 
@@ -184,7 +224,8 @@ in {
         wtype
         xdg-user-dirs
         xdg-utils
-        pkgs.thunar
+        nautilus
+        # pkgs.thunar
       ];
     };
   };
@@ -195,9 +236,15 @@ in {
       enable = true;
     };
     podman = {
-      defaultNetwork = { settings = { dns_enabled = true; }; };
+      defaultNetwork = {
+        settings = {
+          dns_enabled = true;
+        };
+      };
       dockerCompat = true;
-      dockerSocket = { enable = true; };
+      dockerSocket = {
+        enable = true;
+      };
       enable = true;
     };
     spiceUSBRedirection.enable = true;
