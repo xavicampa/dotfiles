@@ -87,7 +87,42 @@ profiles:
         mem_clock_offsets:
           0: 4000
       10DE:2203-1458:40A6-0000:03:00.0:
-        fan_control_enabled: false
+        fan_control_enabled: true
+        fan_control_settings:
+          mode: curve
+          static_speed: 0.5
+          temperature_key: edge
+          interval_ms: 500
+          curve:
+            40: 0.45
+            50: 0.45
+            60: 0.5
+            70: 0.75
+            80: 1.0
+          spindown_delay_ms: 5000
+          change_threshold: 2
+        power_cap: 330.0
+        min_core_clock: 210
+        max_core_clock: 2050
+        gpu_clock_offsets:
+          0: 100
+        mem_clock_offsets:
+          0: 2000
+      10DE:2203-1458:40A6-0000:81:00.0:
+        fan_control_enabled: true
+        fan_control_settings:
+          mode: curve
+          static_speed: 0.5
+          temperature_key: edge
+          interval_ms: 500
+          curve:
+            40: 0.45
+            50: 0.45
+            60: 0.5
+            70: 0.75
+            80: 1.0
+          spindown_delay_ms: 5000
+          change_threshold: 2
         power_cap: 330.0
         min_core_clock: 210
         max_core_clock: 2050
