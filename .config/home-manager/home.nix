@@ -63,7 +63,7 @@ in {
     pkgs.graphviz
     pkgs.git-remote-codecommit
     pkgs.imagemagick
-    pkgs.inetutils
+    # pkgs.inetutils
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
