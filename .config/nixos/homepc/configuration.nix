@@ -102,21 +102,22 @@ in
       "boot.shell_on_fail"
       "rd.systemd.show_status=auto"
       "udev.log_priority=3"
-      "NVreg_UseKernelSuspendNotifiers=0"
-      "NVreg_PreserveVideoMemoryAllocations=1"
       # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
       # "pci=realloc"
       # "pcie_aspm=off"
       # "pcie_port_pm=off"
       # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-      # "nvidia.NVreg_EnableGpuFirmware=0"
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
+      "mem_sleep_default=deep"
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
     kernelPackages = pkgs.linuxPackages_latest;
     # extraModprobeConfig = ''
-    #   options i915 enable_guc=3
+    #   options nvidia NVreg_EnableGpuFirmware=0
+    #   options nvidia NVreg_UseKernelSuspendNotifiers=0
+    #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
+    #   options nvidia NVreg_EnableS0ixPowerManagement=0
     # '';
   };
 
