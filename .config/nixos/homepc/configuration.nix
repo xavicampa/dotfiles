@@ -102,6 +102,8 @@ in
       "boot.shell_on_fail"
       "rd.systemd.show_status=auto"
       "udev.log_priority=3"
+      "NVreg_UseKernelSuspendNotifiers=0"
+      "NVreg_PreserveVideoMemoryAllocations=1"
       # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
       # "pci=realloc"
       # "pcie_aspm=off"
@@ -113,9 +115,9 @@ in
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
     kernelPackages = pkgs.linuxPackages_latest;
-    extraModprobeConfig = ''
-      options i915 enable_gux=3
-    '';
+    # extraModprobeConfig = ''
+    #   options i915 enable_guc=3
+    # '';
   };
 
   # File systems
