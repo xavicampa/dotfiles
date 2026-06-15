@@ -109,12 +109,11 @@ in
       # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
-      "mem_sleep_default=deep"
+      # "mem_sleep_default=deep"
     ];
     # kernelPackages = pkgs.linuxPackages_6_13;
     kernelPackages = pkgs.linuxPackages_latest;
     # extraModprobeConfig = ''
-    #   options nvidia NVreg_EnableGpuFirmware=0
     #   options nvidia NVreg_UseKernelSuspendNotifiers=0
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
     #   options nvidia NVreg_EnableS0ixPowerManagement=0
