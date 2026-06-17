@@ -13,6 +13,7 @@ let
     ppkgs.black
     ppkgs.cfn-lint
     ppkgs.greenlet
+    ppkgs.huggingface-hub
     # ppkgs.litellm
     ppkgs.pynvim
   ]);

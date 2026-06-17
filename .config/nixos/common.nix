@@ -34,6 +34,7 @@ in
       GIT_ASKPASS = "";
     };
     systemPackages = [
+      pkgs.dig
       pkgs.efibootmgr
       pkgs.spice-gtk
       pkgs.lsof
@@ -49,15 +50,24 @@ in
   };
 
   networking = {
-    nameservers = [ "172.16.99.4" ];
-    networkmanager = {
-      enable = true; # Easiest to use and most distros use this by default.
-      dns = "none";
-      wifi = {
-        backend = "iwd";
+    enableIPv6 = false;
+    useDHCP = true;
+    wireless = {
+      enable = false;
+      iwd = {
+        enable = true;
       };
     };
-    enableIPv6 = false;
+    # nameservers = [ "172.16.99.4" ];
+    # networkmanager = {
+    #   enable = true; # Easiest to use and most distros use this by default.
+    # wifi = {
+    #   backend = "iwd";
+    # };
+    # };
+    # resolvconf = {
+    #   useLocalResolver = false;
+    # };
   };
 
   nix = {
@@ -161,7 +171,6 @@ in
     libinput = {
       enable = true;
     };
-    resolved.enable = false;
     udisks2.enable = true;
   };
 
