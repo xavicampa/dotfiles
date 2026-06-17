@@ -51,7 +51,7 @@ in {
     # nodePackages."@aws-amplify/cli"
     # nodePackages."@angular/cli"
     pkgs.awscli2
-    # pkgs.aws-sam-cli
+    pkgs.aws-sam-cli
     pkgs.cargo
     unstable.claude-code
     # unstable.crush
