@@ -127,6 +127,7 @@ in
     options = [
       "subvol=root"
       "compress=zstd"
+      "noatime"
     ];
   };
   fileSystems."/home" = {
@@ -134,7 +135,8 @@ in
     fsType = "btrfs";
     options = [
       "subvol=home"
-      "compress=lzo"
+      "compress=none"
+      "noatime"
     ];
   };
   fileSystems."/nix" = {
@@ -150,6 +152,11 @@ in
     device = "/dev/disk/by-uuid/36FE-D52D";
     fsType = "vfat";
   };
+  # fileSystems."/mnt/models" = {
+  #   device = "/dev/disk/by-uuid/ff1ed146-327e-4b0f-a039-5672bc3feb14";
+  #   fsType = "ext4";
+  #   options = [ "defaults" "noatime" ];
+  # };  
 
   # Network configuration
   networking = {

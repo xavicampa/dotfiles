@@ -65,9 +65,9 @@ in
     #   backend = "iwd";
     # };
     # };
-    # resolvconf = {
-    #   useLocalResolver = false;
-    # };
+    resolvconf = {
+      useLocalResolver = false;
+    };
   };
 
   nix = {

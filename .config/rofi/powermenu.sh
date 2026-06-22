@@ -12,6 +12,6 @@ case $op in
     hyprctl dispatch exit 1
     ;;
   reboot-to-windows)
-    pkexec efibootmgr -n 0000 && reboot
+    pkexec efibootmgr -n 0001 && reboot
     ;;
 esac
