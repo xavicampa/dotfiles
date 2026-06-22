@@ -122,41 +122,13 @@ in
 
   # File systems
   fileSystems."/" = {
-    device = "/dev/disk/by-uuid/93e624aa-5323-466d-9dc8-b395a78efef1";
-    fsType = "btrfs";
-    options = [
-      "subvol=root"
-      "compress=zstd"
-      "noatime"
-    ];
-  };
-  fileSystems."/home" = {
-    device = "/dev/disk/by-uuid/93e624aa-5323-466d-9dc8-b395a78efef1";
-    fsType = "btrfs";
-    options = [
-      "subvol=home"
-      "compress=none"
-      "noatime"
-    ];
-  };
-  fileSystems."/nix" = {
-    device = "/dev/disk/by-uuid/93e624aa-5323-466d-9dc8-b395a78efef1";
-    fsType = "btrfs";
-    options = [
-      "subvol=nix"
-      "compress=zstd"
-      "noatime"
-    ];
+    device = "/dev/disk/by-label/NIXROOT";
+    fsType = "ext4";
   };
   fileSystems."/boot" = {
-    device = "/dev/disk/by-uuid/36FE-D52D";
+    device = "/dev/disk/by-label/NIXBOOT";
     fsType = "vfat";
   };
-  # fileSystems."/mnt/models" = {
-  #   device = "/dev/disk/by-uuid/ff1ed146-327e-4b0f-a039-5672bc3feb14";
-  #   fsType = "ext4";
-  #   options = [ "defaults" "noatime" ];
-  # };  
 
   # Network configuration
   networking = {
