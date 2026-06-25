@@ -102,6 +102,7 @@ in
       "boot.shell_on_fail"
       "rd.systemd.show_status=auto"
       "udev.log_priority=3"
+      # "pcie_aspm.policy=powersupersave"
       # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
       # "pci=realloc"
       # "pcie_aspm=off"
@@ -111,7 +112,6 @@ in
       # "nvidia-drm.fbdev=1"
       # "mem_sleep_default=deep"
     ];
-    # kernelPackages = pkgs.linuxPackages_6_13;
     kernelPackages = pkgs.linuxPackages_latest;
     # extraModprobeConfig = ''
     #   options nvidia NVreg_UseKernelSuspendNotifiers=0
@@ -193,10 +193,10 @@ in
 
   # Environment configuration
   environment.systemPackages = [
+    pkgs.intel-npu-driver
     pkgs.nvidia_oc
     pkgs.nvtopPackages.nvidia
     unstable.btop-cuda
-    pkgs.intel-npu-driver
   ];
   environment.etc."lact/config.yaml".source =
     "${config.users.users.javi.home}/.config/lact/config.yaml";
