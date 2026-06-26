@@ -102,6 +102,8 @@ in
       "boot.shell_on_fail"
       "rd.systemd.show_status=auto"
       "udev.log_priority=3"
+      "reboot=pci,cold"
+      # "pcie_aspm.policy=performance"
       # "pcie_aspm.policy=powersupersave"
       # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
       # "pci=realloc"
@@ -118,6 +120,9 @@ in
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
     #   options nvidia NVreg_EnableS0ixPowerManagement=0
     # '';
+    kernel.sysctl = {
+      "vm.blockdev.readahead" = "2048";
+      };
   };
 
   # File systems
@@ -171,6 +176,9 @@ in
       pulse.enable = true;
     };
     thermald.enable = true;
+    udev.extraRules = ''
+      ACTION=="add|change", KERNEL=="nvme0n1", ATTR{queue/read_ahead_kb}="2048"
+    '';
     xserver = {
       videoDrivers = [
         "modesetting"
