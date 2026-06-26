@@ -1,4 +1,4 @@
-op=$( echo -e " Suspend\n Poweroff\n󰜉 Reboot\n Logout\n Reboot-to-Windows" | rofi -i -dmenu | awk '{print tolower($2)}' )
+op=$( echo -e " Suspend\n Poweroff\n󰜉 Reboot\n Logout\n Reboot-to-Windows\n⚙ Reboot-to-UEFI" | rofi -i -dmenu | awk '{print tolower($2)}' )
 
 case $op in 
   poweroff)
@@ -13,5 +13,8 @@ case $op in
     ;;
   reboot-to-windows)
     pkexec efibootmgr -n 0001 && reboot
+    ;;
+  reboot-to-uefi)
+    systemctl reboot --firmware-setup
     ;;
 esac

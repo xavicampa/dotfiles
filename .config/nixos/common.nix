@@ -1,7 +1,6 @@
 {
   pkgs,
   config,
-  lib,
   ...
 }:
 
@@ -58,13 +57,6 @@ in
         enable = true;
       };
     };
-    # nameservers = [ "172.16.99.4" ];
-    # networkmanager = {
-    #   enable = true; # Easiest to use and most distros use this by default.
-    # wifi = {
-    #   backend = "iwd";
-    # };
-    # };
     resolvconf = {
       useLocalResolver = false;
     };
