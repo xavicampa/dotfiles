@@ -121,7 +121,6 @@ in
     };
     hyprland = {
       enable = true;
-      package = unstable.hyprland;
       xwayland.enable = true;
       withUWSM = true;
     };
