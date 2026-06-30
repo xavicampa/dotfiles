@@ -1,4 +1,4 @@
-op=$( echo -e " Suspend\n Poweroff\n󰜉 Reboot\n Logout\n Reboot-to-Windows\n⚙ Reboot-to-UEFI" | rofi -i -dmenu | awk '{print tolower($2)}' )
+op=$( echo -e " Suspend\n Poweroff\n󰜉 Reboot\n Logout\n Reboot-to-Windows\n Reboot-to-UEFI" | rofi -i -dmenu | awk '{print tolower($2)}' )
 
 case $op in 
   poweroff)
