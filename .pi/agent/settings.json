@@ -1,8 +1,0 @@
-{
-  "lastChangelogVersion": "0.78.1",
-  "defaultThinkingLevel": "medium",
-  "enableInstallTelemetry": false,
-  "defaultProvider": "local",
-  "defaultModel": "Jackrong/Qwopus3.6-27B-v2-MTP-GGUF:Q8_0",
-  "hideThinkingBlock": false
-}
