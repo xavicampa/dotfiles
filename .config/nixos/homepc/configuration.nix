@@ -200,6 +200,9 @@ in
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
   };
 
+  # Suspend/resume hooks via NixOS powerManagement
+  powerManagement.powerDownCommands = "/run/current-system/systemd/bin/systemctl restart podman-llamacpp.service || true";
+
   # Environment configuration
   environment.systemPackages = [
     pkgs.intel-npu-driver
