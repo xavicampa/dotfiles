@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  lib,
   ...
 }:
 
@@ -11,7 +12,7 @@ let
   };
 in
 {
-  # {
+  _module.args = { inherit unstable; };
 
   boot = {
     loader.systemd-boot.enable = true;

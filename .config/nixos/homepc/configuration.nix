@@ -6,12 +6,9 @@
   lib,
   pkgs,
   modulesPath,
+  unstable,
   ...
 }:
-
-let
-  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
-in
 
 {
   # Hardware configuration
