@@ -37,6 +37,7 @@ in
       pkgs.dig
       pkgs.efibootmgr
       pkgs.spice-gtk
+      pkgs.librepods
       pkgs.lsof
       (pkgs.catppuccin-sddm.override {
         flavor = "mocha";
