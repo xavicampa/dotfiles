@@ -67,29 +67,14 @@
     #   intelBusId = "PCI:0:2:0";
     #   nvidiaBusId = "PCI:1:0:0";
     # };
-    cpu.intel = {
-      updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-      npu.enable = true;
-    };
   };
 
   # Boot configuration
   boot = {
-    initrd.availableKernelModules = [
-      "xhci_pci"
-      "ahci"
-      "nvme"
-      "usb_storage"
-      "usbhid"
-      "sd_mod"
-    ];
     initrd.kernelModules = [ ];
     initrd.systemd.enable = true;
     initrd.verbose = false;
-    kernelModules = [
-      "kvm-intel"
-      "i2c-dev"
-    ];
+    kernelModules = [ "i2c-dev" ];
     # boot.extraModulePackages = [ ];
     loader.systemd-boot.consoleMode = "max";
     loader.timeout = 0;
@@ -122,17 +107,6 @@
       };
   };
 
-  # File systems
-  fileSystems."/" = {
-    device = "/dev/disk/by-label/NIXROOT";
-    fsType = "ext4";
-    options = [ "noatime" ];
-  };
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-label/NIXBOOT";
-    fsType = "vfat";
-  };
-
   # Network configuration
   networking = {
     hostName = "homepc"; # Define your hostname.
@@ -143,6 +117,7 @@
 
   # Nix configuration
   nixpkgs.config.cudaSupport = true;
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
   # Security configuration
   security = {
@@ -210,14 +185,6 @@
   environment.etc."lact/config.yaml".source =
     "${config.users.users.javi.home}/.config/lact/config.yaml";
 
-  # System configuration
-  swapDevices = [
-    {
-      device = "/swapfile";
-      size = 32 * 1024; # 32GB
-    }
-  ];
-
   # Virtualization configuration
   virtualisation.oci-containers = {
     backend = "podman";
@@ -244,6 +211,6 @@
 
   imports = [
     ../common.nix
-    (modulesPath + "/installer/scan/not-detected.nix")
+    ./hardware-configuration.nix
   ];
 }

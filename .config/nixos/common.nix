@@ -119,7 +119,7 @@ in
     };
     firefox = {
       enable = true;
-      package = unstable.firefox-bin;
+      package = pkgs.firefox-bin;
     };
     hyprland = {
       enable = true;
@@ -162,6 +162,9 @@ in
     };
     gnome.gnome-keyring.enable = true;
     libinput = {
+      enable = true;
+    };
+    hypridle = {
       enable = true;
     };
     udisks2.enable = true;
@@ -207,7 +210,6 @@ in
         file-roller
         git
         google-chrome
-        hypridle
         hyprpaper
         hyprshot
         # nix-du
