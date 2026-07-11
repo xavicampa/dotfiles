@@ -1,6 +1,6 @@
 ---
 name: elevated-permissions
-description: Execute commands requiring elevated (root) permissions. Triggered when commands fail with access denied, permission denied, EACCES, or similar errors — OR when the task involves system administration, hardware inspection (lspci, lshw, dmidecode), package management, service control, disk/mount operations, firewall rules, or any operation that may need root. Always load this skill before running any command that might require elevated permissions.
+description: Execute commands requiring elevated (root) permissions. Triggered when commands fail with access denied, permission denied, EACCES, or similar errors — OR when sudo is required or mentioned — OR when the task involves system administration, hardware inspection (lspci, lshw, dmidecode), package management, service control, disk/mount operations, firewall rules, or any operation that may need root. Always load this skill before running any command that might require elevated permissions.
 ---
 
 # pkexec

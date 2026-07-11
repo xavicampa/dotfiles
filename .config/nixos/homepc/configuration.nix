@@ -174,8 +174,18 @@
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
   };
 
-  # Suspend/resume hooks via NixOS powerManagement
-  powerManagement.powerDownCommands = "/run/current-system/systemd/bin/systemctl restart podman-llamacpp.service || true";
+  # Suspend/resume hook — only restart llama.cpp on suspend, NOT on reboot/shutdown
+  environment.etc."systemd/system-sleep/llamacpp".source = pkgs.writeShellScript "llamacpp-sleep-hook" ''
+    # $1 = pre|post, $2 = suspend|hibernate|hybrid-sleep|suspend-then-hibernate
+    case "$1:$2" in
+      pre:suspend)
+        /run/current-system/systemd/bin/systemctl stop podman-llamacpp.service || true
+        ;;
+      post:suspend)
+        /run/current-system/systemd/bin/systemctl start podman-llamacpp.service || true
+        ;;
+    esac
+  '';
 
   # Environment configuration
   environment.systemPackages = [
