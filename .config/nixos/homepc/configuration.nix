@@ -197,6 +197,12 @@
           "/app/llama-preset.ini"
           "--models-max"
           "1"
+          "-lv"
+          "4"
+          "-t"
+          "8"
+          "-tb"
+          "8"
         ];
         ports = [ "8080:8080" ];
         devices = [ "nvidia.com/gpu=all" ];
