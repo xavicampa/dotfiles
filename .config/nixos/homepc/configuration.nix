@@ -95,8 +95,10 @@
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
       # "mem_sleep_default=deep"
+      "xhci_hcd.quirks=0x80"  # RESET_ON_RESUME: fix xHC error in resume (USBSTS 0x401/0x411)
     ];
     kernelPackages = pkgs.linuxPackages_latest;
+    blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_UseKernelSuspendNotifiers=0
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
