@@ -96,6 +96,7 @@
       # "nvidia-drm.fbdev=1"
       # "mem_sleep_default=deep"
       "xhci_hcd.quirks=0x80"  # RESET_ON_RESUME: fix xHC error in resume (USBSTS 0x401/0x411)
+      "usbcore.autosuspend=-1" # disable USB autosuspend to prevent context state warnings
     ];
     kernelPackages = pkgs.linuxPackages_latest;
     blacklistedKernelModules = [ "spd5118" ];
