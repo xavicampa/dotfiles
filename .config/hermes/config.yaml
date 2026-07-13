@@ -1,0 +1,4 @@
+model:
+  provider: custom
+  base_url: http://host.containers.internal:8080/v1
+  default: unsloth/Qwen3.6-27B-MTP-GGUF:Q6_K_XL
