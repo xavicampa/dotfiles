@@ -173,6 +173,57 @@
 
     # shows wattage in btop for intel cpus
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
+
+    user.services = {
+      hermes = {
+        description = "Hermes Agent container";
+        wantedBy = [ "default.target" ];
+        serviceConfig = {
+          Type = "simple";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          Environment = "PATH=/run/current-system/sw/bin";
+          ExecStartPost = "/bin/sh -c 'sleep 5 && ${pkgs.podman}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${pkgs.podman}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
+        };
+
+        script = ''
+          podman run \
+            --replace \
+            --name hermes \
+            -v /home/javi/.local/hermes:/opt/data \
+            nousresearch/hermes-agent:latest \
+            gateway run
+        '';
+      };
+
+      llamacpp = {
+        description = "llama.cpp server container";
+        wantedBy = [ "default.target" ];
+        serviceConfig = {
+          Type = "simple";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          Environment = "PATH=/run/current-system/sw/bin";
+        };
+
+        script = ''
+          podman run \
+            --replace \
+            --name llamacpp \
+            --pull newer \
+            --network host \
+            --device nvidia.com/gpu=all \
+            -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
+            -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
+            ghcr.io/ggml-org/llama.cpp:server-cuda \
+            --models-preset /app/llama-preset.ini \
+            --models-max 1 \
+            -lv 4 \
+            -t 8 \
+            -tb 8
+        '';
+      };
+    };
   };
 
   # Suspend/resume hook — only restart llama.cpp on suspend, NOT on reboot/shutdown
@@ -180,10 +231,10 @@
     # $1 = pre|post, $2 = suspend|hibernate|hybrid-sleep|suspend-then-hibernate
     case "$1:$2" in
       pre:suspend)
-        /run/current-system/systemd/bin/systemctl stop podman-llamacpp.service || true
+        systemctl --user stop llamacpp.service || true
         ;;
       post:suspend)
-        /run/current-system/systemd/bin/systemctl start podman-llamacpp.service || true
+        systemctl --user start llamacpp.service || true
         ;;
     esac
   '';
@@ -197,36 +248,6 @@
   ];
   environment.etc."lact/config.yaml".source =
     "${config.users.users.javi.home}/.config/lact/config.yaml";
-
-  # Virtualization configuration
-  virtualisation.oci-containers = {
-    backend = "podman";
-    containers = {
-      llamacpp = {
-        autoStart = true;
-        image = "ghcr.io/ggml-org/llama.cpp:server-cuda";
-        cmd = [
-          "--models-preset"
-          "/app/llama-preset.ini"
-          "--models-max"
-          "1"
-          "-lv"
-          "4"
-          "-t"
-          "8"
-          "-tb"
-          "8"
-        ];
-        ports = [ "8080:8080" ];
-        devices = [ "nvidia.com/gpu=all" ];
-        volumes = [
-          "/home/javi/.cache/huggingface:/root/.cache/huggingface"
-          "/home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro"
-        ];
-        pull = "newer";
-      };
-    };
-  };
 
   imports = [
     ../common.nix

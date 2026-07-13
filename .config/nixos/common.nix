@@ -180,6 +180,7 @@ in
     users.javi = {
       shell = pkgs.zsh;
       isNormalUser = true;
+      linger = true;
       extraGroups = [
         "wheel"
         "i2c"
