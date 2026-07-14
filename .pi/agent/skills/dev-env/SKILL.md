@@ -1,6 +1,6 @@
 ---
-name: package-install
-description: Install packages and dependencies for a project. Use nix-shell for ephemeral environments (preferred), podman containers as fallback. Covers language runtimes, build tools, CLI utilities, and libraries.
+name: dev-env
+description: Set up a development environment with the right runtimes, tools, and libraries. Use nix-shell for ephemeral environments (preferred), podman containers as fallback, nix profile for persistent installs.
 ---
 
 # Package Install
