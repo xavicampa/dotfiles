@@ -16,7 +16,10 @@
     bluetooth.enable = true;
     graphics = {
       enable = true;
-      extraPackages = with pkgs; [ intel-media-driver vpl-gpu-rt ];
+      extraPackages = with pkgs; [
+        intel-media-driver
+        vpl-gpu-rt
+      ];
     };
     i2c.enable = true;
     nvidia = {
@@ -95,7 +98,7 @@
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
       # "mem_sleep_default=deep"
-      "xhci_hcd.quirks=0x80"  # RESET_ON_RESUME: fix xHC error in resume (USBSTS 0x401/0x411)
+      "xhci_hcd.quirks=0x80" # RESET_ON_RESUME: fix xHC error in resume (USBSTS 0x401/0x411)
       "usbcore.autosuspend=-1" # disable USB autosuspend to prevent context state warnings
     ];
     kernelPackages = pkgs.linuxPackages_latest;
@@ -107,7 +110,7 @@
     # '';
     kernel.sysctl = {
       "vm.blockdev.readahead" = "2048";
-      };
+    };
   };
 
   # Network configuration
@@ -174,36 +177,20 @@
     # shows wattage in btop for intel cpus
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
 
-    user.services = {
-      hermes = {
-        description = "Hermes Agent container";
-        wantedBy = [ "default.target" ];
-        serviceConfig = {
-          Type = "simple";
-          Restart = "on-failure";
-          RestartSec = "5s";
-          Environment = "PATH=/run/current-system/sw/bin";
-          ExecStartPost = "/bin/sh -c 'sleep 5 && ${pkgs.podman}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${pkgs.podman}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
-        };
-
-        script = ''
-          podman run \
-            --replace \
-            --name hermes \
-            -v /home/javi/.local/hermes:/opt/data \
-            nousresearch/hermes-agent:latest \
-            gateway run
-        '';
-      };
-
+    services = {
       llamacpp = {
         description = "llama.cpp server container";
-        wantedBy = [ "default.target" ];
+        wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "simple";
           Restart = "on-failure";
           RestartSec = "5s";
-          Environment = "PATH=/run/current-system/sw/bin";
+          User = "javi";
+          Group = "users";
+          Environment = [
+            "PATH=/run/current-system/sw/bin"
+            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
+          ];
         };
 
         script = ''
@@ -223,21 +210,44 @@
             -tb 8
         '';
       };
+
+      hermes = {
+        description = "Hermes Agent container";
+        wantedBy = [ "default.target" ];
+        serviceConfig = {
+          Type = "simple";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          User = "javi";
+          Group = "users";
+          Environment = "PATH=/run/current-system/sw/bin";
+          ExecStartPost = "/bin/sh -c 'sleep 5 && ${pkgs.podman}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${pkgs.podman}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
+        };
+
+        script = ''
+          podman run \
+            --replace \
+            --name hermes \
+            -v /home/javi/.local/hermes:/opt/data \
+            nousresearch/hermes-agent:latest \
+            gateway run
+        '';
+      };
     };
   };
 
   # Suspend/resume hook — only restart llama.cpp on suspend, NOT on reboot/shutdown
-  environment.etc."systemd/system-sleep/llamacpp".source = pkgs.writeShellScript "llamacpp-sleep-hook" ''
-    # $1 = pre|post, $2 = suspend|hibernate|hybrid-sleep|suspend-then-hibernate
-    case "$1:$2" in
-      pre:suspend)
-        systemctl --user stop llamacpp.service || true
-        ;;
-      post:suspend)
-        systemctl --user start llamacpp.service || true
-        ;;
-    esac
-  '';
+  # environment.etc."systemd/system-sleep/llamacpp".source = pkgs.writeShellScript "llamacpp-sleep-hook" ''
+  #   # $1 = pre|post, $2 = suspend|hibernate|hybrid-sleep|suspend-then-hibernate
+  #   case "$1:$2" in
+  #     pre:suspend)
+  #       systemctl stop llamacpp.service || true
+  #       ;;
+  #     post:suspend)
+  #       systemctl start llamacpp.service || true
+  #       ;;
+  #   esac
+  # '';
 
   # Environment configuration
   environment.systemPackages = [
