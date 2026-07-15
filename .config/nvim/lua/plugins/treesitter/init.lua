@@ -8,7 +8,7 @@ return {
                 auto_install = true,
 
                 -- A list of parser names, or "all"
-                ensure_installed = { "python", "lua", "yaml", "graphql", "javascript", "json", "go", "nix", "tsx", "typescript", "c", "vimdoc" },
+                ensure_installed = { "python", "lua", "yaml", "graphql", "javascript", "json", "go", "nix", "tsx", "typescript", "c", "vimdoc", "regex" },
 
                 -- Install parsers synchronously (only applied to `ensure_installed`)
                 sync_install = false,
