@@ -84,11 +84,11 @@ function setContextFooter(ctx: ExtensionContext) {
 				if (usage && contextWindow) {
 					percent = Math.min((usage.tokens / contextWindow) * 100, 100);
 
-					let colorFg: string;
-					const colorReset = "\x1b[39m";
-					if (percent < 60) colorFg = "\x1b[32m";
-					else if (percent < 85) colorFg = "\x1b[33m";
-					else colorFg = "\x1b[31m";
+					const colorFg = percent < 60
+						? (s: string) => "\x1b[38;2;78;201;114m" + s + "\x1b[39m"
+						: percent < 85
+							? (s: string) => "\x1b[38;2;241;250;140m" + s + "\x1b[39m"
+							: (s: string) => "\x1b[38;2;255;85;85m" + s + "\x1b[39m";
 
 					let bar = "";
 					for (let i = 0; i < BAR_WIDTH; i++) {
@@ -107,7 +107,7 @@ function setContextFooter(ctx: ExtensionContext) {
 							bar += BLOCK_EMPTY;
 						}
 					}
-					barStr = colorFg + `[${bar}] ` + colorReset + colorFg + `${Math.round(percent)}%` + colorReset + theme.fg("dim", ` ${fmt(contextWindow)}`);
+					barStr = colorFg(`[${bar}] `) + colorFg(`${Math.round(percent)}%`) + theme.fg("dim", ` ${fmt(contextWindow)}`);
 				} else {
 					barStr = theme.fg("dim", `[${BLOCK_EMPTY.repeat(BAR_WIDTH)}] --%`);
 				}
