@@ -107,7 +107,7 @@ function setContextFooter(ctx: ExtensionContext) {
 							bar += BLOCK_EMPTY;
 						}
 					}
-					barStr = colorFg(`[${bar}] `) + colorFg(`${Math.round(percent)}%`) + theme.fg("dim", ` ${fmt(contextWindow)}`);
+					barStr = colorFg(`[${bar}] `) + colorFg(`${Math.round(percent)}%`) + theme.fg("dim", ` ${fmt(usage.tokens)}/${fmt(contextWindow)}`);
 				} else {
 					barStr = theme.fg("dim", `[${BLOCK_EMPTY.repeat(BAR_WIDTH)}] --%`);
 				}
