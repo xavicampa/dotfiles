@@ -27,8 +27,7 @@
 
   swapDevices = [
     {
-      device = "/swapfile";
-      size = 32 * 1024; # 32GB
+      device = "/dev/disk/by-label/swap";
     }
   ];
 

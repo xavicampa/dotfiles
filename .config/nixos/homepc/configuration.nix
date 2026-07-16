@@ -101,9 +101,8 @@
     kernelPackages = pkgs.linuxPackages_latest;
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
-    #   options nvidia NVreg_UseKernelSuspendNotifiers=0
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
-    #   options nvidia NVreg_EnableS0ixPowerManagement=0
+    #   (disabled - powerManagement.enable = false handles this)
     # '';
     kernel.sysctl = {
       "vm.blockdev.readahead" = "2048";
