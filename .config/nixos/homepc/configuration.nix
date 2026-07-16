@@ -207,6 +207,21 @@
         '';
       };
 
+      llamacpp-sleep-guard = {
+        description = "Stop llamacpp before NVIDIA suspend, restart after resume";
+        unitConfig = {
+          Before = [ "nvidia-suspend.service" "sleep.target" ];
+          StopWhenUnneeded = true;
+        };
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "-${pkgs.systemd}/bin/systemctl stop llamacpp.service";
+          ExecStop = "-${pkgs.systemd}/bin/systemctl start llamacpp.service";
+        };
+        wantedBy = [ "sleep.target" ];
+      };
+
       hermes = {
         description = "Hermes Agent container";
         wantedBy = [ "default.target" ];
@@ -231,19 +246,6 @@
       };
     };
   };
-
-  # Suspend/resume hook — only restart llama.cpp on suspend, NOT on reboot/shutdown
-  # environment.etc."systemd/system-sleep/llamacpp".source = pkgs.writeShellScript "llamacpp-sleep-hook" ''
-  #   # $1 = pre|post, $2 = suspend|hibernate|hybrid-sleep|suspend-then-hibernate
-  #   case "$1:$2" in
-  #     pre:suspend)
-  #       systemctl stop llamacpp.service || true
-  #       ;;
-  #     post:suspend)
-  #       systemctl start llamacpp.service || true
-  #       ;;
-  #   esac
-  # '';
 
   # Environment configuration
   environment.systemPackages = [
