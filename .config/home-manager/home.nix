@@ -155,7 +155,7 @@ in {
       };
       # theme = "Gruvbox Dark";
       # themeFile = "Catppuccin-Mocha";
-      themeFile = "Dracula";
+      # themeFile = "Dracula";
     };
 
     neovim = {
