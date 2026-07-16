@@ -1,5 +1,8 @@
 vim.g.mapleader = ','
 
+-- Highlights
+vim.api.nvim_set_hl(0, "Comment", { italic = true })
+
 vim.opt.encoding = 'utf-8'
 vim.opt.number = true
 vim.opt.relativenumber = true
