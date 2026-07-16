@@ -58,6 +58,7 @@ in {
     # unstable.crush
     pkgs.dwt1-shell-color-scripts
     # pkgs.aws-sam-cli
+    pkgs.gh
     pkgs.ghostscript
     pkgs.go
     pkgs.graph-easy
