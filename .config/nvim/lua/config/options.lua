@@ -1,18 +1,18 @@
 vim.g.mapleader = ','
 
 -- Highlights
-vim.api.nvim_set_hl(0, "Comment", { italic = true })
+-- Use NonText color (muted by most themes) for comments and folds
+local function apply_muted_highlights()
+  local non_text_fg = vim.api.nvim_get_hl(0, { name = "NonText" }).fg
+  vim.api.nvim_set_hl(0, "Comment", { italic = true, fg = non_text_fg })
+  vim.api.nvim_set_hl(0, "Folded", { bg = "NONE", fg = non_text_fg, italic = true })
+end
 
--- Fix Folded background (default is black, overriding terminal theme)
--- Use a muted foreground so folded sections are visible but stand back
 vim.api.nvim_create_autocmd("ColorScheme", {
   pattern = "*",
-  callback = function()
-    vim.api.nvim_set_hl(0, "Folded", { bg = "NONE", fg = "#808080", italic = true })
-  end,
+  callback = apply_muted_highlights,
 })
--- Apply immediately for the current colorscheme
-vim.api.nvim_set_hl(0, "Folded", { bg = "NONE", fg = "#808080", italic = true })
+apply_muted_highlights()
 
 vim.opt.encoding = 'utf-8'
 vim.opt.number = true
