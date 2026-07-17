@@ -3,6 +3,17 @@ vim.g.mapleader = ','
 -- Highlights
 vim.api.nvim_set_hl(0, "Comment", { italic = true })
 
+-- Fix Folded background (default is black, overriding terminal theme)
+-- Use a muted foreground so folded sections are visible but stand back
+vim.api.nvim_create_autocmd("ColorScheme", {
+  pattern = "*",
+  callback = function()
+    vim.api.nvim_set_hl(0, "Folded", { bg = "NONE", fg = "#808080", italic = true })
+  end,
+})
+-- Apply immediately for the current colorscheme
+vim.api.nvim_set_hl(0, "Folded", { bg = "NONE", fg = "#808080", italic = true })
+
 vim.opt.encoding = 'utf-8'
 vim.opt.number = true
 vim.opt.relativenumber = true
