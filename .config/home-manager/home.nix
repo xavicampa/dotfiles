@@ -69,7 +69,7 @@ in {
     pkgs.kitty-themes
     pkgs.marksman
     pkgs.fastfetch
-    unstable.gemini-cli
+    # unstable.gemini-cli
     # pkgs.kiro
     # pkgs.kiro-cli
     pkgs.nerd-fonts.jetbrains-mono
@@ -171,7 +171,7 @@ in {
       '';
       package = unstable.neovim-unwrapped;
       extraPackages = [
-        pkgs.checkstyle
+        # pkgs.checkstyle
         pkgs.gcc
         pkgs.lemminx
         # pkgs.llm-ls
