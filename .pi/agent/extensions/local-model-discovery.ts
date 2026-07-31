@@ -128,6 +128,16 @@ function extractRpiInputTypes(model: RpiModelRaw): ("text" | "image")[] {
 
 type Confirm = (title: string, message: string) => Promise<boolean>;
 
+// Default to "No" by listing it first in a select dialog
+async function confirmNo(
+  ui: { select: (title: string, options: string[]) => Promise<string | undefined> },
+  title: string,
+  message: string,
+): Promise<boolean> {
+  const choice = await ui.select(`${title} — ${message}`, ["No", "Yes"]);
+  return choice === "Yes";
+}
+
 function buildModels(provider: ProviderConfig, data: any[]): any[] {
   if (provider.id === "local") {
     const overrides = loadModelOverrides();
@@ -253,7 +263,7 @@ export default async function (pi: ExtensionAPI) {
       ctx.ui.setStatus("local-models", "Refreshing models...");
       for (const provider of PROVIDERS) {
         pi.unregisterProvider(provider.id);
-        const { count } = await discoverAndRegister(pi, provider, (title, msg) => ctx.ui.confirm(title, msg));
+        const { count } = await discoverAndRegister(pi, provider, (title, msg) => confirmNo(ctx.ui, title, msg));
         if (count > 0) {
           ctx.ui.notify(`Refreshed ${count} ${provider.label} models`, "info");
         } else {
@@ -274,12 +284,13 @@ export default async function (pi: ExtensionAPI) {
     pi.on("session_start", async (_event, ctx) => {
       if (!ctx.hasUI) return;
       for (const { provider, reason } of failedProviders) {
-        const retry = await ctx.ui.confirm(
+        const retry = await confirmNo(
+          ctx.ui,
           `${provider.label} model discovery failed`,
           `${provider.baseUrl}: ${reason} — retry?`,
         );
         if (!retry) continue;
-        const { count } = await discoverAndRegister(pi, provider, (title, msg) => ctx.ui.confirm(title, msg));
+        const { count } = await discoverAndRegister(pi, provider, (title, msg) => confirmNo(ctx.ui, title, msg));
         if (count > 0) {
           ctx.ui.notify(`Registered ${count} ${provider.label} models`, "info");
         } else {
