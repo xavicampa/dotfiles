@@ -3,6 +3,7 @@
  *
  * Renders a compact progress bar on the third footer line using ctx.ui.setStatus().
  * Green → yellow → red as context fills, matching the default footer thresholds (70/90%).
+ * Updates on turn boundaries, message end, session compaction, and agent settlement.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -21,8 +22,9 @@ function render(pct: number): string {
   const barLen = process.stdout.columns ?? 80;
   const filled = Math.round((pct / 100) * barLen);
 
+  // Match built-in footer thresholds: 70% warning, 90% error
   const color =
-    pct > 85 ? RED : pct > 60 ? YELLOW : GREEN;
+    pct > 90 ? RED : pct > 70 ? YELLOW : GREEN;
 
   let bar = "";
   for (let i = 0; i < barLen; i++) {
@@ -48,7 +50,12 @@ function update(ctx: ExtensionContext): void {
 
 export default function (pi: ExtensionAPI) {
   pi.on("turn_end", (_e, ctx) => update(ctx));
+  pi.on("message_end", (_e, ctx) => update(ctx));
   pi.on("session_compact", (_e, ctx) => update(ctx));
   pi.on("session_start", (_e, ctx) => update(ctx));
-  pi.on("agent_end", (_e, ctx) => update(ctx));
+  pi.on("agent_settled", (_e, ctx) => update(ctx));
+  pi.on("session_shutdown", (_e, ctx) => {
+    if (!ctx.hasUI) return;
+    ctx.ui.setStatus(STATUS_KEY, undefined);
+  });
 }
