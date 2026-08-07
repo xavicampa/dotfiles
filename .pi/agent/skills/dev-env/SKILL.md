@@ -1,6 +1,6 @@
 ---
 name: dev-env
-description: Set up a development environment with the right runtimes, tools, and libraries. Use nix-shell for ephemeral environments (preferred), podman containers as fallback, nix profile for persistent installs.
+description: Set up a development environment with the right runtimes, tools, and libraries. Triggered when a command fails with "command not found" or when installing/setting up tools is needed. Use nix-shell for ephemeral environments (preferred), podman containers as fallback, nix profile for persistent installs.
 ---
 
 # Package Install
