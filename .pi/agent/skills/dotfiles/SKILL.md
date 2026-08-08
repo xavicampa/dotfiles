@@ -1,6 +1,6 @@
 ---
 name: dotfiles
-description: appends git-dir and work-tree to the git command to allow me to interact with my dotfiles from any location
+description: Manage the dotfiles repository by appending git-dir and work-tree flags. Only trigger when the user explicitly mentions dotfiles.
 ---
 
 # dotfiles
