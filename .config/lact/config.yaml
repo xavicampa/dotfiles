@@ -98,7 +98,7 @@ profiles:
         mem_clock_offsets:
           0: 2000
       10DE:2203-1458:40A6-0000:03:00.0:
-        fan_control_enabled: true
+        fan_control_enabled: false
         fan_control_settings:
           mode: curve
           static_speed: 0.5
