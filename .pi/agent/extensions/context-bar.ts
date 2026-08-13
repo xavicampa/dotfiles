@@ -70,7 +70,7 @@ function renderTiming(): string {
 function update(ctx: ExtensionContext): void {
   if (!ctx.hasUI) return;
   const usage = ctx.getContextUsage();
-  if (!usage || usage.percent === null) {
+  if (!usage || usage.percent === null || usage.percent <= 0) {
     ctx.ui.setStatus(STATUS_KEY, undefined);
     return;
   }
