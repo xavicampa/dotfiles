@@ -1,1 +1,10 @@
-{}
+{
+  "bartowski/Qwen3.8-27B-GGUF:Q8_0": {
+    "supportsReasoningEffort": true,
+    "thinkingFormat": "qwen-chat-template"
+  },
+  "unsloth/Qwen3.8-27B-GGUF:Q8_K_XL": {
+    "supportsReasoningEffort": true,
+    "thinkingFormat": "qwen-chat-template"
+  }
+}
