@@ -222,28 +222,28 @@
         wantedBy = [ "sleep.target" ];
       };
 
-      # hermes = {
-      #   description = "Hermes Agent container";
-      #   wantedBy = [ "default.target" ];
-      #   serviceConfig = {
-      #     Type = "simple";
-      #     Restart = "on-failure";
-      #     RestartSec = "5s";
-      #     User = "javi";
-      #     Group = "users";
-      #     Environment = "PATH=/run/current-system/sw/bin";
-      #     ExecStartPost = "/bin/sh -c 'sleep 5 && ${pkgs.podman}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${pkgs.podman}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
-      #   };
-      #
-      #   script = ''
-      #     podman run \
-      #       --replace \
-      #       --name hermes \
-      #       -v /home/javi/.local/hermes:/opt/data \
-      #       nousresearch/hermes-agent:latest \
-      #       gateway run
-      #   '';
-      # };
+      hermes = {
+        description = "Hermes Agent container";
+        wantedBy = [ "default.target" ];
+        serviceConfig = {
+          Type = "simple";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          User = "javi";
+          Group = "users";
+          Environment = "PATH=/run/current-system/sw/bin";
+          ExecStartPost = "/bin/sh -c 'sleep 5 && ${pkgs.podman}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${pkgs.podman}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
+        };
+
+        script = ''
+          podman run \
+            --replace \
+            --name hermes \
+            -v /home/javi/.local/hermes:/opt/data \
+            nousresearch/hermes-agent:latest \
+            gateway run
+        '';
+      };
     };
   };
 

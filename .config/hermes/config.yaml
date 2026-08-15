@@ -1,4 +1,5 @@
 model:
   provider: custom
   base_url: http://host.containers.internal:8080/v1
-  default: bartowski/Qwen_Qwen3.6-27B-GGUF:Q8_0
+  default: unsloth/Qwen3.8-27B-GGUF:Q8_K_XL
+  model.context_length: 81920
