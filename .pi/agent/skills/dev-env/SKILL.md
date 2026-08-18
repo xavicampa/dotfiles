@@ -1,6 +1,6 @@
 ---
 name: dev-env
-description: Set up a development environment with the right runtimes, tools, and libraries. Triggered when a command fails with "command not found" or when installing/setting up tools is needed. Use nix-shell for ephemeral environments (preferred), podman containers as fallback, nix profile for persistent installs.
+description: Get any missing command, runtime, tool, or library via nix-shell, podman, or nix profile. MUST be loaded the moment a command fails with "command not found", "No such file or directory", or EACCES — or whenever a tool that is not already on PATH is needed, even for one-off use (e.g. nmap, avahi, git, jq, python3, node, ffmpeg). Do NOT improvise workarounds or paper over missing tools with shell one-liners; load this skill first and use nix-shell -p (preferred), podman as fallback, or nix profile for persistent installs.
 ---
 
 # Package Install
