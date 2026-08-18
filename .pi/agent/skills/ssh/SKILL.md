@@ -1,5 +1,5 @@
 ---
-name: op-ssh
+name: ssh
 description: SSH to local/LAN machines (rpi, NAS, home servers — anything resolvable by name on the local network) using the SSH keys provisioned by 1Password. Triggered when the user wants to ssh to a local host, when ssh fails with "Permission denied (publickey,password)", or when ssh fails with "sign_and_send_pubkey ... agent refused operation".
 ---
 
