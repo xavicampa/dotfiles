@@ -1,6 +1,6 @@
 ---
 name: hf
-description: Manage the Hugging Face Hub cache and downloads. Download models/datasets from the Hub (file filters, local dirs, gated-repo tokens), check remote repo sizes, list cached repos/quants with disk usage, delete or prune cache, verify integrity. Use when the user wants to download an HF model/dataset, or asks about HF cache size, which models/quants are cached, freeing disk space, or a cached repo that won't load.
+description: Manage the Hugging Face Hub — remote repo queries AND the local cache. List what files/quants a remote repo has with sizes (e.g. 'what Q4/GGUF quants of X are on HF', 'list files in an HF repo'), check repo sizes, download models/datasets (file filters, local dirs, gated-repo tokens), list cached repos/quants with disk usage, delete or prune cache, verify integrity. Use whenever the user mentions Hugging Face / HF / Hub or GGUF quants — including purely remote questions (no download or cache involved) — plus downloads, HF cache size, which models/quants are cached, freeing disk space, or a cached repo that won't load.
 ---
 
 # Hugging Face Hub: downloads & local cache
