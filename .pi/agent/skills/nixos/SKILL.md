@@ -1,5 +1,5 @@
 ---
-name: nixos-upgrade
+name: nixos
 description: Upgrade NixOS on this host (classic non-flake setup) — update the system channels, build the new system, show a summary table of package upgrades (diff-closures), roll the channels back to the pre-upgrade generation, and only after explicit user confirmation switch to the built toplevel via --store-path. Triggered when the user asks to upgrade NixOS, update channels, "what will nixos-rebuild switch upgrade", run nixos-rebuild with --upgrade/--diff, or apply a NixOS update.
 ---
 
