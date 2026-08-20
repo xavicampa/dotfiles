@@ -51,7 +51,20 @@
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
       # package = config.boot.kernelPackages.nvidiaPackages.latest;
-      # package = unstable.linuxPackages.nvidiaPackages.latest;
+      # 610.57.04 (latest new-feature branch from nixpkgs-unstable 26.11pre),
+      # built against the system kernel — testing.
+      # Previous working pin: 595.91.07, hashes sha256-yiPIjdJLB6GRZE4eEc+3vN11NzBXSa9A+YABiwleYxM= /
+      # open sha256-OB8Epd+qn/WywxsPiFpxEOAzlJqb6I1SyRoV3a8l71k= /
+      # settings sha256-QzT8Cw1luuZGP9DUje3HN/0ngiayqHURj+bqPsxlJ5w= /
+      # persistenced sha256-3JQBaNmkwxvCXv9q8aHKas6VZM/JjLsuilC2t7ET0u0=
+      # (release-branch 595.71.05 fails to compile vs kernel 7.2: strncpy implicit decl)
+      package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
+        version = "610.57.04";
+        sha256_64bit = "sha256-suk1xmuDuwDAyFe8jg7g/VLekoa0DJzB7sKafOfrEW0=";
+        openSha256 = "sha256-rQHOOOY4KL92Ww3KDwh+j4eGU7oNAH8LutZC5wmFnPo=";
+        settingsSha256 = "sha256-ZEMo8I8Zc2Tq6RVDNYpAH+f094dUaZiBqO+5f6lIjRI=";
+        persistencedSha256 = "sha256-aXmD2VY1RLlgAnlHhOUMWzvMyhI6JTClcFLm4imF/mA=";
+      };
       # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
