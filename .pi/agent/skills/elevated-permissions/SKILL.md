@@ -111,8 +111,9 @@ pkexec /bin/sh -c "command1 && command2"
 - `pkexec` resets most of the environment: `PATH`, `HOME`, and user-defined variables (`NIX_PATH`, `XDG_STATE_HOME`, …) do not pass through. If the elevated command needs them, pass them via `env` **inside** the pkexec invocation:
   ```bash
   pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrappers/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-    NIX_PATH="..." nixos-rebuild build
+    NIX_PATH="$NIX_PATH" nixos-rebuild build
   ```
+  Pass the current shell's `NIX_PATH` **through verbatim** — don't reconstruct or omit it. `nixos-rebuild` re-evaluates the config, so it needs the `nixos-config` and `nixpkgs` entries; a missing/empty `NIX_PATH` fails with `error: file 'nixpkgs/nixos' was not found in the Nix search path`.
 - **Never export or modify `PATH` in the outer shell before invoking `pkexec`.** On NixOS only the wrapper at `/run/wrappers/bin/pkexec` is setuid; other resolved locations (e.g. `/run/current-system/sw/bin/pkexec`) are not setuid and fail with "pkexec must be setuid root". Invoke `pkexec` with the default PATH and pass `PATH` via `env PATH=...` inside.
 
 ## Tips
