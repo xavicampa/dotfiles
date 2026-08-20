@@ -1,6 +1,6 @@
 ---
 name: dotfiles
-description: Manage the dotfiles repository by passing --git-dir and --work-tree flags before the git subcommand. Only trigger when the user explicitly mentions dotfiles.
+description: Manage the dotfiles repository. Only trigger when the user explicitly mentions dotfiles.
 ---
 
 # dotfiles
