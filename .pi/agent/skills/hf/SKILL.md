@@ -13,6 +13,8 @@ Prefer `hf` subcommands over poking at the cache dir (snapshots are symlink farm
 
 ## Auth
 
+**ALWAYS export HF_TOKEN before downloading models — no exceptions.** Even for public repos (unauthenticated downloads get throttled rate limits). Export it once in the shell session before any `hf download` command, including `--dry-run`.
+
 Token lives in 1Password (dev vault); read on demand, never write to disk:
 
 ```bash
@@ -31,6 +33,8 @@ export HF_TOKEN=$(timeout 90 op read "op://dev/HF_TOKEN/credential")  # op can b
 
 ## Downloading
 
+**Precondition: `HF_TOKEN` is exported** (see Auth). If it isn't, get it from 1Password first — do not start a download without it.
+
 ```bash
 hf download org/repo                                # whole repo → cache
 hf download org/repo file1 file2                    # specific files
@@ -48,6 +52,16 @@ hf download org/repo --token $HF_TOKEN              # gated repos
 - Prefer `--include` for GGUF repos: one quantization, not all ~28.
 - Python: `hf_hub_download("org/repo","f.gguf")` → path; `snapshot_download("org/repo", allow_patterns=["*.gguf"])` → dir.
 - Single file outside cache: `hf cp hf://org/repo/config.json ./`.
+
+**Post-download llama.cpp preset option**
+
+After a successful `hf download` of a GGUF / llama.cpp model, ask the user: “Do you want to add a preset for this model in `~/.config/llamacpp/llama-preset.ini`?”
+
+If yes:
+1. Fetch the model card on the Hub, e.g. `hf models info org/repo` or via `HfApi().model_info("org/repo")`, and read README / `model_index.json` / tags for recommended sampling parameters.
+2. Propose the recommended parameters, e.g. `temperature`, `top_p`, `top_k`, `min_p`, `repeat_penalty`, `context_length`, etc., in a `[model_id]` section.
+3. If the card lists more than one option / use-case, present them and ask the user which to use before writing.
+4. Write/append to `~/.config/llamacpp/llama-preset.ini` with the chosen values, backing up existing file first.
 
 ## Listing the cache
 
