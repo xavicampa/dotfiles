@@ -133,6 +133,7 @@ in
       enable = true;
       libraries = with pkgs; [ stdenv.cc.cc.lib ];
     };
+    quark-goldleaf.enable = true;
     ssh = {
       enableAskPassword = false;
     };
