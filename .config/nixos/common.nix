@@ -177,6 +177,8 @@ in
   };
 
   users = {
+    groups.plugdev = { };
+
     users.javi = {
       shell = pkgs.zsh;
       isNormalUser = true;
@@ -194,6 +196,7 @@ in
         "users"
         "disk"
         "libvirtd"
+        "plugdev"
       ];
       packages = with pkgs; [
         apple-cursor

@@ -5,10 +5,18 @@
   config,
   lib,
   pkgs,
-  modulesPath,
+  # modulesPath,
   unstable,
   ...
 }:
+
+let
+  jdkWithFX = pkgs.openjdk.override {
+    enableJavaFX = true; # for JavaFX
+    # include following line if JavaFX with Webkit is needed
+    openjfx_jdk = pkgs.openjfx.override { withWebKit = true; };
+  };
+in
 
 {
   # Hardware configuration
@@ -165,6 +173,7 @@
     thermald.enable = true;
     udev.extraRules = ''
       ACTION=="add|change", KERNEL=="nvme0n1", ATTR{queue/read_ahead_kb}="2048"
+      SUBSYSTEM=="usb", ATTRS{idVendor}=="057e", ATTRS{idProduct}=="3000", GROUP="plugdev", MODE="0666"
     '';
     xserver = {
       videoDrivers = [
@@ -266,6 +275,7 @@
     pkgs.nvidia_oc
     pkgs.nvtopPackages.nvidia
     unstable.btop-cuda
+    jdkWithFX
   ];
   environment.etc."lact/config.yaml".source =
     "${config.users.users.javi.home}/.config/lact/config.yaml";
