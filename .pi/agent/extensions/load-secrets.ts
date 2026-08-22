@@ -1,12 +1,18 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 
 export default function (pi: ExtensionAPI) {
-  const OP_PATH = "op://dev/BRAVE_API_KEY/credential";
+  type Secret = { opPath: string; envVar: string; label: string };
 
-  let keyState: "pending" | "loaded" | "failed" = "pending";
-  let loadPromise: Promise<void> | null = null;
+  const SECRETS: Secret[] = [
+    { opPath: "op://dev/BRAVE_API_KEY/credential", envVar: "BRAVE_API_KEY", label: "Brave API key" },
+    { opPath: "op://dev/HF_TOKEN/credential", envVar: "HF_TOKEN", label: "HF token" },
+  ];
+
+  type State = "pending" | "loaded" | "failed";
+  const state = new Map<string, State>();
+  const loading = new Map<string, Promise<void>>();
+  for (const s of SECRETS) state.set(s.envVar, "pending");
 
   type Context = Parameters<Parameters<typeof pi.on>[1]>[1];
 
@@ -28,47 +34,53 @@ export default function (pi: ExtensionAPI) {
     child.unref();
   }
 
-  function doLoad(ctx: Context): Promise<void> {
+  function doLoad(secret: Secret, ctx: Context): Promise<void> {
     if (!is1PasswordRunning()) {
-      keyState = "failed";
+      state.set(secret.envVar, "failed");
       ctx.ui.notify("1Password desktop app is not running", "error");
-      return;
+      return Promise.resolve();
     }
     try {
-      const key = execSync(`op read ${OP_PATH}`, {
+      const value = execSync(`op read ${secret.opPath}`, {
         encoding: "utf-8",
         timeout: 120_000,
       }).trim();
-      if (key) {
-        process.env.BRAVE_API_KEY = key;
-        keyState = "loaded";
-        ctx.ui.notify("Brave API key loaded", "info");
+      if (value) {
+        process.env[secret.envVar] = value;
+        state.set(secret.envVar, "loaded");
+        ctx.ui.notify(`${secret.label} loaded`, "info");
       } else {
-        keyState = "failed";
+        state.set(secret.envVar, "failed");
       }
     } catch (err) {
-      keyState = "failed";
+      state.set(secret.envVar, "failed");
       const message = err instanceof Error ? err.message : String(err);
-      ctx.ui.notify(`Failed to load Brave API key: ${message}`, "error");
+      ctx.ui.notify(`Failed to load ${secret.label}: ${message}`, "error");
     }
+    return Promise.resolve();
   }
 
-  async function loadKey(ctx: Context): Promise<void> {
-    if (keyState === "loaded") return;
-    if (loadPromise) return loadPromise;
-    loadPromise = doLoad(ctx);
-    try {
-      await loadPromise;
-    } finally {
-      loadPromise = null;
+  async function loadSecrets(ctx: Context, envVars: string[]): Promise<void> {
+    for (const secret of SECRETS.filter((s) => envVars.includes(s.envVar))) {
+      if (state.get(secret.envVar) === "loaded") continue;
+      const inFlight = loading.get(secret.envVar);
+      if (inFlight) {
+        await inFlight;
+        continue;
+      }
+      const p = doLoad(secret, ctx);
+      loading.set(secret.envVar, p);
+      try {
+        await p;
+      } finally {
+        loading.delete(secret.envVar);
+      }
     }
   }
 
   async function forceReload(ctx: Context): Promise<void> {
-    if (keyState === "loaded" && !loadPromise) {
-      keyState = "pending";
-    }
-    await loadKey(ctx);
+    for (const s of SECRETS) state.set(s.envVar, "pending");
+    await loadSecrets(ctx, SECRETS.map((s) => s.envVar));
   }
 
   // Open 1Password on startup if not running
@@ -84,10 +96,17 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // Auto-load on first web_search (no retry after failure)
+  // Auto-load on first use (no retry after failure)
+  const HF_CMD = /\bhf\s+(download|cache|auth|models|env|cp|version|whoami)\b/;
   pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName === "web_search" && keyState === "pending") {
-      await loadKey(ctx);
+    if (event.toolName === "web_search") {
+      await loadSecrets(ctx, ["BRAVE_API_KEY"]);
+    } else if (
+      event.toolName === "bash" &&
+      typeof event.input?.command === "string" &&
+      HF_CMD.test(event.input.command)
+    ) {
+      await loadSecrets(ctx, ["HF_TOKEN"]);
     }
   });
 }

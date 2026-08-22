@@ -13,15 +13,10 @@ Prefer `hf` subcommands over poking at the cache dir (snapshots are symlink farm
 
 ## Auth
 
-**ALWAYS export HF_TOKEN before downloading models — no exceptions.** Even for public repos (unauthenticated downloads get throttled rate limits). Export it once in the shell session before any `hf download` command, including `--dry-run`.
+**Auth is automatic** — no manual export. The `load-secrets` pi extension intercepts any bash command matching `hf download|cache|auth|models|env|cp|...` and loads `HF_TOKEN` from 1Password (`op://dev/HF_TOKEN/credential`) into the process env before the command runs (once per pi session; loaded secrets persist in `process.env` and are inherited by every bash call). This also protects public-repo downloads from unauthenticated rate limits, including `--dry-run`.
 
-Token lives in 1Password (dev vault); read on demand, never write to disk:
-
-```bash
-export HF_TOKEN=$(timeout 90 op read "op://dev/HF_TOKEN/credential")  # op can block ~90s waiting for approval
-```
-
-- `hf auth whoami` → `user=XaviCampa` verifies. Exported env var is used by all `hf` commands; `--token` also works per command.
+- Verify with `hf auth whoami` → `user=XaviCampa`. The env var is used by all `hf` commands; `--token` also works per command.
+- If auth fails (extension didn't fire, op not approved, 1Password not running): ask the user to run the `/load-secrets` command in pi, then retry. Last resort: `export HF_TOKEN=$(timeout 90 op read "op://dev/HF_TOKEN/credential")` on the same command line (op can block ~90s waiting for approval). Never write the token to disk or echo it.
 - Gated repos (Llama, some Qwen) additionally need terms accepted once on huggingface.co with that account.
 - If `op` is broken (not approved/signed out): `hf auth login` (stores token in `~/.hf/credentials`).
 
@@ -33,7 +28,7 @@ export HF_TOKEN=$(timeout 90 op read "op://dev/HF_TOKEN/credential")  # op can b
 
 ## Downloading
 
-**Precondition: `HF_TOKEN` is exported** (see Auth). If it isn't, get it from 1Password first — do not start a download without it.
+**Precondition: auth is in place** (see Auth — the load-secrets extension injects `HF_TOKEN` automatically when a bash command runs `hf ...`). If `hf auth whoami` reports unauthenticated, fix auth first — do not start a download without it.
 
 ```bash
 hf download org/repo                                # whole repo → cache
