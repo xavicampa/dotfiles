@@ -134,6 +134,16 @@
   nixpkgs.config.cudaSupport = true;
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
+  # Virtualisation configuration
+  # Run QEMU as unprivileged user qemu-libvirtd (fixes the libvirt
+  # "tainted: running with undesirable elevated privileges" warning).
+  # Guest files must be owned by qemu-libvirtd (see /home/javi/images/omarchy-vm).
+  virtualisation.libvirtd.qemu.runAsRoot = false;
+
+  # Search-only access to $HOME so qemu-libvirtd can reach the VM images
+  # in /home/javi/images/omarchy-vm (no list/read granted).
+  users.users.javi.homeMode = "751";
+
   # Security configuration
   security = {
     rtkit.enable = true;
