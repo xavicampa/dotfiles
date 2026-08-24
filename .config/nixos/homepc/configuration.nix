@@ -50,7 +50,7 @@
       nvidiaSettings = true;
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
-      # package = config.boot.kernelPackages.nvidiaPackages.latest;
+      package = config.boot.kernelPackages.nvidiaPackages.latest;
       # 610.57.04 (latest new-feature branch from nixpkgs-unstable 26.11pre),
       # built against the system kernel — testing.
       # Previous working pin: 595.91.07, hashes sha256-yiPIjdJLB6GRZE4eEc+3vN11NzBXSa9A+YABiwleYxM= /
@@ -58,13 +58,13 @@
       # settings sha256-QzT8Cw1luuZGP9DUje3HN/0ngiayqHURj+bqPsxlJ5w= /
       # persistenced sha256-3JQBaNmkwxvCXv9q8aHKas6VZM/JjLsuilC2t7ET0u0=
       # (release-branch 595.71.05 fails to compile vs kernel 7.2: strncpy implicit decl)
-      package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
-        version = "610.57.04";
-        sha256_64bit = "sha256-suk1xmuDuwDAyFe8jg7g/VLekoa0DJzB7sKafOfrEW0=";
-        openSha256 = "sha256-rQHOOOY4KL92Ww3KDwh+j4eGU7oNAH8LutZC5wmFnPo=";
-        settingsSha256 = "sha256-ZEMo8I8Zc2Tq6RVDNYpAH+f094dUaZiBqO+5f6lIjRI=";
-        persistencedSha256 = "sha256-aXmD2VY1RLlgAnlHhOUMWzvMyhI6JTClcFLm4imF/mA=";
-      };
+      # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
+      #   version = "610.57.04";
+      #   sha256_64bit = "sha256-suk1xmuDuwDAyFe8jg7g/VLekoa0DJzB7sKafOfrEW0=";
+      #   openSha256 = "sha256-rQHOOOY4KL92Ww3KDwh+j4eGU7oNAH8LutZC5wmFnPo=";
+      #   settingsSha256 = "sha256-ZEMo8I8Zc2Tq6RVDNYpAH+f094dUaZiBqO+5f6lIjRI=";
+      #   persistencedSha256 = "sha256-aXmD2VY1RLlgAnlHhOUMWzvMyhI6JTClcFLm4imF/mA=";
+      # };
       # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
@@ -111,7 +111,7 @@
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
-    kernelPackages = pkgs.linuxPackages_latest;
+    kernelPackages = pkgs.linuxPackages_7_1;
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
@@ -221,7 +221,7 @@
             --device nvidia.com/gpu=all \
             -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
             -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-            ghcr.io/ggml-org/llama.cpp:server-cuda \
+            localhost/server-cuda:latest \
             --models-preset /app/llama-preset.ini \
             --models-max 1 \
             -lv 4 \
