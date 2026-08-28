@@ -197,6 +197,27 @@
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
 
     services = {
+      # The BIOS shows PL1=160 W but the firmware still writes 200 W to the CPU
+      # (verified: RAPL constraint_0 reads 200000000 uW after fresh reboots).
+      # Clamp the long-duration limit from the OS; sysfs write verified to stick.
+      rapl-pl1 = {
+        description = "Clamp CPU RAPL long-duration power limit (PL1) to 160 W (BIOS does not persist PL1)";
+        unitConfig.After = [ "sysinit.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        wantedBy = [ "multi-user.target" ];
+        script = ''
+          # Wait up to 30 s for the RAPL sysfs node, then write the PL1 limit (uW)
+          for i in $(seq 1 30); do
+            [ -e "/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw" ] && break
+            sleep 1
+          done
+          echo 160000000 > /sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw
+        '';
+      };
+
       llamacpp = {
         description = "llama.cpp server container";
         wantedBy = [ "multi-user.target" ];
@@ -272,6 +293,7 @@
 
   # Environment configuration
   environment.systemPackages = [
+    pkgs.jellyfin-media-player
     pkgs.intel-npu-driver
     pkgs.nvidia_oc
     pkgs.nvtopPackages.nvidia
