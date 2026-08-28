@@ -7,6 +7,7 @@ export default function (pi: ExtensionAPI) {
   const SECRETS: Secret[] = [
     { opPath: "op://dev/BRAVE_API_KEY/credential", envVar: "BRAVE_API_KEY", label: "Brave API key" },
     { opPath: "op://dev/HF_TOKEN/credential", envVar: "HF_TOKEN", label: "HF token" },
+    { opPath: "op://Private/portainer-rpi-ai-user/notesPlain", envVar: "PORTAINER_API_KEY", label: "Portainer API key" },
   ];
 
   type State = "pending" | "loaded" | "failed";
@@ -98,15 +99,18 @@ export default function (pi: ExtensionAPI) {
 
   // Auto-load on first use (no retry after failure)
   const HF_CMD = /\bhf\s+(download|cache|auth|models|env|cp|version|whoami)\b/;
+  const PORTAINER_CMD = /portainer[\\/]scripts[\\/]portainer|rpi:9443/;
   pi.on("tool_call", async (event, ctx) => {
     if (event.toolName === "web_search") {
       await loadSecrets(ctx, ["BRAVE_API_KEY"]);
-    } else if (
-      event.toolName === "bash" &&
-      typeof event.input?.command === "string" &&
-      HF_CMD.test(event.input.command)
-    ) {
-      await loadSecrets(ctx, ["HF_TOKEN"]);
+    } else if (event.toolName === "read" && /skills[\\/]portainer[\\/]SKILL\.md$/.test(String(event.input?.path ?? ""))) {
+      await loadSecrets(ctx, ["PORTAINER_API_KEY"]);
+    } else if (event.toolName === "bash" && typeof event.input?.command === "string") {
+      const cmd = event.input.command;
+      const vars: string[] = [];
+      if (HF_CMD.test(cmd)) vars.push("HF_TOKEN");
+      if (PORTAINER_CMD.test(cmd)) vars.push("PORTAINER_API_KEY");
+      if (vars.length > 0) await loadSecrets(ctx, vars);
     }
   });
 }

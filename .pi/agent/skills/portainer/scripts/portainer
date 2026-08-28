@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# portainer — API helper for the rpi Portainer instance (Podman backend)
+# Usage:
+#   portainer                       # show status + local endpoint id
+#   portainer containers [list]     # list containers (all) on local endpoint
+#   portainer create FILE.json      # create container from JSON body (Docker createContainer schema)
+#   portainer start <containerId>   # start container
+#   portainer logs <containerId>    # follow logs
+#   portainer templates [filter]    # list App Store templates
+#   portainer deploy <templateId> NAME [ENV=VAL ...]   # deploy template (hostId = local endpoint)
+#   portainer raw <method> <path> [json-body]          # raw API call, e.g: portainer raw GET /endpoints
+set -euo pipefail
+
+# PORTAINER_API_KEY is loaded on-demand by the load-secrets extension
+# (1Password item: op://Private/portainer-rpi-ai-user/notesPlain).
+BASE="${PORTAINER_BASE_URL:-https://rpi:9443}"
+TOKEN="${PORTAINER_API_KEY:-}"
+if [ -z "$TOKEN" ]; then
+  echo "error: PORTAINER_API_KEY not set (run /load-secrets or open the 1Password app)" >&2
+  exit 1
+fi
+LOCAL_ID="$(curl -sk -H "X-API-KEY: $TOKEN" "$BASE/api/endpoints" | jq -r '.[] | select(.Name=="local") | .Id')"
+
+api() { # method path [body]
+  local m="$1" p="$2" b="${3:-}"
+  if [ -n "$b" ]; then
+    curl -sk -X "$m" -H "X-API-KEY: $TOKEN" -H "Content-Type: application/json" -d "$b" "$BASE/api$p"
+  else
+    curl -sk -X "$m" -H "X-API-KEY: $TOKEN" "$BASE/api$p"
+  fi
+}
+
+case "${1:-status}" in
+  status)
+    echo "base: $BASE"
+    echo "local endpoint id: $LOCAL_ID"
+    api GET /status
+    ;;
+  containers)
+    api GET "/endpoints/$LOCAL_ID/docker/containers/json?all=true" | jq -r '.[] | [(.Names[0] // "?"), .Image, .State, .Ports | tostring] | @tsv'
+    ;;
+  create)
+    api POST "/endpoints/$LOCAL_ID/docker/containers/create" "$(cat "$2")"
+    ;;
+  start)  api POST "/endpoints/$LOCAL_ID/docker/containers/$2/start" ;;
+  stop)   api POST "/endpoints/$LOCAL_ID/docker/containers/$2/stop" ;;
+  rm)     api DELETE "/endpoints/$LOCAL_ID/docker/containers/$2" ;;
+  logs)   api GET "/endpoints/$LOCAL_ID/docker/containers/$2/logs?stdout=true&stderr=true&tail=100" ;;
+  images) api GET "/endpoints/$LOCAL_ID/docker/images/json" | jq -r '.[].RepoTags // empty' ;;
+  volumes) api GET "/endpoints/$LOCAL_ID/docker/volumes" | jq -r '.Volumes[].Name' ;;
+  templates)
+    body="$(api GET /templates)"
+    if [ -n "${2:-}" ]; then
+      echo "$body" | jq -r --arg f "$2" '.templates[] | select(.title | ascii_downcase | contains($f)) | [.id, .title, .image // ""] | @tsv'
+    else
+      echo "$body" | jq -r '.templates[] | [.id, .title] | @tsv'
+    fi
+    ;;
+  deploy)
+    local_id="$LOCAL_ID" tid="$2" name="$3"; shift 3
+    env_json="[]"
+    for kv in "$@"; do
+      k="${kv%%=*}"; v="${kv#*=}"
+      env_json=$(jq -c --arg k "$k" --arg v "$v" '. + [{name:$k, value:$v}]' <<<"$env_json")
+    done
+    payload=$(jq -cn --arg name "$name" --argjson hostId "$local_id" --argjson env "$env_json" '{name:$name, hostId:$hostId, env:$env, volumes:[]}')
+    api POST "/templates/$tid/deploy" "$payload" | jq .
+    ;;
+  raw)
+    api "$2" "$3" "${4:-}"
+    ;;
+  *)
+    echo "unknown command: $1 (see script header)"; exit 1 ;;
+esac
