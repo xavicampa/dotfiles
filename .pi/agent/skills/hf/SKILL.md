@@ -58,6 +58,8 @@ If yes:
 3. If the card lists more than one option / use-case, present them and ask the user which to use before writing.
 4. Write/append to `~/.config/llamacpp/llama-preset.ini` with the chosen values, backing up existing file first.
 
+**Path prefix — always `/root`**: llama.cpp runs in a container with the HF cache mounted at `/root/.cache`. So every absolute path in the preset (`chat-template-file`, `mmproj`, `spec-draft-model`, ...) must be written as `/root/.cache/huggingface/hub/models--<org>--<name>/snapshots/<rev>/...` — even though on the host the cache actually lives in `~/.cache/huggingface/hub` (see `hf env`). Derive the `models--org--name` + snapshot `<rev>` from the real local path and just swap the prefix to `/root`. Never use the host's home path in the preset.
+
 ## Listing the cache
 
 ```bash

@@ -1,7 +1,13 @@
 ---
 name: dev-env
-description: Get any missing command, runtime, tool, or library via nix-shell, podman, or nix profile. MUST be loaded the moment a command fails with "command not found", "No such file or directory", or EACCES — or whenever a tool that is not already on PATH is needed, even for one-off use (e.g. nmap, avahi, git, jq, python3, node, ffmpeg). Do NOT improvise workarounds or paper over missing tools with shell one-liners; load this skill first and use nix-shell -p (preferred), podman as fallback, or nix profile for persistent installs.
+description: Get any missing command, runtime, tool, or library via nix-shell or podman. MUST be loaded the moment a command fails with "command not found", "No such file or directory", or EACCES — or whenever a tool that is not already on PATH is needed, even for one-off use (e.g. nmap, avahi, git, jq, python3, node, ffmpeg). Do NOT improvise workarounds or paper over missing tools with shell one-liners; load this skill first and use nix-shell -p (preferred) or podman as fallback. NEVER install anything into the machine itself - no system-wide/root installs, no `npm install` / `npm -g` / `npx --package`, no `pip install` / `pipx`, no `apt` / `dnf` / `brew` / `cpanm`, no nixos-rebuild or nixpkgs edits, no nixos/systemd changes, no nix profile / nix-env installs — only nix-shell (ephemeral) or podman (containers).
 ---
+
+## Hard rule: no installs on the machine
+
+- **Deny:** `nixos-rebuild`, editing the NixOS system profile/config, any root (`sudo`/`su`) package install, `nix profile install`, `nix-env -i`, package-manager installs like `npm install` / `npm -g` / `npx --package`, `pip install` / `pipx`, `apt` / `dnf` / `brew` / `cpanm`, or anything that persists a package on the machine or mutates its state.
+- **Allow:** `nix-shell` (ephemeral) and `podman`/`docker` containers only.
+- If a task truly requires a persistent or system-level install, stop and ask the user instead of doing it.
 
 # Package Install
 
@@ -9,7 +15,6 @@ description: Get any missing command, runtime, tool, or library via nix-shell, p
 
 1. **nix-shell** — Preferred. Ephemeral, no root, reproducible.
 2. **podman** — Fallback when nix-shell is unavailable or unsuitable.
-3. **nix-env / nix profile** — Last resort for persistent installs (user-level, no root).
 
 ## nix-shell
 
@@ -109,21 +114,6 @@ podman run --rm -it -v "$PWD":/work -w /work docker.io/library/python:3.12-slim
 podman run --rm -it -v "$PWD":/work -w /work \
   docker.io/library/node:22-alpine \
   sh -c "npm install && npm run build"
-```
-
-## nix profile (persistent, user-level)
-
-When a package must persist across sessions without root:
-
-```bash
-nix profile install nixpkgs#nodejs_22
-nix profile install nixpkgs#ripgrep
-```
-
-List and remove:
-```bash
-nix profile list
-nix profile remove nodejs_22
 ```
 
 ## Tips
