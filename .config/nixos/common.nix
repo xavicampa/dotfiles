@@ -162,6 +162,7 @@ in
       enable = true;
     };
     gnome.gnome-keyring.enable = true;
+    gvfs.enable = true;
     libinput = {
       enable = true;
     };

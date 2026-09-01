@@ -175,6 +175,7 @@
     thermald.enable = true;
     udev.extraRules = ''
       ACTION=="add|change", KERNEL=="nvme0n1", ATTR{queue/read_ahead_kb}="2048"
+      SUBSYSTEM=="usb", ATTR{idVendor}=="0955", MODE="0664", GROUP="plugdev"
     '';
     xserver = {
       videoDrivers = [
@@ -311,8 +312,10 @@
   environment.systemPackages = [
     pkgs.jellyfin-media-player
     pkgs.intel-npu-driver
+    pkgs.libmtp
     pkgs.nvidia_oc
     pkgs.nvtopPackages.nvidia
+    pkgs.thunar-volman
     unstable.btop-cuda
   ];
   environment.etc."lact/config.yaml".source =
