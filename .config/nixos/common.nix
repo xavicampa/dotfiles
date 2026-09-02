@@ -43,6 +43,7 @@ in
         flavor = "mocha";
         accent = "mauve";
       })
+      pkgs.unrar
     ];
   };
 
