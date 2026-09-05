@@ -1,6 +1,6 @@
 ---
 name: portainer
-description: Manage the Portainer instance on the Raspberry Pi home server via its REST API — install/deploy applications (App Store templates, containers, stacks), and manage containers, images, and volumes. Use when the user asks to install an app on the rpi/home server, list or manage rpi containers, or interact with Portainer.
+description: Manage the Portainer instance on the Raspberry Pi home server via its REST API — install/deploy applications (App Store templates, containers, stacks), and manage containers, images, and volumes. Use when the user asks to install an app on the rpi/home server, list or manage rpi containers, or interact with Portainer. Only trigger when the rpi/home server/Portainer is explicitly named — a bare app name like 'hub'/'status' does NOT mean this (e.g. 'hub status' means the Hugging Face Hub, see the hf skill).
 ---
 
 # Portainer (rpi home server)

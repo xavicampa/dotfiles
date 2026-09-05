@@ -234,22 +234,6 @@
           ];
         };
 
-        script = ''
-          podman run \
-            --replace \
-            --name llamacpp \
-            --pull newer \
-            --network host \
-            --device nvidia.com/gpu=all \
-            -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
-            -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-            localhost/llama-cuda:current \
-            --models-preset /app/llama-preset.ini \
-            --models-max 1 \
-            -lv 5 \
-            -t 8 \
-            -tb 8
-        '';
         # script = ''
         #   podman run \
         #     --replace \
@@ -259,13 +243,29 @@
         #     --device nvidia.com/gpu=all \
         #     -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
         #     -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-        #     ghcr.io/ggml-org/llama.cpp:server-cuda \
+        #     localhost/llama-cuda:current \
         #     --models-preset /app/llama-preset.ini \
         #     --models-max 1 \
-        #     -lv 4 \
+        #     -lv 5 \
         #     -t 8 \
         #     -tb 8
         # '';
+        script = ''
+          podman run \
+            --replace \
+            --name llamacpp \
+            --pull newer \
+            --network host \
+            --device nvidia.com/gpu=all \
+            -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
+            -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
+            ghcr.io/ggml-org/llama.cpp:server-cuda \
+            --models-preset /app/llama-preset.ini \
+            --models-max 1 \
+            -lv 5 \
+            -t 8 \
+            -tb 8
+        '';
       };
 
       llamacpp-sleep-guard = {
