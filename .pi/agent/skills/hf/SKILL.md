@@ -143,6 +143,7 @@ done | sort
 | download X | `--dry-run` (sizes) → `hf download org/repo [--include ...]` |
 | path to cached file | `hf download org/repo file -q` (instant if cached) |
 | cache size / contents | `hf cache ls` (biggest: `--sort size`) |
+| hub status (summary of cached models/quants) | `hf cache ls` → summarize repos + GGUF quants with sizes (Python `scan_cache_dir()` for per-quant detail) |
 | quants available in X (remote) | `hf download org/repo --dry-run` |
 | quants of X cached locally | Python `scan_cache_dir()` snippet above |
 | free space | `hf cache prune --dry-run` → `--yes` |
