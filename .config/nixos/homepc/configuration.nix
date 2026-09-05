@@ -246,7 +246,7 @@
             localhost/llama-cuda:current \
             --models-preset /app/llama-preset.ini \
             --models-max 1 \
-            -lv 4 \
+            -lv 5 \
             -t 8 \
             -tb 8
         '';
