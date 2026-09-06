@@ -176,14 +176,18 @@ function buildModels(provider: ProviderConfig, data: any[]): ProviderModelConfig
     return data.map((model) => {
       const override = overrides.get(model.id) ?? {};
       const thinkingFormat = override.thinkingFormat;
+      const contextWindow = extractContextSize(model.status ?? {});
+      // Output-token cap: half the context window (so long prompts stay
+      // usable), capped so huge contexts don't imply absurdly long outputs.
+      const maxTokens = override.maxTokens ?? Math.min(Math.floor(contextWindow / 2), 65536);
       return {
         id: model.id,
         name: model.name ?? model.id,
         reasoning: override.reasoning ?? true,
         input: extractLocalInputTypes(model.architecture ?? {}),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: extractContextSize(model.status ?? {}),
-        maxTokens: override.maxTokens ?? 16384,
+        contextWindow,
+        maxTokens,
         compat: {
           supportsDeveloperRole: true,
           supportsReasoningEffort: override.supportsReasoningEffort ?? false,

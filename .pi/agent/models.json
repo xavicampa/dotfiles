@@ -20,23 +20,6 @@
             }
           }
         },
-        "unsloth/Muse-Glimmer-30B-GGUF:Q8_K_XL": {
-          "thinkingLevelMap": {
-            "off": null,
-            "minimal": null,
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": "xhigh",
-            "max": null
-          },
-          "compat": {
-            "thinkingFormat": "chat-template",
-            "chatTemplateKwargs": {
-              "reasoning_effort": { "$var": "thinking.effort", "omitWhenOff": true }
-            }
-          }
-        },
         "unsloth/Qwen3.8-27B-GGUF:Q8_K_XL": {
           "thinkingLevelMap": {
             "minimal": null,
