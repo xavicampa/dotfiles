@@ -251,15 +251,17 @@
         #     -tb 8
         # '';
         script = ''
+          # Local build of master @ 95ef7fc16 + patches/mtmd-dflash-mrope-fix.patch
+          # (fixes #27408: dflash + mtmd image decoding 500s). Rebuild via
+          # ~/dev/personal/llama.cpp/build-patched.sh, then redeploy on upstream merge.
           podman run \
             --replace \
             --name llamacpp \
-            --pull newer \
             --network host \
             --device nvidia.com/gpu=all \
             -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
             -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-            ghcr.io/ggml-org/llama.cpp:server-cuda \
+            localhost/llama-cuda:mtmd-fix \
             --models-preset /app/llama-preset.ini \
             --models-max 1 \
             -lv 5 \
