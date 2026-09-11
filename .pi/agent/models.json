@@ -2,6 +2,29 @@
   "providers": {
     "local": {
       "modelOverrides": {
+        "bartowski/Qwen3.8-27B-GGUF:DFLASH2": {
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": null,
+            "xhigh": "xhigh",
+            "max": null
+          },
+          "compat": {
+            "thinkingFormat": "chat-template",
+            "chatTemplateKwargs": {
+              "enable_thinking": {
+                "$var": "thinking.enabled"
+              },
+              "reasoning_effort": {
+                "$var": "thinking.effort",
+                "omitWhenOff": true
+              },
+              "preserve_thinking": true
+            }
+          }
+        },
         "bartowski/Qwen3.8-27B-GGUF:Q8_0": {
           "thinkingLevelMap": {
             "minimal": null,
