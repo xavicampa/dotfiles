@@ -111,7 +111,8 @@
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
-    kernelPackages = pkgs.linuxPackages_7_1;
+    # Kernel: unpin — channel default pkgs.linuxPackages (6.18 LTS on nixos 26.05).
+    # (was linuxPackages_7_1 — 7.1 removed as EOL upstream; 7_2 needs nvidia mkDriver pin)
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
