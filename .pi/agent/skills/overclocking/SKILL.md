@@ -24,17 +24,22 @@ description: CPU undervolting, overclocking, and stability stress testing on thi
 | Core Voltage Mode | **Adaptive** | Override = flat voltage at all freqs, wastes power at low clocks. |
 | VF Offset Mode | **Legacy** | Global offset. "Selection" = per-VF-point tuning (power users only). |
 | Power limits (PL1/PL2) | currently **Intel baseline** (PL1 200 / PL2 177 W) | Self-limits to ~160 W in practice — see RESULTS.md. |
+| NGU Max OC Ratio / CPU D2D Ratio | Auto (cool) or 32x (fast) | GPU/NPU domain (to 34) and die-to-die link (15–40). 32x: +100–200 MHz CPU transients but +10 °C peak / +15 W — thermal edge in ITX. |
 
 **Full experiment log: `RESULTS.md` in this skill's directory.** Current state
-(2026-09-13): BIOS on **Intel baseline**, no OS PL1 clamp (service removed).
-Tuned profile (-50 mV input / -50 mV core / vdroop 224 mΩ / PL2 170 W) is saved
-in a BIOS profile. Quick comparison of the two at ~160 W sustained:
+(2026-09-13): BIOS on **Intel baseline + -50 mV core offset + NGU/D2D 32x**.
+Findings: the **-25 mV core input** offset regressed (+5–8 °C, +15 W, same
+clocks — avoid it); **NGU/D2D 32x** lifts CPU turbo (+100–200 MHz blips) but
+adds ~+10 °C peak. -50 mV core only remains the coolest/simplest. No OS PL1
+clamp (service removed). Tuned profile (-50 mV input / -50 mV core / vdroop
+224 mΩ / PL2 170 W) is saved in a BIOS profile.
+Quick comparison at ~160 W sustained (stock → -50 mV offset → full tuned):
 
-| | Intel baseline | Tuned (-50/-50, vdroop 224, PL2 170 W) |
-|---|---|---|
-| P / E freq | 4.9–5.0 / ~4.3–4.4 GHz | 5.0–5.2 / ~4.5–4.7 GHz |
-| Pkg T | 89–98 °C | 85–90 °C |
-| Power | ~157–165 W (self-limited, never hits 177 W cap) | 170 W burst → 160 W sustained |
+| | Stock baseline | + -50 mV core offset | Tuned (-50/-50, vdroop 224, PL2 170 W) |
+|---|---|---|---|
+| P / E freq | 4.9–5.0 / ~4.3–4.4 GHz | 5.00 / ~4.4–4.5 GHz | 5.0–5.2 / ~4.5–4.7 GHz |
+| Pkg T | 89–98 °C | 82–90 °C | 85–90 °C |
+| Power | ~157–165 W (self-limited, never hits 177 W cap) | ~152–161 W | 170 W burst → 160 W sustained |
 
 ### LLC direction (verified against the ASRock BIOS manual)
 
@@ -45,6 +50,39 @@ in a BIOS profile. Quick comparison of the two at ~160 W sustained:
 - Memory aid: Level scale → **L**arger level = **L**ess droop.
 - The manual exposes LLC up to Level 5 for CPU; if the actual BIOS shows more (some users
   report up to 12), the direction is the same.
+
+### NGU / D2D fabric OC (researched 2026-09-14)
+
+What the knobs are:
+- **NGU = "Next-Generation Uncore"** — SoC-tile fabric (NoC + UFI bridges);
+  on Arrow Lake-S, "NGU OC is essentially NoC OC" — the main bridge between
+  memory controller, cores (via D2D), and iGPU (via D2D). Stock ratio 26x =
+  2.6 GHz (normal Arrow Lake); ASRock "NGU Max OC Ratio" range is non-turbo
+  max → 34.
+- **D2D = die-to-die link** (compute tile ↔ SoC tile where the memory
+  controller lives). Stock ratio 21x = 2.1 GHz, max 40x; only settable at boot.
+- **The 270K Plus already runs D2D at 3.0 GHz stock** (+43% vs normal Arrow
+  Lake — Intel raised it specifically to cut the memory latency that hurts
+  gaming). So 32x here is only +200 MHz (+7%), far less headroom than the
+  gains reported for normal chips.
+
+Measured/perf impact:
+- D2D alone: **<1%** on 7-Zip across 1.5→3.5 GHz (SkatterBencher, stock 285K).
+- D2D + NGU + DDR5 timings tuned together: **~+10% avg FPS** in gaming; the
+  gain was "mostly D2D and timings, not so much NGU" (TechPowerUp, 285K).
+- Full D2D/NGU/ring tuning: 2–20% depending on workload (Tom's Hardware).
+- This machine, 32x/32x: +100–200 MHz transient P-core blips at +10 °C peak /
+  +15 W (see RESULTS.md). Modest payoff for the thermal cost in ITX.
+
+Takeaway: on the Plus chip, fabric OC has little left to give (Intel already
+consumed most of the D2D headroom). If chasing fabric/latency gains, **DDR5
+timings are the better lever**, not pushing NGU/D2D higher.
+
+Sources:
+- https://skatterbencher.com/2024/10/24/arrow-lake-ngu-overclocking/
+- https://skatterbencher.com/2024/10/24/arrow-lake-d2d-overclocking/
+- https://www.servethehome.com/intel-intros-core-ultra-250k-270k-plus-chips-refreshing-desktop-arrow-lake-for-enthusiasts/
+- https://www.tomshardware.com/reviews/intel-core-ultra-9-285k-world-record
 
 Undervolt pairing rules of thumb:
 - Conservative: -50 mV + LLC 4–5

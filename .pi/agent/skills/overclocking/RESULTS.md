@@ -16,11 +16,58 @@ state + methodology; this file is the A/B reference.
 
 ## Current state (2026-09-13)
 
-BIOS set to **Intel baseline** (no undervolt, PL1 200 W / PL2 177 W), and the
-`rapl-pl1` systemd service (OS PL1 clamp) was **removed**. The tuned profile
-(-50/-50 mV + vdroop 224) still exists in a BIOS profile, untested since.
+BIOS on **Intel baseline + -50 mV core offset + NGU 32x + D2D 32x**, PL1 200 W /
+PL2 177 W. Input offset was tested and removed (regression). -50 mV core only
+remains the coolest/simplest; the fabric OC trades +10 °C peak for +100–200 MHz
+transients (see run log). The `rapl-pl1` systemd service (OS PL1
+clamp) was **removed**. The full tuned profile (-50/-50 mV + vdroop 224 + PL2 170 W) still
+exists in a BIOS profile, untested since.
 
-## Run log (newest last is fine; grouped chronologically)
+## Run log (newest on top)
+
+### Intel baseline + -50 mV core offset + NGU 32x + D2D 32x, PL1 200 W / PL2 177 W — 2026-09-13
+
+- Full 3-min PASS (26/26, 0 untrustworthy). P 4.9–5.1 GHz (5.03–5.1 GHz blips —
+  highest CPU clocks yet), E ~4.3–4.5 GHz, pkg 87–101 °C (peak 101 — first
+  soft-thermal touch), power 169–177 W (nearly at the cap). Idle ~50–52 °C.
+- NGU Max OC Ratio (GPU/NPU domain, range to 34) and CPU D2D Ratio (die-to-die
+  link, range 15–40) both set to 32x. Effect: raises the CPU turbo ceiling
+  (+100–200 MHz transients vs the flat 5.00 of the -50 mV-core-only run) but
+  adds ~+10 °C peak and ~+15 W package heat from the SoC-die domains. Stable
+  but at the thermal edge in ITX — the trade is transient clocks vs. sustained
+  temps.
+- **Research follow-up (2026-09-14):** NGU = "Next-Generation Uncore" = SoC-tile
+  NoC/UFI fabric ("NGU OC is essentially NoC OC" — SkatterBencher); stock NGU
+  26x = 2.6 GHz, D2D 21x = 2.1 GHz on *normal* Arrow Lake. **The 270K Plus
+  already ships D2D at 3.0 GHz stock** (+43% vs normal chips, done by Intel to
+  cut memory latency — ServeTheHome), so 32x is only +200 MHz (+7%) here. Perf
+  data: D2D alone <1% (7-Zip, 1.5→3.5 GHz — SkatterBencher); D2D+NGU+DDR5
+  timings tuned together ~+10% avg FPS in gaming, gain "mostly D2D and
+  timings, not so much NGU" (TechPowerUp 285K); full D2D/NGU/ring tuning
+  2–20% (Tom's Hardware). Conclusion: little fabric headroom left on the Plus
+  chip; DDR5 timings are the better latency lever than pushing NGU/D2D higher.
+
+### Intel baseline + -25 mV core input + -50 mV core offset, PL1 200 W / PL2 177 W — 2026-09-13
+
+- Full 3-min PASS (26/26, 0 untrustworthy). P 5.00 GHz (one 5.05 GHz blip),
+  E ~4.4–4.48 GHz, pkg 91–98 °C (peak 98), power 171–177 W — nearly at the cap,
+  the highest power of any 2026-09 run. Idle ~52 °C.
+- **The -25 mV core input offset made it WORSE than the -50 mV core-only run:
+  same clocks, +5–8 °C, +~15 W.** Consistent with the Aug runs (the -25 mV input
+  variant was always hotter than -50 mV input / auto input). On this board the
+  "core input voltage" offset does not reduce effective Vcore as expected — it
+  interacts with the VRM/LLC chain. Avoid the input offset; core offset alone is
+  better.
+
+### Intel baseline + -50 mV core voltage offset (only change), PL1 200 W / PL2 177 W — 2026-09-13
+
+- Full 3-min PASS (26/26, 0 untrustworthy). P pinned 5.00 GHz (occasional
+  4.93–4.96 dips), E ~4.40–4.48 GHz, pkg 82–90 °C (peak 90), power 152–161 W
+  settling ~155 W. Idle ~46 °C (vs 51–52 °C stock).
+- Vs. the stock baseline run: **+~100 MHz P, +~75 MHz E, −5 to −8 °C pkg, and
+  ~5 W less power.** A plain -50 mV core offset on an otherwise stock profile is
+  already a clean win; the extra vdroop/PL2 tweaks of the tuned profile buy the
+  5.2 GHz bursts and extra E-freq, at slightly more heat.
 
 ### Intel baseline (BIOS default, PL1 200 W / PL2 177 W) — 2026-09-13
 
