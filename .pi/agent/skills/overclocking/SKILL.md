@@ -23,7 +23,18 @@ description: CPU undervolting, overclocking, and stability stress testing on thi
 | Intel CPU Vcore Loadline Calibration (LLC) | **Level 4–6** | Higher level = **less** Vdroop = more voltage under load (flatter). Lower level = more droop = lower voltage under load but less stability headroom. |
 | Core Voltage Mode | **Adaptive** | Override = flat voltage at all freqs, wastes power at low clocks. |
 | VF Offset Mode | **Legacy** | Global offset. "Selection" = per-VF-point tuning (power users only). |
-| Power limits (PL1/PL2) | **PL2 150 W** (done, works) | The real win on this board — see power-limit check below. |
+| Power limits (PL1/PL2) | currently **Intel baseline** (PL1 200 / PL2 177 W) | Self-limits to ~160 W in practice — see RESULTS.md. |
+
+**Full experiment log: `RESULTS.md` in this skill's directory.** Current state
+(2026-09-13): BIOS on **Intel baseline**, no OS PL1 clamp (service removed).
+Tuned profile (-50 mV input / -50 mV core / vdroop 224 mΩ / PL2 170 W) is saved
+in a BIOS profile. Quick comparison of the two at ~160 W sustained:
+
+| | Intel baseline | Tuned (-50/-50, vdroop 224, PL2 170 W) |
+|---|---|---|
+| P / E freq | 4.9–5.0 / ~4.3–4.4 GHz | 5.0–5.2 / ~4.5–4.7 GHz |
+| Pkg T | 89–98 °C | 85–90 °C |
+| Power | ~157–165 W (self-limited, never hits 177 W cap) | 170 W burst → 160 W sustained |
 
 ### LLC direction (verified against the ASRock BIOS manual)
 
@@ -52,19 +63,16 @@ Monitoring sources (all user-readable, no root):
 - Temps: `/sys/class/hwmon/hwmon2/` (coretemp) — `temp*_input` m°C + `temp*_label`
 - Power: `/sys/class/powercap/intel-rapl:0/energy_uj` (µJ, delta between samples / seconds)
 
-### PL1 workaround (BIOS does not persist PL1)
+### PL1 clamping (ad-hoc)
 
-The BIOS shows PL1 (Long Duration Power Limit) as set (e.g. 150 W), but the
-firmware still writes the default 200 W to the CPU — verified: fresh reboot
-shows `constraint_0_power_limit_uw` = 200000000 while PL2 applies correctly.
-The sysfs file IS root-writable and the value sticks, so a systemd oneshot
-`rapl-pl1` (in `~/.config/nixos/homepc/configuration.nix`) writes
-`echo 150000000 > /sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw`
-at boot after waiting for the RAPL node. To change PL1: edit that service's
-`script` (uW), `pkexec nixos-rebuild switch`. To change it ad-hoc:
+BIOS PL1 ("Long Duration Power Limit") is not reliably written to the CPU by
+firmware. Clamp ad-hoc (root, reverts on reboot):
 `pkexec sh -c "echo <uW> > /sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw"`.
-Note PL1 only bites after the long-duration time window on sustained load —
-short stress runs (2–5 min) still run at PL2.
+Caveats: **sysfs read-back of RAPL limit values is flaky on this platform — judge
+the effective limit by measured power under load, not the file value.** PL1 only
+bites after the long-duration window on sustained load; 2–5 min runs run at PL2.
+History: a boot-time `rapl-pl1` systemd oneshot did this for 150–160 W, removed
+2026-09-13 (see RESULTS.md).
 
 ### Run a stability test (5 minutes is the house standard)
 
@@ -107,39 +115,7 @@ Pass criteria:
 **power-capped**, not just thermally limited — an undervolt will change nothing visible
 under the cap, and lowering PL1/PL2 in BIOS is the real fix for temps.
 
-Data points (24 CPU + 2 VM @ 4 GB mixed load):
-- Stock-ish, PL2 178 W: P ~5.1 GHz, E ~4.6 GHz, pkg 99–104 °C, flat 178 W (power-capped).
-- -75 mV + LLC 5 + PL2 150 W (PL1 200 W): P ~4.9–5.0 GHz, E ~4.4–4.5 GHz,
-  pkg 86–94 °C, 150 W, stress-ng 3-min --verify PASS (26/26). 5-min pass also verified
-  earlier on -75 mV + LLC 5 + 178 W.
-- -100 mV + PL2 160 W (PL1 200 W): P ~5.0–5.1 GHz, E ~4.6 GHz,
-  pkg 90–98 °C, flat 160 W (power-capped, not thermally), 5-min stress-ng --verify
-  PASS (26/26).** +100 MHz on P and E vs. the 150 W config for +4–5 °C; power cap
-  buys more clocks than the deeper offset saves.
-- -25 mV core input + -50 mV core offset (two-offset split) + PL2 160 W:
-  P ~4.9–5.0 GHz, E ~4.5 GHz, pkg 90–93 °C, flat 160 W, stress-ng --verify
-  passed 26/26 failed 0 (~2 min 15 s, stopped early by user). ~3–5 °C cooler than
-  the flat -100 mV offset at the cost of ~100–150 MHz on P-cores.
-- **Best so far: Auto core input + -75 mV core offset + vdroop 224 mΩ (instead of
-  LLC level) + PL2 160 W (PL1 200 W): P pinned exactly 5.00 GHz, E ~4.5 GHz,
-  pkg 87–91 °C, flat 160 W, full 3-min stress-ng --verify PASS (26/26, 0 untrustworthy).**
-  Coolest of the 160 W configs; vdroop 224 mΩ keeps the offset stable under the cap.
-  Note: vdroop (mΩ, bigger = more droop, like IA AC Loadline) is a separate dial from
-  the LLC level scale on this BIOS.
-- -25 mV core input + -50 mV core offset + vdroop 224 mΩ + PL2 170 W:
-  P pinned 5.00 GHz, E ~4.5 GHz, pkg 85–96 °C, flat 170 W, full 2-min stress-ng
-  --verify PASS (26/26, 0 untrustworthy). Same clocks as the 160 W auto-input config
-  but ~5 °C hotter → no gain from the extra 10 W or the -25 mV input offset; the
-  160 W / auto-input setup is strictly better.
-- -50 mV core input + -50 mV core offset + vdroop 224 mΩ + PL2 170 W:
-  P pinned 5.00 GHz (one 5.2 GHz blip), E ~4.5–4.7 GHz, pkg 88–93 °C, flat 170 W,
-  full 3-min stress-ng --verify PASS (26/26, 0 untrustworthy). ~3–4 °C cooler than
-  the -25 mV input variant at the same cap; the deeper input offset helps a little.
-- **Final: -50 mV core input + -50 mV core offset + vdroop 224 mΩ + PL2 170 W
-  (BIOS) + PL1 150 W (OS-enforced, see PL1 workaround above).** 3-min stress-ng
-  --verify PASS (26/26, 0 untrustworthy). Confirmed PL1 bites under sustained load:
-  flat 170 W for the first ~90 s (P 5.0–5.2 GHz, E ~4.5–4.7 GHz, pkg 85–90 °C),
-  then RAPL drops to flat 150 W (P ~4.9 GHz, E ~4.3 GHz, pkg 85–88 °C).
+Full per-config data points: **RESULTS.md** (in this skill's directory).
 
 Voltage verification is a dead end on Intel client CPUs: no Vcore MSR exists (unlike AMD
 0xCD01); confirmed against kernel turbostat source. RAPL power + A/B testing is the way.
@@ -148,6 +124,7 @@ Note: `find` returns nothing on /sys/class/hwmon on this system — use glob loo
 ## Process
 
 1. One BIOS change at a time; F10, reboot, then run the 5-min test.
-2. Record offset/LLC/power cap + resulting temp/power/freq each iteration.
+2. Record offset/LLC/power cap + resulting temp/power/freq each iteration in
+   `RESULTS.md` (newest section on top).
 3. If stable, push offset -25 mV deeper and re-test; if unstable, step back.
 4. Final validation: a longer run (30 min) or a real workload day before trusting it.
