@@ -50,9 +50,10 @@
       nvidiaSettings = true;
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
-      package = config.boot.kernelPackages.nvidiaPackages.latest;
-      # 610.57.04 (latest new-feature branch from nixpkgs-unstable 26.11pre),
-      # built against the system kernel — testing.
+      package = unstable.linuxPackages_7_2.nvidiaPackages.latest;
+      # 610.57.04 (latest new-feature branch from nixpkgs-unstable 26.11pre).
+      # Verified 2026-07-10: nvidia-open-610.57.04-7.2.4 prebuilt on Hydra; 595.71.05
+      # fails to compile vs 7.2 (os-interface.c strncpy implicit declaration).
       # Previous working pin: 595.91.07, hashes sha256-yiPIjdJLB6GRZE4eEc+3vN11NzBXSa9A+YABiwleYxM= /
       # open sha256-OB8Epd+qn/WywxsPiFpxEOAzlJqb6I1SyRoV3a8l71k= /
       # settings sha256-QzT8Cw1luuZGP9DUje3HN/0ngiayqHURj+bqPsxlJ5w= /
@@ -111,8 +112,7 @@
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
-    # Kernel: unpin — channel default pkgs.linuxPackages (6.18 LTS on nixos 26.05).
-    # (was linuxPackages_7_1 — 7.1 removed as EOL upstream; 7_2 needs nvidia mkDriver pin)
+    kernelPackages = pkgs.linuxPackages_7_2; # 7.2.4 (non-LTS); needs nvidia 610 — see hardware.nvidia
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
