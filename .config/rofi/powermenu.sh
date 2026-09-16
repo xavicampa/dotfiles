@@ -12,7 +12,7 @@ case $op in
     hyprctl dispatch exit 1
     ;;
   reboot-to-windows)
-    pkexec efibootmgr -n 0001 && reboot
+    pkexec efibootmgr -n 0002 && reboot
     ;;
   reboot-to-uefi)
     systemctl reboot --firmware-setup
