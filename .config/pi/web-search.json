@@ -2,5 +2,6 @@
   "searchRouting": {
     "providers": ["brave", "exa"],
     "fallbackOn": ["quota", "transient"]
-  }
+  },
+  "workflow": "none"
 }
