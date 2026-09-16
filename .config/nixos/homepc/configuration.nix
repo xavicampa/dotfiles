@@ -244,7 +244,7 @@
             localhost/llama-cuda:mtmd-fix \
             --models-preset /app/llama-preset.ini \
             --models-max 1 \
-            -lv 5 \
+            -lv 3 \
             -t 8 \
             -tb 8
         '';
