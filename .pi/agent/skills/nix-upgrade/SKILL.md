@@ -1,6 +1,6 @@
 ---
 name: nix-upgrade
-description: "Upgrade the NixOS system (root channels + nixos-rebuild, NixOS host) and/or Home Manager (user channels, both hosts) on classic non-flake setups: fetch, test-build, closure-diff summary, explicit confirmation, then activate exactly the built store path — declined or failed attempts roll back or clean up so nothing real changes. Also the reference for no-upgrade home-manager rebuilds (build/switch/--rollback). Triggered when the user asks to upgrade NixOS or home-manager, update channels, run nixos-rebuild with --upgrade/--diff, or apply a NixOS/home-manager update."
+description: "Upgrade NixOS (root channels, NixOS host) and/or Home Manager (user channels, both hosts) on classic non-flake setups: fetch → build → diff → explicit confirm → activate the exact built store path; declined/failed attempts roll back. Also the reference for no-upgrade home-manager build/switch/--rollback. Triggered by: upgrade NixOS or home-manager, update channels, nixos-rebuild --upgrade/--diff, apply a NixOS/home-manager update."
 ---
 
 # NixOS + Home Manager upgrades
@@ -139,21 +139,24 @@ Notes:
 - The `--diff` output (`nix store diff-closures /run/current-system <new>`) goes to **stderr** with ANSI colors — strip them with `sed 's/\x1b\[[0-9;]*m//g'`.
 - The new toplevel path appears in the log twice: the `>>> /nix/store/...` diff header line and the final `Done. The new configuration is /nix/store/...` line. Grep for it:
   ```bash
-  grep -oE '/nix/store/[a-z0-9]+-nixos-system-[a-z0-9.]+-[a-f0-9]+' /tmp/nixos-upgrade-build.log | tail -1
+  grep -oE '/nix/store/[a-z0-9]+-nixos-system-[a-z0-9.-]+' /tmp/nixos-upgrade-build.log | tail -1
   ```
+  (The class after `-nixos-system-` must include `.` — the version `26.05.…` contains dots; a tail like `-[a-f0-9]+` truncates the path at the first dot, yielding a non-existent store path.)
 - If the build fails on creating the result link over a stale root-owned `/tmp/result` (left by an older pkexec build), `pkexec rm -f /tmp/result` and retry.
 - **If the build fails (otherwise):** show the user the tail of the log and stop. Nothing real was mutated — no rollback needed. Retry against the same scratch channels, or re-run A1 to pick up newer revisions; clean up per the A4-decline branch when done.
 
 ### A3 — present the summary
 
-Use the shared diff format above. Always also check the **kernel** (it's often not in the named diff lines):
+Use the shared diff format above. Always also check the **kernel** (it's often not in the named diff lines). Run it **per toplevel** — one combined call unions both closures, so the direction of a kernel change becomes ambiguous (and `uname -r` only pins the booted side, which can lag current-system):
 
 ```bash
-nix path-info --recursive <old-toplevel> <new-toplevel> \
-  | grep -oE '/nix/store/[a-z0-9]+-linux-[0-9][^/]*' | sort -u
+for T in <old-toplevel> <new-toplevel>; do
+  echo "== $T"
+  nix path-info --recursive "$T" | grep -oE '/nix/store/[a-z0-9]+-linux-[0-9][^/]*' | sort -u
+done
 ```
 
-Compare against `uname -r`, and add a line like `Kernel: linux 7.1.8 (unchanged)` or `7.1.8 → 7.2.1 (reboot required)`.
+The `-modules` paths are kernel modules of the same version. Compare the two lists, and add a line like `Kernel: linux 7.1.8 (unchanged)` or `7.1.8 → 7.2.1 (reboot required)`.
 
 Mention that `--diff` compares against `/run/current-system` (last activated), which can differ from `/run/booted-system` if a switch happened after the last boot.
 
@@ -181,7 +184,8 @@ pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrapper
   --install "$NEW_NIXOS" "$NEW_UNSTABLE"
 ```
 
-- Installing channel store subdirectories creates the standard channel layout and names the entries after the subdirectory — `nixos`, `nixpkgs-unstable` (verified to match a real channel profile). The profile gains a new generation; history is preserved.
+- Installing channel store subdirectories creates the standard channel layout and names the entries after the subdirectory — `nixos`, `nixpkgs-unstable` (verified to match a real channel profile, including the `manifest.nix` entry; the `installing '…'` line nix-env prints shows the store-path suffix, not the entry name — trust the `readlink -f` verification below). The profile gains a new generation; history is preserved.
+- The install list must cover **every** channel in the root channel list (Background → NixOS host): nix-env operations are cumulative, so a channel omitted here keeps its stale entry in the profile, and the verification below would not catch that.
 - Verify **before** the switch:
   ```bash
   readlink -f /nix/var/nix/profiles/per-user/root/channels/nixos             # must equal $NEW_NIXOS
@@ -329,7 +333,7 @@ pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrapper
 
 ### NixOS host (this machine)
 
-- Classic (non-flake) NixOS. Config: `/etc/nixos/configuration.nix` (symlink to `~/.config/nixos/homepc`), shared bits in `~/.config/nixos/common.nix`.
+- Classic (non-flake) NixOS. `/etc/nixos` is a **directory symlink** to `~/.config/nixos/homepc` (the config is one real file, `~/.config/nixos/homepc/configuration.nix`, reached as `/etc/nixos/configuration.nix`); shared bits in `~/.config/nixos/common.nix`, imported as `../common.nix` (the relative import resolves against the symlink target's directory).
 - `nixos-rebuild` on this system is **nixos-rebuild-ng** (supports `--diff`, `--upgrade`, `--upgrade-all`, `--store-path`).
 - `pkgs` = root's **`nixos` channel** (`nixos-26.05` branch). `unstable` (used in `common.nix` for e.g. `kiro-cli`, `btop-cuda`, `_1password-cli`) = root's **`nixpkgs-unstable` channel**.
 - Kernel: `pkgs.linuxPackages_latest` (from the `nixos` channel). Kernel/initrd changes only take effect after a reboot.
