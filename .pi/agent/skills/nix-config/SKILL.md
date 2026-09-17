@@ -25,8 +25,9 @@ and confirm with the user before activating.
     builtins.pathExists "/Users/javi"` flag — keep HM changes
     cross-platform-safe (or guard them) unless the user says otherwise
 - Both NixOS configs expose `unstable = import <nixpkgs-unstable> {
-  config.allowUnfree = true; }` (`_module.args` in common.nix; module arg in
-  configuration.nix). `pkgs` = stable nixpkgs (root `nixos` channel);
+  config.allowUnfree = true; }` — bound once in common.nix's `_module.args`
+  (homepc additionally lists it as a module arg; dell relies on
+  `_module.args` only). `pkgs` = stable nixpkgs (root `nixos` channel);
   prefer `unstable.<pkg>` when the package is newer/unfree there
 - Configs are **not** under git — make surgical edits, keep diffs minimal
 
@@ -75,7 +76,7 @@ correspond to a Nix language value") — use the `nix eval` form above.
 
 **Online (when local search is inconclusive)**: `web_search` for
 "nixpkgs <name>" / "nixos <service>"; module docs at
-https://nixos.wiki/wiki/<PackageName>; human-facing indexes
+https://wiki.nixos.org/wiki/<PackageName>; human-facing indexes
 https://search.nixos.org/packages and /options (channel 26.05 / unstable).
 If the option/module only exists in a newer nixpkgs, suggest the
 **nix-upgrade** skill (channel update) instead of patching.
@@ -103,16 +104,19 @@ relative `../common.nix` import):
 }
 ```
 
-`NIXOS_CONFIG=/tmp/draft.nix nixos-rebuild dry-build` — same strict check.
-Pitfall: the overlay must import the **canonical** `~/.config/nixos/...`
-path, not `/etc/nixos/...` — `import` paths in file bodies are not
-symlink-canonicalized, so the relative `../common.nix` import would break.
+`NIXOS_CONFIG=/tmp/draft.nix nixos-rebuild build` — same strict check.
+(`NIXOS_CONFIG` is honored: the nixos channel's `default.nix` prefers it
+over the `<nixos-config>` NIX_PATH entry.) Pitfall: the overlay must import
+the **canonical** `~/.config/nixos/...` path, not `/etc/nixos/...` —
+`import` paths in file bodies are not symlink-canonicalized, so the
+relative `../common.nix` import would break.
 
 ## 3. Build (validates, does not activate)
 
-- NixOS, no root: `nixos-rebuild dry-build` (fast eval check, ~10 s) →
-  `nixos-rebuild build` (full build, no activation). On failure: show the
-  error, fix, repeat.
+- NixOS, no root: `nixos-rebuild build` — full eval+build, no activation
+  (`dry-build` is an identical alias in nixos-rebuild-ng). ~5 s on a warm
+  cache; minutes if new packages need building. On failure: show the error,
+  fix, repeat.
 - Home-manager, no root: `home-manager build --no-out-link`. On failure:
   fix, repeat.
 
@@ -120,8 +124,9 @@ symlink-canonicalized, so the relative `../common.nix` import would break.
 
 - NixOS: `pkexec nixos-rebuild switch` (needs root — see the
   **elevated-permissions** skill). `nixos-rebuild` is nixos-rebuild-ng:
-  `--diff` shows which files will change; `--dry-run` simulates. Do not
-  reboot unless the user asks.
+  `--diff` shows which files will change (no-op with `dry-build`);
+  `--dry-run` is an alias for `dry-build` (builds, does not activate). Do
+  not reboot unless the user asks.
 - Home-manager: `home-manager switch` (no root needed).
 
 ## Coordination
