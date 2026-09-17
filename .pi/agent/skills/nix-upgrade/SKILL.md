@@ -1,6 +1,6 @@
 ---
 name: nix-upgrade
-description: "Two independent upgrade flows — NixOS system (root channels + nixos-rebuild, NixOS host only) and Home Manager (user channels + home-manager, both hosts) — run either or both, on the NixOS host (classic non-flake) or the macOS host (classic home-manager). NixOS flow: fetch root channels into a scratch profile as the plain user, build + closure diff, present summary, and only on explicit confirmation commit the channels to the root profile and switch via --store-path — the root profile is never mutated before confirmation, so decline/failure needs no rollback. Home Manager flow: update the user's channels (macOS host also the root channels, via sudo), test-build, diff, and on confirmation activate the built generation; never touches the system toplevel. Also the reference for no-upgrade home-manager rebuilds (build/switch/--rollback). Triggered when the user asks to upgrade NixOS or home-manager, update channels, run nixos-rebuild with --upgrade/--diff, or apply a NixOS/home-manager update."
+description: "Upgrade the NixOS system (root channels + nixos-rebuild, NixOS host) and/or Home Manager (user channels, both hosts) on classic non-flake setups: fetch, test-build, closure-diff summary, explicit confirmation, then activate exactly the built store path — declined or failed attempts roll back or clean up so nothing real changes. Also the reference for no-upgrade home-manager rebuilds (build/switch/--rollback). Triggered when the user asks to upgrade NixOS or home-manager, update channels, run nixos-rebuild with --upgrade/--diff, or apply a NixOS/home-manager update."
 ---
 
 # NixOS + Home Manager upgrades
@@ -62,7 +62,7 @@ Why a scratch profile instead of `nix-channel --update` under pkexec (the old ap
 
 - `nix-channel` run as **root ignores `XDG_STATE_HOME`** (verified on nix 2.34.8): under pkexec it always commits to the real root channel profile, so a root-side fetch can't be isolated from real state.
 - `nix-channel` run as the **plain user honors `XDG_STATE_HOME`** (profile at `$XDG_STATE_HOME/nix/profiles/channels`) and reads its channel list from `$HOME/.nix-channels` — both redirectable, so a plain-user fetch into a scratch dir is fully isolated and user-owned (cleanup = `rm -rf`).
-- Channel store paths land in the global `/nix/store` either way, and Nix auto-GC-roots the profiles it operates on (even under `/var/tmp`), so a plain-user scratch fetch feeds the root `switch` cleanly.
+- Channel store paths land in the global `/nix/store` either way, and the built toplevel stays reachable (referenced by `/tmp/result` from A2, then committed to the system profile by the confirmed `switch`) — so a plain-user scratch fetch feeds the root `switch` cleanly.
 
 ### A0 — snapshot (no elevation needed)
 
@@ -89,13 +89,9 @@ nix-instantiate --eval --strict --raw --impure --expr \
 
 ### A1 — scratch fetch (plain user, **no root**)
 
-Read the real root channel list first (read-only, but `/root` isn't readable without elevation — pkexec, approval per the `elevated-permissions` skill):
+The root channel list is recorded in **Background → NixOS host** — use it directly; no elevation needed for the fetch. (If the A2 sanity check fails or the fetch errors in a way that suggests the branch moved, re-read the live list with `pkexec cat /root/.nix-channels` — approval per the `elevated-permissions` skill — and update the Background record before retrying A1.)
 
-```bash
-pkexec cat /root/.nix-channels
-```
-
-Then replicate it in a scratch `HOME` and fetch into a scratch state dir (plain user):
+Replicate the list in a scratch `HOME` and fetch into a scratch state dir (plain user):
 
 ```bash
 SCRATCH=/var/tmp/nixos-upgrade
@@ -109,7 +105,7 @@ env HOME="$SCRATCH/home" XDG_STATE_HOME="$SCRATCH/state" \
   nix-channel --update
 ```
 
-- The heredoc **must match `/root/.nix-channels` exactly** (one `<url> <name>` per line). Channel branches change across releases — never trust a stale copy.
+- The heredoc **must match `/root/.nix-channels` exactly** (one `<url> <name>` per line). The current contents are recorded in **Background → NixOS host** — keep that record in sync when the branch changes (re-verify with `pkexec cat /root/.nix-channels` if the A2 sanity check fails unexpectedly).
 - If `rm -rf` fails on a leftover root-owned scratch (aborted pkexec attempt), `pkexec rm -rf "$SCRATCH"` first.
 - Result: scratch profile `$SCRATCH/state/nix/profiles/channels/` with one symlink per channel. The profile is just symlinks; the store paths live in `/nix/store`.
 - Fast (network fetch, no build). If it fails (e.g. network), nothing real was touched — fix and retry.
@@ -126,8 +122,8 @@ NEW_UNSTABLE=$(readlink -f "$SCRATCH/state/nix/profiles/channels/nixpkgs-unstabl
 Sanity-check the pins before the long build (fast; catches a botched fetch):
 
 ```bash
-NIX_PATH="nixpkgs=$NEW_NIXOS" nix-instantiate --eval --strict --raw -E 'lib.version'
-NIX_PATH="nixpkgs-unstable=$NEW_UNSTABLE" nix-instantiate --eval --strict --raw -E 'lib.version'
+NIX_PATH="nixpkgs=$NEW_NIXOS" nix-instantiate --eval --strict --raw --impure -E '(import <nixpkgs> {}).lib.version'
+NIX_PATH="nixpkgs-unstable=$NEW_UNSTABLE" nix-instantiate --eval --strict --raw --impure -E '(import <nixpkgs-unstable> {}).lib.version'
 ```
 
 (Expect a `26.05.x` release and an unstable version respectively.) Then build (background + poll, minutes):
@@ -193,7 +189,7 @@ pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrapper
   ```
 - If a name is wrong or a path is unexpected: **stop, do not switch**; roll the profile back with `pkexec nix-channel --rollback <N>` (the A0 generation number — `--rollback` takes an absolute generation number, not an offset) and report.
 
-Then switch (pkexec). `<new-toplevel>` is the path grepped in A2; reuse the A2 `NIX_PATH` (it equals the just-committed channel dirs):
+Then switch (pkexec). `<new-toplevel>` is the path grepped in A2. The `NIX_PATH` below is kept for symmetry with A2 — `--store-path` skips evaluation entirely, so it plays no role here:
 
 ```bash
 pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrappers/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
@@ -208,8 +204,9 @@ Then:
 - Verify: `readlink -f /run/current-system` points at the new toplevel.
 - Clean up the scratch (plain user — it's user-owned): `rm -rf "$SCRATCH"`.
 - If the kernel changed, tell the user a reboot is needed for the new kernel/initrd.
+- Offer optional post-upgrade cleanup (see **Post-upgrade cleanup**).
 - The home environment was not touched by this flow. If the user wants their home env on the new root-channel packages, a plain `home-manager switch` (no-upgrade path) picks them up — no channel moves needed.
-- Escape hatch if the new system turns out broken: `nixos-rebuild switch --rollback` (pkexec, same env vars; one toplevel generation back). If the new *channels* are the problem, roll them back to `N` (pkexec `nix-channel --rollback <N>`) — old channel generations are retained, never auto-pruned.
+- Escape hatch if the `switch` fails partway (the system profile moves before the activation script runs) or the new system turns out broken: `nixos-rebuild switch --rollback` (pkexec, same env vars; one toplevel generation back). If the new *channels* are the problem, try rolling back to `N` (pkexec `nix-channel --rollback <N>`) — but on nix 2.34 the old generation is usually already auto-pruned (see Gotchas); then pin `NIX_PATH` to the A0 snapshot paths and rebuild instead.
 
 ## Flow B — Home Manager upgrade (both hosts)
 
@@ -267,7 +264,7 @@ home-manager build --no-out-link > /tmp/hm-build.log 2>&1 # test build — never
   ```bash
   grep -oE '/nix/store/[a-z0-9]+-home-manager-generation' /tmp/hm-build.log | tail -1
   ```
-- Do **not** rely on `home-manager build --dry-run`: in the non-flake CLI it is ignored in the build path (observed on 26.05-pre) — it behaves exactly like a plain build.
+- Do **not** rely on `home-manager build --dry-run`: the flag is accepted (it even shows in `build --help`) but has **no effect** on `build` (observed on 26.05-pre) — it behaves exactly like a plain build.
 - **If the hm build fails:** show the user the tail of the log and stop. The channels are already updated — roll them back (user to `M`, and on the macOS host also root to `N` — commands in B3), verify against the B0 paths, then retry `home-manager build` **without** re-fetching.
 
 ### B2 — present the summary (hm diff)
@@ -305,7 +302,28 @@ Then:
 
 - Verify: `readlink -f ~/.local/state/nix/profiles/home-manager` points at the new generation, and `home-manager generations` marks it `(current)`.
 - Escape hatch if the new home env turns out broken: `home-manager switch --rollback` (one generation back, no new generation created).
+- Offer optional post-upgrade cleanup (see **Post-upgrade cleanup**).
 - The channels stay at the new generation (confirmed upgrade advances channel state) — user channels on both hosts, plus the root channels on the macOS host. Future no-upgrade `home-manager build`/`switch` runs evaluate against them.
+
+## Post-upgrade cleanup (optional — offer after a confirmed upgrade)
+
+After a confirmed Flow A or B (and ideally after the user verified the new system — rebooted if the kernel changed), offer:
+
+> "Want to reclaim the old store paths? I'll run `nix-collect-garbage -d` as the plain user (user profiles + home-manager) and as root via pkexec (system + root channels) — it deletes only unreachable store paths."
+
+If yes (the root invocation needs approval per the `elevated-permissions` skill):
+
+```bash
+nix-collect-garbage -d     # plain user: user profiles + home-manager generations
+pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrappers/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  nix-collect-garbage -d   # root: system profile + root channels
+```
+
+- `-d` = delete only — it never builds or activates anything, so the running system is untouched.
+- This reclaims the previous system toplevel, old channel revisions, and old home-manager generations — ~8 GiB on this host for a combined system + home upgrade (2026-09-17: user 3.6 GiB + root 4.7 GiB, `/nix/store` 35 → 30 GiB).
+- GC cannot break rollbacks: it only removes unreachable paths. But note Nix 2.34 auto-prunes profile generations on update (see Gotchas), so the old generations are usually already gone by the time this step runs — the one-command rollback of the finished upgrade is lost at the moment of the update, not by the GC.
+- Declined → nothing changes; the old closures just stay in `/nix/store` until the next GC.
+- Listing what's reclaimable first (optional): `nix-store --gc --print-dead` (plain user), same under pkexec for the root side. Don't bother pre-pruning generations: see the Gotcha below, they're usually already gone.
 
 ## Background
 
@@ -316,8 +334,20 @@ Then:
 - `pkgs` = root's **`nixos` channel** (`nixos-26.05` branch). `unstable` (used in `common.nix` for e.g. `kiro-cli`, `btop-cuda`, `_1password-cli`) = root's **`nixpkgs-unstable` channel**.
 - Kernel: `pkgs.linuxPackages_latest` (from the `nixos` channel). Kernel/initrd changes only take effect after a reboot.
 - Root channels live in `/nix/var/nix/profiles/per-user/root/channels/` (root-owned).
+- **Root channel list** (`/root/.nix-channels`, recorded 2026-09-17 — used verbatim for the A1 heredoc, no pkexec read needed):
+  ```
+  https://channels.nixos.org/nixos-26.05 nixos
+  https://channels.nixos.org/nixos-unstable nixpkgs-unstable
+  ```
+  If the A1 fetch or A2 sanity check fails in a way that suggests the branch moved, re-read the live file and update this record.
 - Home Manager: classic (no flakes). CLI: `home-manager` **26.05-pre** from the user's nix-env profile (`~/.nix-profile/bin/home-manager`). Config: `~/.config/home-manager/home.nix`.
-- **User's channels profile**: `~/.local/state/nix/profiles/channels` (alias `~/.nix-defexpr/channels`; note `/nix/var/nix/profiles/per-user/javi/` does **not** exist). User-owned. Two channels: `home-manager` (provides `<home-manager>`, the module set the CLI evaluates) and `unstable` (provides `<unstable>`, currently unused by `home.nix`).
+- **User's channels profile**: `~/.local/state/nix/profiles/channels` (alias `~/.nix-defexpr/channels`; note `/nix/var/nix/profiles/per-user/javi/` does **not** exist). User-owned. Two channels: `home-manager` (provides `<home-manager>`, the module set the CLI evaluates) and `unstable` — home-manager's **master branch**, not nixpkgs (provides `<unstable>`, currently unused by `home.nix`).
+  **User channel list** (`~/.nix-channels`, recorded 2026-09-17):
+  ```
+  https://github.com/nix-community/home-manager/archive/release-26.05.tar.gz home-manager
+  https://github.com/nix-community/home-manager/archive/master.tar.gz unstable
+  ```
+  Unlike the root channel URLs (stable branches), `master.tar.gz` re-fetches the latest commit on every `nix-channel --update` — the user channels gain a new generation on every Flow B even though `home.nix` doesn't use `<unstable>` yet.
 - **What `home-manager build` actually resolves**: `pkgs` = `<nixpkgs>` = root's `nixos` channel; the `unstable` variable in `home.nix` = `import <nixpkgs-unstable>` = root's `nixpkgs-unstable` channel. Consequence: Flow B (user channels only) refreshes the home-manager module set but **not** home package versions — those move only when a confirmed Flow A has advanced the root channels. The `home-manager` CLI itself never fetches any channel (`build`/`switch` only evaluate + build).
 - **home-manager profile**: `~/.local/state/nix/profiles/home-manager` (the CLI picks `$XDG_STATE_HOME/nix/profiles`). List generations with `home-manager generations`; `nix profile history --profile …` has the same "No changes" quirk as the channel profiles.
 - Update the user's channels with `nix-channel --update`; roll them back with `nix-channel --rollback <M>` (both plain user).
@@ -332,7 +362,7 @@ Then:
 
 ## Elevation — NixOS host (Flow A) + macOS host (Flow B root channels)
 
-- Flow A needs root for **only two steps, plus one read**: committing the confirmed channel revisions into the root profile (`nix-env --install`, A4), the activation (`nixos-rebuild switch --store-path`, A4), and the read-only `pkexec cat /root/.nix-channels` (A1). The scratch fetch (A1) and the build (A2) run as the plain user — the scratch profile is user-owned and the build touches only `/nix/store`.
+- Flow A needs root for **only two steps**: committing the confirmed channel revisions into the root profile (`nix-env --install`, A4) and the activation (`nixos-rebuild switch --store-path`, A4). The scratch fetch (A1) and the build (A2) run as the plain user — the scratch profile is user-owned and the build touches only `/nix/store`. (A read-only `pkexec cat /root/.nix-channels` is only needed if the channel list recorded in Background → NixOS host turns out to be stale.)
 - `switch` updates the system profile and runs activation — root-only. The root channel profile is root-owned — hence those steps run under `pkexec` (per the `elevated-permissions` skill: **ask the user for approval before each pkexec invocation**).
 - NixOS host: Flow B never needs elevation (user channels only). macOS host: Flow B's **root channel fetch + rollback** run under `sudo` (pkexec doesn't exist on macOS — apply the same ask-before-each-invocation rule); everything else in Flow B is plain user.
 - Running under pkexec resets parts of the environment, so **always set `PATH` (and `NIX_PATH` where evaluation happens) explicitly** — otherwise `<nixpkgs>`, `<nixos-config>` and `<nixpkgs-unstable>` may not resolve. For the Flow A pkexec steps:
@@ -351,12 +381,13 @@ NIX_PATH="nixpkgs=$NEW_NIXOS:nixpkgs-unstable=$NEW_UNSTABLE:nixos-config=/etc/ni
 - The global flake registry has `flake:nixpkgs` pinned to a live unstable tarball — irrelevant for this classic rebuild (which resolves via NIX_PATH/channels), don't let it confuse the summary.
 - `nixos-rebuild build` (non-flake) resolves to `import <nixpkgs/nixos>` with `configuration = <nixos-config>`; no flake or `--file` arguments are needed.
 - Any channel update on a **real** profile commits a generation (`--upgrade-all` does one `nix-channel --update <name>` per channel, each its own generation; a plain `nix-channel --update` commits one). So roll back to the recorded generation number, never "one back" — the rule for Flow B and for the Flow A escape hatch. Note `nix-channel --rollback` takes an **absolute generation number**, not an offset: bare `nix-channel --rollback 1` would jump to generation 1.
-- Channel generations are never auto-pruned (only explicit `nix-env --delete-generations` removes them), so pre-upgrade generations survive across upgrades. Old generations keep their channel store paths valid and GC-protected — if a rollback isn't possible (e.g. the old generation was pruned), retry the build with `NIX_PATH` pinned to the A0 snapshot store paths (explicit `nixpkgs=…` / `nixpkgs-unstable=…` entries) instead of re-fetching.
+- Nix 2.34.8 **auto-prunes profile generations on update** (verified 2026-09-17: right after a full system + home upgrade, the system, root-channel, user-channel, and home-manager profiles each retained exactly one generation link — no explicit `--delete-generations` was run). Consequences: (a) the one-command rollback of a completed upgrade is usually already gone at the moment the update committed — `nixos-rebuild switch --rollback`, `nix-channel --rollback <N>`, and `home-manager switch --rollback` may have nothing to roll back to; (b) the old closures become plain GC garbage, reclaimable via the post-upgrade cleanup step. If a rollback isn't possible, retry the build with `NIX_PATH` pinned to the A0 snapshot store paths (explicit `nixpkgs=…` / `nixpkgs-unstable=…` entries) instead of re-fetching.
+- `nix-env --list-generations` on a **root-owned** profile (e.g. `/nix/var/nix/profiles/system`) as the plain user fails with `opening lock file …: Permission denied` — it takes the profile lock even for read-only listing. Count generations with `ls`/`readlink` instead: generation links live next to the profile symlink (e.g. `system-197-link` in `/nix/var/nix/profiles/`, `channels-17-link` in `/nix/var/nix/profiles/per-user/root/`).
 - Confirmed upgrades intentionally leave channels at the new generation; declined and failed attempts must leave them at the snapshot generation. Always verify with `readlink -f` against the snapshot paths before declaring either branch done.
 - On the NixOS host, a Flow B that runs without a preceding Flow A shows a small diff (module set only) — expected, because home package versions are pinned by the root channels. After a confirmed Flow A, a plain `home-manager switch` (no-upgrade path) brings the home env onto the new packages with no channel moves.
 - On the NixOS host home-manager is classic: the CLI comes from the user's nix-env profile, not a flake or the channel. Updating the channels does **not** update the CLI binary; to bump it, `nix-env -u home-manager` (after the channel/repo it was installed from has moved).
 - `home-manager build`/`switch` never fetch channels — neither the user's nor the root's. A "home-manager upgrade" that skips the fetch steps (B1) is just a rebuild against the same channels — on the macOS host the **root** fetch is the one that carries the package versions.
-- `home-manager build` (non-flake) ignores `--dry-run` — it does the full build either way. A plain `build` never touches the profile; the `./result` it leaves (unless `--no-out-link`) is just a symlink in the CWD, not a GC root.
+- `home-manager build` (non-flake) accepts `--dry-run` but it has no effect — it does the full build either way. A plain `build` never touches the profile; the `./result` it leaves (unless `--no-out-link`) is just a symlink in the CWD, not a GC root.
 - The user's channels profile and the home-manager profile live under `~/.local/state/nix/profiles/` (XDG state), not `/nix/var/nix/profiles/per-user/<user>/` — that directory does not exist on the NixOS host.
 - Root `nix-channel` **ignores `XDG_STATE_HOME`** (verified on nix 2.34.8): under pkexec it always commits to the real root channel profile, even with a scratch `XDG_STATE_HOME` exported. Plain-user `nix-channel` **honors** `XDG_STATE_HOME` (profile at `$XDG_STATE_HOME/nix/profiles/channels`) and reads its channel list from `$HOME/.nix-channels`. That asymmetry is why A1 fetches as the plain user with scratch `HOME` + `XDG_STATE_HOME`. Side effect: any `nix-channel` invocation (even read-only `--list-generations`) auto-creates a profile skeleton in the state dir it resolves to — with a scratch `XDG_STATE_HOME` that's harmless scratch state, but don't run plain `nix-channel` against a real state dir unless that's what you want.
 - The A1 scratch is user-owned: cleanup is a plain `rm -rf "$SCRATCH"`. If a leftover scratch is root-owned (e.g. from an aborted pkexec attempt), `pkexec rm -rf "$SCRATCH"` is needed instead.
