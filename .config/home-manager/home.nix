@@ -8,6 +8,16 @@ let
 
   unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
+  # Pinned nixpkgs master — the nixos-unstable channel lags and still ships the
+  # broken opencode 1.18.30 (upstream regression #48645, fixed in 1.18.31).
+  # Revert to unstable.opencode once the channel catches up.
+  nixpkgsFixed = import (fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/0fd7ffadbdb893668eab870e085cacf4c94f5867.tar.gz";
+    # Hash of the byte variant codeload serves to nix's fetcher (curl gets a
+    # different gzip of identical content — 45043f4d…).
+    sha256 = "13ackf67rhr84n9m3mk358kmngh35n58b40nz01qmvjnpmhv6x24";
+  }) { config.allowUnfree = true; };
+
   pythonEnv = unstable.python3.withPackages (ppkgs: [
     ppkgs.python
     ppkgs.black
@@ -190,7 +200,7 @@ in {
 
     opencode = {
       enable = true;
-      package = unstable.opencode;
+      package = nixpkgsFixed.opencode;
     };
 
     zsh = {
