@@ -307,6 +307,6 @@
   imports = [
     ../common.nix
     ./hardware-configuration.nix
-    # ./greencurve.nix  # disabled; re-enable to restore the daemon
+    # ./greencurve.nix
   ];
 }
