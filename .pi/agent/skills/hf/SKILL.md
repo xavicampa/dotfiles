@@ -1,6 +1,6 @@
 ---
 name: hf
-description: Manage the Hugging Face Hub — remote repo queries (files/quants with sizes) AND the local cache (downloads, size, delete, prune, verify). Use whenever the user mentions Hugging Face / HF / Hub or GGUF quants — including purely remote questions — plus downloads, cached models/quants, freeing cache space, or a cached repo that won't load. 'Hub' alone (e.g. 'hub status', 'hub cache') means the HF Hub — load this skill immediately; do NOT assume some other local app, container, or service, and never probe the system or ask a clarifying question first.
+description: Manage the Hugging Face Hub — remote repo queries (files/quants with sizes) and local cache (downloads, size, delete, prune, verify). Load on any mention of Hugging Face / HF / Hub or GGUF quants — including purely remote questions — downloads, freeing cache space, or a cached repo that won't load. 'Hub' alone (e.g. 'hub status') means the HF Hub: load immediately; do NOT assume another local app/service, or probe/ask first.
 ---
 
 # Hugging Face Hub: downloads & local cache
@@ -51,7 +51,7 @@ hf download org/repo --token $HF_TOKEN              # gated repos
 
 After a successful `hf download` of a GGUF / llama.cpp model, ask: "Do you want to add a preset for this model in `~/.config/llamacpp/llama-preset.ini`?" If yes:
 
-1. Read the model card (`hf models info org/repo` or `HfApi().model_info()`) — README / `model_index.json` / tags — for recommended sampling params.
+1. Read the model card (`hf models card org/repo` — README; tags/`model_index.json` via `hf models info`) — for recommended sampling params.
 2. Propose them (`temperature`, `top_p`, `top_k`, `min_p`, `repeat_penalty`, `context_length`, …) as a `[model_id]` section.
 3. If the card lists multiple use-cases, present them and let the user choose before writing.
 4. Write/append to the ini, backing up the existing file first.
@@ -91,6 +91,7 @@ There is no `hf files` command.
 
 **Remote — what's in org/repo:**
 
+- `hf models ls org/repo` — names + sizes (bytes; `-h` for human-readable); also `--tree`, `-R`, `--revision`, `--json`. First choice for "what quants exist here".
 - `hf download org/repo --dry-run` — names + sizes; `-` in the size column = already cached (doubles as local check).
 - `hf models info org/repo | jq -r '.siblings[].rfilename'` — names only, **no sizes**; raw output is a wall of JSON — always filter. Also gives download counts/sha/gguf metadata.
 - Python: `HfApi().list_repo_tree("org/repo")` → `RepoFile` (`.path`, `.size`) / `RepoFolder` (no `.size`) — filter with `hasattr(f, "size")`.
@@ -130,7 +131,7 @@ hf cache prune --yes
 
 ## Verifying integrity
 
-`hf cache verify org/repo` (opts: `--revision <ref>`, `--repo-type dataset`) — checksums vs remote, needs network. Use when a cached file won't load; fix = `hf cache rm` + re-`hf download`.
+`hf cache verify org/repo` (opts: `--revision <ref>`, `--repo-type dataset`, `--local-dir <dir>` for plain-dir copies) — checksums vs remote, needs network. Use when a cached file won't load; fix = `hf cache rm` + re-`hf download`. `hf cache ls --show-warnings` also surfaces cache inconsistencies.
 
 ## Manual inspection fallback
 
@@ -158,7 +159,7 @@ done | sort
 | path to cached file | `hf download org/repo file -q` (instant if cached) |
 | cache size / contents | `hf cache ls` (biggest: `--sort size`) |
 | hub status | "Hub status" section — `hf cache ls` **and** `scan_cache_dir()` snippet, present as per-quant table |
-| quants in X (remote) | `hf download org/repo --dry-run` |
+| quants in X (remote) | `hf models ls org/repo` (sizes); `--dry-run` also shows what's cached |
 | quants of X cached locally | `scan_cache_dir()` snippet above |
 | free space | `hf cache prune --dry-run` → `--yes` |
 | delete X | confirm → `hf cache rm model/X --dry-run` → `--yes` |
