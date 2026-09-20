@@ -1,6 +1,12 @@
 ---
 name: hf
-description: Manage the Hugging Face Hub — remote repo queries (files/quants with sizes) and local cache (downloads, size, delete, prune, verify). Load on any mention of Hugging Face / HF / Hub or GGUF quants — including purely remote questions — downloads, freeing cache space, or a cached repo that won't load. 'Hub' alone (e.g. 'hub status') means the HF Hub: load immediately; do NOT assume another local app/service, or probe/ask first.
+description: >-
+  Manage the Hugging Face Hub — remote repo queries (files/quants with sizes)
+  and local cache (downloads, size, delete, prune, verify). Load on any mention
+  of Hugging Face / HF / Hub or GGUF quants — including purely remote questions —
+  downloads, freeing cache space, or a cached repo that won't load. 'Hub' alone
+  (e.g. 'hub status') means the HF Hub: load immediately; do NOT assume another
+  local app/service, or probe/ask first.
 ---
 
 # Hugging Face Hub: downloads & local cache
