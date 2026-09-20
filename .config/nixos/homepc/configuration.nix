@@ -251,6 +251,43 @@
         '';
       };
 
+      # llamacpp-npu = {
+      #   description = "llama.cpp server container on Intel NPU (OpenVINO backend)";
+      #   wantedBy = [ "multi-user.target" ];
+      #   serviceConfig = {
+      #     Type = "simple";
+      #     Restart = "on-failure";
+      #     RestartSec = "5s";
+      #     User = "javi";
+      #     Group = "users";
+      #     Environment = [
+      #       "PATH=/run/current-system/sw/bin"
+      #       "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
+      #     ];
+      #   };
+      #
+      #   script = ''
+      #     # llama.cpp with OpenVINO backend (official image), NPU via /dev/accel
+      #     # (render group = 303). OpenAI API on :8090 -> container :8080.
+      #     podman run \
+      #       --replace \
+      #       --name llamacpp-npu \
+      #       -p 8090:8080 \
+      #       --device /dev/accel \
+      #       -e GGML_OPENVINO_DEVICE=NPU \
+      #       --group-add 303 \
+      #       -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
+      #       -v /home/javi/.config/llamacpp-npu/llama-preset.ini:/app/llama-preset.ini:ro \
+      #       ghcr.io/ggml-org/llama.cpp:server-openvino \
+      #       --no-warmup \
+      #       --models-preset /app/llama-preset.ini \
+      #       --models-max 1 \
+      #       -lv 5 \
+      #       -t 8 \
+      #       -tb 8
+      #   '';
+      # };
+
       llamacpp-sleep-guard = {
         description = "Stop llamacpp before NVIDIA suspend, restart after resume";
         unitConfig = {
@@ -260,7 +297,7 @@
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          ExecStart = "-${pkgs.systemd}/bin/systemctl stop llamacpp.service";
+          ExecStart = "-${config.systemd.package}/bin/systemctl stop llamacpp.service";
           ExecStop = "-${pkgs.systemd}/bin/systemctl start llamacpp.service";
         };
         wantedBy = [ "sleep.target" ];
@@ -276,7 +313,7 @@
           User = "javi";
           Group = "users";
           Environment = "PATH=/run/current-system/sw/bin";
-          ExecStartPost = "/bin/sh -c 'sleep 5 && ${pkgs.podman}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${pkgs.podman}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
+          ExecStartPost = "/bin/sh -c 'sleep 5 && ${config.virtualisation.podman.package}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${config.virtualisation.podman.package}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
         };
 
         script = ''
@@ -294,11 +331,10 @@
   # Environment configuration
   environment.systemPackages = [
     pkgs.jellyfin-media-player
-    pkgs.intel-npu-driver
+    pkgs.level-zero
     pkgs.libmtp
     pkgs.nvidia_oc
     pkgs.nvtopPackages.nvidia
-    pkgs.thunar-volman
     unstable.btop-cuda
   ];
   environment.etc."lact/config.yaml".source =
@@ -307,6 +343,7 @@
   imports = [
     ../common.nix
     ./hardware-configuration.nix
+    # ./openvino.nix
     # ./greencurve.nix
   ];
 }
