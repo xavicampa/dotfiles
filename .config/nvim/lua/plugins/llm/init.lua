@@ -10,7 +10,7 @@ return {
       -- model_fim = "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M",
 
       endpoint_inst = "http://localhost:8080/v1/chat/completions",
-      model_inst = "bartowski/Qwen3.8-27B-GGUF:DFLASH2"
+      model_inst = "bartowski/Qwen3.8-27B-GGUF:MTP"
     }
   end
 }
