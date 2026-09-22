@@ -10,10 +10,36 @@
   ...
 }:
 
+let
+  # --- TEMPORARY iwlwifi firmware test (DISABLED 2026-09-20, rolled back
+  # --- to stock linux-firmware / c106). Un-comment this binding + the
+  # --- enableRedistributableFirmware/firmware overrides below to force
+  # --- the driver to load c102 again (hides c106 + c103).
+  # linuxFirmwareNoC102Newer = pkgs.runCommand "linux-firmware-no-iwlwifi-c103-c106"
+  #   { src = pkgs.linux-firmware; } ''
+  #   cp -r $src/. $out
+  #   chmod -R u+w $out
+  #   rm -f $out/lib/firmware/iwlwifi-gl-c0-fm-c0-c106.ucode
+  #   rm -f $out/lib/firmware/iwlwifi-gl-c0-fm-c0-c103.ucode
+  # '';
+in
 {
   # Hardware configuration
   hardware = {
     bluetooth.enable = true;
+    # TEMPORARY iwlwifi firmware test (see let-block at top) — DISABLED:
+    # enableRedistributableFirmware = lib.mkForce false;
+    # firmware = with pkgs; [
+    #   linuxFirmwareNoC102Newer
+    #   ipw2200-firmware
+    #   rtl8192su-firmware
+    #   rt5677-firmware
+    #   rtl8761b-firmware
+    #   zd1211fw
+    #   alsa-firmware
+    #   sof-firmware
+    #   libreelec-dvb-firmware
+    # ];
     graphics = {
       enable = true;
       extraPackages = with pkgs; [
@@ -50,22 +76,17 @@
       nvidiaSettings = true;
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
+      # 2026-09-22: kernel AND driver both from `unstable.linuxPackages_7_2`
+      # (7.2.7 + nvidia 615.71.09) — the only combination that is fully
+      # prebuilt on Hydra/cache.nixos.org: the nixos-26.05 release channel
+      # never prebuilds nvidia for the non-LTS 7.2 series (its LTS series
+      # 6.12/6.18 are prebuilt; 7.2.6 → "will be built", and its channel
+      # driver is 595.71.05, which is a downgrade and failed to compile vs 7.2
+      # in July: os-interface.c strncpy implicit declaration). Previously the
+      # kernel came from the nixos channel while this came from unstable —
+      # that broke when the two 7.2.x versions diverged (7.2.6 vs 7.2.7,
+      # "inconsistent kernel versions" in the modules aggregator).
       package = unstable.linuxPackages_7_2.nvidiaPackages.latest;
-      # 610.57.04 (latest new-feature branch from nixpkgs-unstable 26.11pre).
-      # Verified 2026-07-10: nvidia-open-610.57.04-7.2.4 prebuilt on Hydra; 595.71.05
-      # fails to compile vs 7.2 (os-interface.c strncpy implicit declaration).
-      # Previous working pin: 595.91.07, hashes sha256-yiPIjdJLB6GRZE4eEc+3vN11NzBXSa9A+YABiwleYxM= /
-      # open sha256-OB8Epd+qn/WywxsPiFpxEOAzlJqb6I1SyRoV3a8l71k= /
-      # settings sha256-QzT8Cw1luuZGP9DUje3HN/0ngiayqHURj+bqPsxlJ5w= /
-      # persistenced sha256-3JQBaNmkwxvCXv9q8aHKas6VZM/JjLsuilC2t7ET0u0=
-      # (release-branch 595.71.05 fails to compile vs kernel 7.2: strncpy implicit decl)
-      # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
-      #   version = "610.57.04";
-      #   sha256_64bit = "sha256-suk1xmuDuwDAyFe8jg7g/VLekoa0DJzB7sKafOfrEW0=";
-      #   openSha256 = "sha256-rQHOOOY4KL92Ww3KDwh+j4eGU7oNAH8LutZC5wmFnPo=";
-      #   settingsSha256 = "sha256-ZEMo8I8Zc2Tq6RVDNYpAH+f094dUaZiBqO+5f6lIjRI=";
-      #   persistencedSha256 = "sha256-aXmD2VY1RLlgAnlHhOUMWzvMyhI6JTClcFLm4imF/mA=";
-      # };
       # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
@@ -112,7 +133,7 @@
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
-    kernelPackages = pkgs.linuxPackages_7_2; # 7.2.4 (non-LTS); needs nvidia 610 — see hardware.nvidia
+    kernelPackages = unstable.linuxPackages_7_2; # 2026-09-22: 7.2 (non-LTS) from unstable (was pkgs.linuxPackages_7_2, 7.2.4) — must match hardware.nvidia.package; the nixos channel never prebuilds nvidia for non-LTS 7.2, see there
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
