@@ -135,6 +135,7 @@ NIX_PATH="nixpkgs=$NEW_NIXOS:nixpkgs-unstable=$NEW_UNSTABLE:nixos-config=/etc/ni
 
 Notes:
 
+- Before kicking off the long build, optionally **probe for pre-built packages** (section below) for the kernel-dependent ones (kernel itself, GPU drivers) — it's fast and sets expectations (fetch vs local compile, and compile time) before committing to a 10+ minute build.
 - **No `--upgrade-all`**: the channels were already fetched in A1, and `--upgrade-all` would try to re-fetch the *root* channels (root-only; it hard-errors as a plain user). The explicit `NIX_PATH` maps exactly what `--upgrade-all` would have expanded: `nixpkgs` ← the `nixos` channel, `nixpkgs-unstable` ← itself.
 - The `--diff` output (`nix store diff-closures /run/current-system <new>`) goes to **stderr** with ANSI colors — strip them with `sed 's/\x1b\[[0-9;]*m//g'`.
 - The new toplevel path appears in the log twice: the `>>> /nix/store/...` diff header line and the final `Done. The new configuration is /nix/store/...` line. Grep for it:
@@ -212,6 +213,48 @@ Then:
 - The home environment was not touched by this flow. If the user wants their home env on the new root-channel packages, a plain `home-manager switch` (no-upgrade path) picks them up — no channel moves needed.
 - Escape hatch if the `switch` fails partway (the system profile moves before the activation script runs) or the new system turns out broken: `nixos-rebuild switch --rollback` (pkexec, same env vars; one toplevel generation back). If the new *channels* are the problem, try rolling back to `N` (pkexec `nix-channel --rollback <N>`) — but on nix 2.34 the old generation is usually already auto-pruned (see Gotchas); then pin `NIX_PATH` to the A0 snapshot paths and rebuild instead.
 
+## Probing for pre-built packages (cache coverage)
+
+Before a long build — in Flow A against the scratch pins, in Flow B against the B0 snapshot paths, or any time — check which of the packages the build needs are **pre-built on the binary cache** (fetched) versus **compiled locally**. Kernel-dependent derivations (kernels, GPU driver modules) are the ones that surprise you: they exist per *(channel × kernel series × driver version)*, and their pre-built status is not visible from the config alone.
+
+**Primary probe: `nix build --dry-run`** — it queries the configured substituters (incl. `cache.nixos.org`) with the real protocol, so it's authoritative. Pin `NIX_PATH` to the channel being probed and evaluate the **exact attribute** the config uses:
+
+```bash
+NIX_PATH="nixpkgs=$NEW_NIXOS" nix build --dry-run --impure \
+  --expr '(import <nixpkgs> {}).linuxPackages_7_2.nvidiaPackages.latest.open' 2>&1 \
+  | grep -E 'will be (fetched|built)'
+```
+
+Output interpretation:
+
+| Line | Meaning |
+|---|---|
+| `these N paths will be fetched (…)`, no `will be built` | pre-built on the cache — fast |
+| `these N derivations will be built` | not on the cache — local compile (budget time; a driver module build is ~5–15 min on this host) |
+| both lines present | target (or a dep) compiles locally — that's the signal; the fetched list is mostly *build inputs* (compilers, sources), its size is build-time, not runtime cost |
+| no such lines at all | the path is **already in the local store** (a previous build fetched or built it) — disambiguate with `nix path-info --store`, below |
+
+Gotchas learned the hard way (2026-09-22, nix 2.34.8, this host):
+
+- **Probe the variant the config actually consumes.** `hardware.nvidia.package = …` + `hardware.nvidia.open = true` loads the **open** kernel module (`nvidia_x11.open` in `boot.extraModulePackages`) — probe `…nvidiaPackages.latest.open`, not the bare attribute. (The module does not apply `open` to an explicitly overridden `package`.)
+- **Don't HTTP-probe `cache.nixos.org`** (curl the `.drv`/output files, scrape the Hydra web job lists, hit the Hydra API): behind this machine's VPN it returns 404s for paths that are verifiably in the cache, and the Hydra HTML job trees are lazy-rendered. Use nix's own protocol (`--dry-run`, `path-info --store`, `nix copy`) only.
+- **Decisive check for *any* path, local or not: `nix path-info --store`** — narinfo query only, no content download; exit 0 = in the cache, error = not, **even when the path is in the local store (no local short-circuit)** (verified 2026-09-22: a local path known to be absent from the cache fails with the same error as a bogus path, while a cache-only path succeeds; the nix protocol was live during the test):
+  ```bash
+  nix path-info --store https://cache.nixos.org/ /nix/store/<hash>-<name> && echo in-cache || echo not-in-cache
+  ```
+- `nix copy --from https://cache.nixos.org/ --to file:///tmp/probestore <path>` answers the same question but downloads the full path **plus its runtime deps** (a kernel module pulls the kernel tree — multi-GB) and has no `--dry-run`. Use `path-info --store` instead.
+- **Some kernel attributes throw when evaluated** (kernels removed from nixpkgs: `error: linux 7.0 was removed because it has reached its end of life upstream`). List series first, then probe **per series in a shell loop** tolerating per-series eval errors — one combined expression aborts on the first bad attr. (`builtins.tryEval` only works for this if you pass the **attr path**, not a lambda: `builtins.tryEval (pkgs.$S.nvidiaPackages.latest.open)` → `{ success = false; value = false; }` for a removed kernel; the lambda form returns `{ success = true; value = «lambda» }` without calling it — verified. On failure, nix 2.34 exposes no error text, just `success`/`value`.)
+- Listing the kernel series of a channel:
+  ```bash
+  NIX_PATH="nixpkgs=$NEW_NIXOS" nix eval --impure --json --expr '
+    let pkgs = import <nixpkgs> {};
+    in pkgs.lib.attrNames (pkgs.lib.filterAttrs
+         (n: _: pkgs.lib.match "linuxPackages(_[0-9]+)?(_[0-9]+)?" n != null) pkgs)'
+  ```
+  The kernel *itself* (not just its modules) is a separate attr family: `pkgs.linux_X_Y` (e.g. `pkgs.linux_7_2` = `linux-7.2.6` on 26.05) — the regex above lists only the `linuxPackages*` sets.
+- **Pre-built status is per-channel** (per nixpkgs revision): a module pre-built for `nixpkgs-unstable`'s 7.2.x does not satisfy the same attribute on the `nixos` release channel — probe each channel separately.
+- Coverage heuristic (empirical, 2026-09-22): Hydra pre-builds nvidia-open modules for **all LTS kernel series plus the channel's in-dev "latest" kernel** — but on the channel where that kernel is the latest. `nixpkgs-unstable` covered 5.10/5.15/6.1/6.6/6.12/6.18 + 7.2 (its in-dev); `nixos-26.05` covered the LTS series (6.12/6.18 verified) but **not** 7.2 (non-LTS in-dev) — so a config pinning a non-LTS kernel to the release channel always pays a local driver compile. Consequence seen in the wild: mixing `boot.kernelPackages` (release channel 7.2.6) with a driver from `unstable.linuxPackages_7_2` (7.2.7) fails the module aggregator with `inconsistent kernel versions` — kernel and driver must come from the same kernel series *and* the same kernel version.
+
 ## Flow B — Home Manager upgrade (both hosts)
 
 The hm build and activation are always plain user (user channels + home-manager profile are user-owned). Channel elevation differs by host:
@@ -255,7 +298,7 @@ Record `N` + root-channel store paths (root rollback target/verification), `M` +
 sudo nix-channel --update > /tmp/hm-root-channels.log 2>&1   # root's channels
 ```
 
-Then the user side (plain user) on **both hosts**. Run in the background and poll (quick channel fetch; the build itself can take minutes if new packages need building):
+Then the user side (plain user) on **both hosts**. Run in the background and poll (quick channel fetch; the build itself can take minutes if new packages need building — see **Probing for pre-built packages** for the dry-run check):
 
 ```bash
 nix-channel --update > /tmp/hm-channels.log 2>&1          # user's channels
