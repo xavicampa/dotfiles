@@ -198,13 +198,51 @@ in
     udev.extraRules = ''
       ACTION=="add|change", KERNEL=="nvme0n1", ATTR{queue/read_ahead_kb}="2048"
       SUBSYSTEM=="usb", ATTR{idVendor}=="0955", MODE="0664", GROUP="plugdev"
+      # The BE200 MLD driver re-registers under a new wiphy index every time
+      # the iwlwifi-reload system-sleep hook runs, which would otherwise make
+      # the interfaces appear as wlan2, wlan3, ... Pin the two card MACs to
+      # stable names. iwd follows the device by wiphy, so the (variable)
+      # station interface name is not functionally important.
+      SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="e8:bf:b8:5a:41:55", NAME="wlan0"
+      SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="e8:bf:b8:5a:41:56", NAME="wlan1"
     '';
+
     xserver = {
       videoDrivers = [
         "modesetting"
         "nvidia"
       ];
     };
+  };
+
+  # The Intel Wi-Fi 7 BE200 (iwlmld) firmware state gets corrupted by
+  # suspend/resume: the link stays nominal (80MHz 2x2, no retries) but
+  # throughput collapses (~25 up / ~320 down on a 600/600 line) until the
+  # driver is fully reloaded. Unload the wifi stack before suspend and
+  # reload it after resume so the firmware is re-initialized cleanly on
+  # every cycle — equivalent to a reboot, without one. iwd reconnects
+  # automatically after the module reloads.
+  environment.etc."systemd/system-sleep/iwlwifi-reload" = {
+    source = "${pkgs.writeShellScriptBin "iwlwifi-reload" ''
+      export PATH=/run/current-system/sw/bin:/run/booted-system/sw/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      case "$1/$2" in
+        pre/*)
+          # The BE200 (MLD) driver registers multiple wlan* interfaces;
+          # bring them all down so the modules unload cleanly.
+          for i in /sys/class/net/wlan*; do
+            ip link set "$(basename "$i")" down 2>/dev/null
+          done
+          modprobe -r iwlmld iwlwifi 2>/dev/null
+          ;;
+        # NOTE: systemd calls post hooks as "post <sleep-type>" (e.g.
+        # "post suspend"), so match any post action here.
+        post/*)
+          # Reload; iwd re-creates the interfaces and reconnects on its
+          # own (the station may come back as wlan0 or wlan1).
+          modprobe iwlmld 2>/dev/null
+          ;;
+      esac
+    ''}/bin/iwlwifi-reload";
   };
 
   # Systemd configuration
