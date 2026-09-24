@@ -76,17 +76,19 @@ in
       nvidiaSettings = true;
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
-      # 2026-09-22: kernel AND driver both from `unstable.linuxPackages_7_2`
-      # (7.2.7 + nvidia 615.71.09) — the only combination that is fully
-      # prebuilt on Hydra/cache.nixos.org: the nixos-26.05 release channel
-      # never prebuilds nvidia for the non-LTS 7.2 series (its LTS series
-      # 6.12/6.18 are prebuilt; 7.2.6 → "will be built", and its channel
-      # driver is 595.71.05, which is a downgrade and failed to compile vs 7.2
-      # in July: os-interface.c strncpy implicit declaration). Previously the
-      # kernel came from the nixos channel while this came from unstable —
-      # that broke when the two 7.2.x versions diverged (7.2.6 vs 7.2.7,
+      # 2026-09-24: kernel AND driver both from `unstable.linuxPackages_6_18`
+      # (6.18.53 LTS + nvidia 615.71.09 / CUDA 13.4) — LTS kernel (no EOL
+      # whiplash) with the newest driver branch, both prebuilt on
+      # cache.nixos.org (verified: 6.18 open module = fetch-only).
+      # History: 2026-09-22 this was `unstable.linuxPackages_7_2` (7.2.7 +
+      # 615.71.09) — fully prebuilt, but 7.2 is non-LTS: no upstream patches
+      # once 7.3 lands, and nixpkgs drops EOL series (7.0 already gone).
+      # The nixos-26.05 release channel prebuilds nvidia for 6.12/6.18 but
+      # only at 595.71.05 (CUDA 12.x) — a downgrade that would break the
+      # CUDA-13 llama-cuda container — so the driver must come from unstable.
+      # Kernel + driver must stay from the SAME set (mixing once broke with
       # "inconsistent kernel versions" in the modules aggregator).
-      package = unstable.linuxPackages_7_2.nvidiaPackages.latest;
+      package = unstable.linuxPackages_6_18.nvidiaPackages.latest;
       # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04"; # use new 570 drivers
@@ -133,7 +135,7 @@ in
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
-    kernelPackages = unstable.linuxPackages_7_2; # 2026-09-22: 7.2 (non-LTS) from unstable (was pkgs.linuxPackages_7_2, 7.2.4) — must match hardware.nvidia.package; the nixos channel never prebuilds nvidia for non-LTS 7.2, see there
+    kernelPackages = unstable.linuxPackages_6_18; # 2026-09-24: 6.18 LTS (6.18.53) from unstable — must match hardware.nvidia.package (same linuxPackages_6_18 set); see the comment there for the full history (was 7.2 non-LTS)
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
@@ -222,28 +224,31 @@ in
   # reload it after resume so the firmware is re-initialized cleanly on
   # every cycle — equivalent to a reboot, without one. iwd reconnects
   # automatically after the module reloads.
-  environment.etc."systemd/system-sleep/iwlwifi-reload" = {
-    source = "${pkgs.writeShellScriptBin "iwlwifi-reload" ''
-      export PATH=/run/current-system/sw/bin:/run/booted-system/sw/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      case "$1/$2" in
-        pre/*)
-          # The BE200 (MLD) driver registers multiple wlan* interfaces;
-          # bring them all down so the modules unload cleanly.
-          for i in /sys/class/net/wlan*; do
-            ip link set "$(basename "$i")" down 2>/dev/null
-          done
-          modprobe -r iwlmld iwlwifi 2>/dev/null
-          ;;
-        # NOTE: systemd calls post hooks as "post <sleep-type>" (e.g.
-        # "post suspend"), so match any post action here.
-        post/*)
-          # Reload; iwd re-creates the interfaces and reconnects on its
-          # own (the station may come back as wlan0 or wlan1).
-          modprobe iwlmld 2>/dev/null
-          ;;
-      esac
-    ''}/bin/iwlwifi-reload";
-  };
+  # 2026-09-24: DISABLED to test whether kernel 6.18.53 (LTS) fixes the
+  # BE200 suspend/resume issue without the reload workaround. If throughput
+  # collapses again after a suspend cycle, un-comment this block.
+  # environment.etc."systemd/system-sleep/iwlwifi-reload" = {
+  #   source = "${pkgs.writeShellScriptBin "iwlwifi-reload" ''
+  #     export PATH=/run/current-system/sw/bin:/run/booted-system/sw/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  #     case "$1/$2" in
+  #       pre/*)
+  #         # The BE200 (MLD) driver registers multiple wlan* interfaces;
+  #         # bring them all down so the modules unload cleanly.
+  #         for i in /sys/class/net/wlan*; do
+  #           ip link set "$(basename "$i")" down 2>/dev/null
+  #         done
+  #         modprobe -r iwlmld iwlwifi 2>/dev/null
+  #         ;;
+  #       # NOTE: systemd calls post hooks as "post <sleep-type>" (e.g.
+  #       # "post suspend"), so match any post action here.
+  #       post/*)
+  #         # Reload; iwd re-creates the interfaces and reconnects on its
+  #         # own (the station may come back as wlan0 or wlan1).
+  #         modprobe iwlmld 2>/dev/null
+  #         ;;
+  #     esac
+  #   ''}/bin/iwlwifi-reload";
+  # };
 
   # Systemd configuration
   systemd = {
@@ -362,28 +367,28 @@ in
         wantedBy = [ "sleep.target" ];
       };
 
-      hermes = {
-        description = "Hermes Agent container";
-        wantedBy = [ "default.target" ];
-        serviceConfig = {
-          Type = "simple";
-          Restart = "on-failure";
-          RestartSec = "5s";
-          User = "javi";
-          Group = "users";
-          Environment = "PATH=/run/current-system/sw/bin";
-          ExecStartPost = "/bin/sh -c 'sleep 5 && ${config.virtualisation.podman.package}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${config.virtualisation.podman.package}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
-        };
+      # hermes = {
+      #   description = "Hermes Agent container";
+      #   wantedBy = [ "default.target" ];
+      #   serviceConfig = {
+      #     Type = "simple";
+      #     Restart = "on-failure";
+      #     RestartSec = "5s";
+      #     User = "javi";
+      #     Group = "users";
+      #     Environment = "PATH=/run/current-system/sw/bin";
+      #     ExecStartPost = "/bin/sh -c 'sleep 5 && ${config.virtualisation.podman.package}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${config.virtualisation.podman.package}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
+      #   };
 
-        script = ''
-          podman run \
-            --replace \
-            --name hermes \
-            -v /home/javi/.local/hermes:/opt/data \
-            nousresearch/hermes-agent:latest \
-            gateway run
-        '';
-      };
+      #   script = ''
+      #     podman run \
+      #       --replace \
+      #       --name hermes \
+      #       -v /home/javi/.local/hermes:/opt/data \
+      #       nousresearch/hermes-agent:latest \
+      #       gateway run
+      #   '';
+      # };
     };
   };
 
