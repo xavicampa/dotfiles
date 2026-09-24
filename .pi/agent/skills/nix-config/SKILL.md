@@ -27,8 +27,9 @@ and confirm with the user before activating.
 - Both NixOS configs expose `unstable = import <nixpkgs-unstable> {
   config.allowUnfree = true; }` — bound once in common.nix's `_module.args`
   (homepc additionally lists it as a module arg; dell relies on
-  `_module.args` only). `pkgs` = stable nixpkgs (root `nixos` channel);
-  prefer `unstable.<pkg>` when the package is newer/unfree there
+  `_module.args` only). `pkgs` = stable nixpkgs; prefer `unstable.<pkg>`
+  when the package is newer/unfree there (channel provenance: Background
+  section of the `nix-upgrade` skill)
 - Configs are **not** under git — make surgical edits, keep diffs minimal
 
 ## Where changes go
@@ -126,7 +127,11 @@ relative `../common.nix` import would break.
   **elevated-permissions** skill). `nixos-rebuild` is nixos-rebuild-ng:
   `--diff` shows which files will change (no-op with `dry-build`);
   `--dry-run` is an alias for `dry-build` (builds, does not activate). Do
-  not reboot unless the user asks.
+  not reboot unless the user asks. To activate **exactly** the toplevel
+  step 3 built — zero re-evaluation, same discipline as the `nix-upgrade`
+  skill — use `pkexec nixos-rebuild switch --store-path <built path>`
+  (the path `nixos-rebuild build` prints); a plain `switch` re-evaluates
+  and yields the same toplevel as long as nothing else changed meanwhile.
 - Home-manager: `home-manager switch` (no root needed).
 
 ## Coordination
