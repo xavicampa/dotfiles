@@ -304,6 +304,7 @@ in
             --network host \
             --device nvidia.com/gpu=all \
             -e GGML_CUDA_ALLREDUCE=internal \
+            -e CUDA_VISIBLE_DEVICES=1,0 \
             -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
             -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
             localhost/llama-cuda:mtmd-fix \
