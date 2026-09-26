@@ -126,6 +126,7 @@ in {
 
     fd.enable = true;
     fzf.enable = true;
+    mpv.enable = true;
     jq.enable = true;
     lazygit.enable = true;
 
