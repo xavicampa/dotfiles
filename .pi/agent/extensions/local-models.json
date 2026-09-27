@@ -1,4 +1,10 @@
 {
+  "_vram": {
+    "tiers": [
+      { "minVramGiB": 16, "model": "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S" },
+      { "minVramGiB": 40, "model": "bartowski/Qwen3.8-27B-GGUF:Q8_0" }
+    ]
+  },
   "bartowski/Qwen3.8-27B-GGUF:Q8_0": {
     "supportsReasoningEffort": true,
     "thinkingFormat": "qwen-chat-template"
