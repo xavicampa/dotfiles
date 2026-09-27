@@ -496,7 +496,7 @@ profiles:
           spindown_delay_ms: 5000
           change_threshold: 2
         power_mizer_mode: Auto
-        power_cap: 480.0
+        power_cap: 350.0
         mem_clock_offsets:
           0: 2000
         nvidia_gpu_vf_curve:
