@@ -295,9 +295,11 @@ in
         #     -tb 8
         # '';
         script = ''
-          # Local build of master @ 95ef7fc16 + patches/mtmd-dflash-mrope-fix.patch
-          # (fixes #27408: dflash + mtmd image decoding 500s). Rebuild via
-          # ~/dev/personal/llama.cpp/build-patched.sh, then redeploy on upstream merge.
+          # Local build: branch local/mtp-qwen4exp = master @ 6e316de29
+          # + patches/mtmd-dflash-mrope-fix.patch (fixes #27408: dflash + mtmd image
+          # decoding 500s) + merge of ggml-org/llama.cpp#28243 (qwen4exp MTP draft
+          # load + tensor borrow, needed for Qwen3.8-Flash-Next MTP heads).
+          # Rebuild via ~/dev/personal/llama.cpp/build-patched.sh <tag>.
           podman run \
             --replace \
             --name llamacpp \
@@ -306,7 +308,7 @@ in
             -e GGML_CUDA_ALLREDUCE=internal \
             -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
             -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-            localhost/llama-cuda:mtmd-fix-rebased \
+            localhost/llama-cuda:mtmd-fix-mtp \
             --models-preset /app/llama-preset.ini \
             --models-max 1 \
             -lv 3 \
