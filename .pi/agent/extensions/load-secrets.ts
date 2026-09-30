@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 
 export default function (pi: ExtensionAPI) {
   type Secret = { opPath: string; envVar: string; label: string };
@@ -12,24 +12,64 @@ export default function (pi: ExtensionAPI) {
   ];
 
   type State = "pending" | "loaded" | "failed";
-  type LoadResult = { label: string; ok: boolean; reason?: string };
+  type LoadResult = { label: string; ok: boolean; reason?: string; cancelled?: boolean };
   const state = new Map<string, State>();
   const loading = new Map<string, Promise<LoadResult>>();
+  /** When each secret last failed, so the automatic path can back off. */
+  const failedAt = new Map<string, number>();
+  /** Auto-load retries a failed secret at most once per window; /load-secrets retries immediately. */
+  const RETRY_COOLDOWN_MS = 60_000;
   for (const s of SECRETS) state.set(s.envVar, "pending");
+
+  function markLoaded(envVar: string): void {
+    state.set(envVar, "loaded");
+    failedAt.delete(envVar);
+  }
+
+  function markFailed(envVar: string): void {
+    state.set(envVar, "failed");
+    failedAt.set(envVar, Date.now());
+  }
+
+  function inCooldown(envVar: string, now: number): boolean {
+    if (state.get(envVar) !== "failed") return false;
+    const at = failedAt.get(envVar);
+    return at !== undefined && now - at < RETRY_COOLDOWN_MS;
+  }
 
   type Context = Parameters<Parameters<typeof pi.on>[1]>[1];
 
-  function is1PasswordRunning(): boolean {
+  const OP_READ_TIMEOUT_MS = 120_000;
+  const PROBE_TIMEOUT_MS = 5_000;
+
+  function firstLine(text: string): string {
+    return text.trim().split("\n")[0] ?? "";
+  }
+
+  function notify(ctx: Context, message: string, level: "info" | "warning" | "error"): void {
     try {
-      execSync("pgrep -f '1password'", { timeout: 5_000 });
-      return true;
+      ctx.ui.notify(message, level);
+    } catch {
+      // No UI in print/JSON mode; a status message must never break a tool call.
+    }
+  }
+
+  // Everything below runs through pi.exec (async spawn, no shell, honours timeout and the
+  // turn's abort signal). execSync would freeze the whole Pi process — UI, other extensions,
+  // and Ctrl+C — for as long as 1Password takes to answer.
+  async function is1PasswordRunning(): Promise<boolean> {
+    try {
+      // -x matches the process name exactly (comm is "1password"), -i ignores case; no shell
+      // wrapper is spawned, so nothing here can match the probe against itself.
+      const res = await pi.exec("pgrep", ["-x", "-i", "1password"], { timeout: PROBE_TIMEOUT_MS });
+      return res.code === 0 && !res.killed;
     } catch {
       return false;
     }
   }
 
-  function open1Password(): void {
-    if (is1PasswordRunning()) return;
+  async function open1Password(): Promise<void> {
+    if (await is1PasswordRunning()) return;
     const child = spawn("xdg-open", ["onepassword://"], { detached: true, stdio: "ignore" });
     child.on("error", (err) => {
       console.error("[load-secrets] Failed to launch 1Password:", err.message);
@@ -37,66 +77,84 @@ export default function (pi: ExtensionAPI) {
     child.unref();
   }
 
-  function doLoad(secret: Secret): Promise<LoadResult> {
-    if (!is1PasswordRunning()) {
-      state.set(secret.envVar, "failed");
-      return Promise.resolve({ label: secret.label, ok: false, reason: "1Password app not running" });
+  async function doLoad(secret: Secret, ctx: Context): Promise<LoadResult> {
+    const { label, envVar, opPath } = secret;
+    if (!(await is1PasswordRunning())) {
+      markFailed(envVar);
+      return { label, ok: false, reason: "1Password app not running" };
     }
-    try {
-      const value = execSync(`op read ${secret.opPath}`, {
-        encoding: "utf-8",
-        timeout: 120_000,
-      }).trim();
-      if (value) {
-        process.env[secret.envVar] = value;
-        state.set(secret.envVar, "loaded");
-        return Promise.resolve({ label: secret.label, ok: true });
-      }
-      state.set(secret.envVar, "failed");
-      return Promise.resolve({ label: secret.label, ok: false, reason: "empty value from 1Password" });
-    } catch (err) {
-      state.set(secret.envVar, "failed");
-      const message = err instanceof Error ? err.message : String(err);
-      return Promise.resolve({ label: secret.label, ok: false, reason: message });
+    const res = await pi.exec("op", ["read", opPath], { timeout: OP_READ_TIMEOUT_MS, signal: ctx.signal });
+    if (ctx.signal?.aborted) {
+      // Interrupted, not proven impossible: stay pending so the next call retries without backoff.
+      return { label, ok: false, cancelled: true };
     }
+    // killed must be checked before code: a SIGTERM'd child resolves with code 0 here.
+    if (res.killed) {
+      markFailed(envVar);
+      return { label, ok: false, reason: `op read timed out after ${OP_READ_TIMEOUT_MS / 1000}s` };
+    }
+    if (res.code !== 0) {
+      markFailed(envVar);
+      return { label, ok: false, reason: firstLine(res.stderr) || `op read failed (exit ${res.code}; is the op CLI on PATH?)` };
+    }
+    const value = res.stdout.trim();
+    if (!value) {
+      markFailed(envVar);
+      return { label, ok: false, reason: "empty value from 1Password" };
+    }
+    process.env[envVar] = value;
+    markLoaded(envVar);
+    return { label, ok: true };
   }
 
-  async function loadSecrets(ctx: Context, envVars: string[]): Promise<void> {
-    const results: LoadResult[] = [];
-    for (const secret of SECRETS.filter((s) => envVars.includes(s.envVar))) {
-      if (state.get(secret.envVar) === "loaded") continue;
-      const inFlight = loading.get(secret.envVar);
-      if (inFlight) {
-        await inFlight;
-        results.push({ label: secret.label, ok: state.get(secret.envVar) === "loaded" });
-        continue;
-      }
-      const p = doLoad(secret);
-      loading.set(secret.envVar, p);
-      try {
-        results.push(await p);
-      } finally {
-        loading.delete(secret.envVar);
-      }
-    }
-    if (results.length === 0) return;
-    const failed = results.filter((r) => !r.ok);
+  /** Deduplicated load of one secret. Never rejects: a blocked tool call is worse than a failed load. */
+  function loadOne(secret: Secret, ctx: Context): Promise<LoadResult> {
+    const inFlight = loading.get(secret.envVar);
+    if (inFlight) return inFlight; // join a running attempt, keeping its outcome and reason
+    const p = doLoad(secret, ctx)
+      .catch((err: unknown): LoadResult => {
+        markFailed(secret.envVar);
+        return { label: secret.label, ok: false, reason: err instanceof Error ? err.message : String(err) };
+      })
+      .finally(() => {
+        if (loading.get(secret.envVar) === p) loading.delete(secret.envVar);
+      });
+    loading.set(secret.envVar, p);
+    return p;
+  }
+
+  async function loadSecrets(ctx: Context, envVars: string[], opts: { force?: boolean } = {}): Promise<void> {
+    const now = Date.now();
+    const wanted = SECRETS.filter((s) => envVars.includes(s.envVar)
+      && state.get(s.envVar) !== "loaded"
+      // Back off after a failure instead of retrying on every matching tool call: each attempt can
+      // wait minutes on 1Password. /load-secrets passes force to retry right away.
+      && (opts.force === true || !inCooldown(s.envVar, now)));
+    if (wanted.length === 0) return;
+    // Concurrent: several `op read` calls waiting on the app at once cost one wait, not several.
+    const results = await Promise.all(wanted.map((s) => loadOne(s, ctx)));
+    const settled = results.filter((r) => !r.cancelled);
+    if (settled.length === 0) return;
+    const failed = settled.filter((r) => !r.ok);
     if (failed.length > 0) {
       const details = failed.map((r) => (r.reason ? `${r.label}: ${r.reason}` : r.label)).join("; ");
-      ctx.ui.notify(`Secret load failed — ${details}`, "error");
+      notify(ctx, `Secret load failed — ${details}. Retry with /load-secrets.`, "error");
       return;
     }
-    ctx.ui.notify(`${results.map((r) => r.label).join(", ")} loaded`, "info");
+    notify(ctx, `${settled.map((r) => r.label).join(", ")} loaded`, "info");
   }
 
   async function forceReload(ctx: Context): Promise<void> {
-    for (const s of SECRETS) state.set(s.envVar, "pending");
-    await loadSecrets(ctx, SECRETS.map((s) => s.envVar));
+    for (const s of SECRETS) {
+      state.set(s.envVar, "pending");
+      failedAt.delete(s.envVar);
+    }
+    await loadSecrets(ctx, SECRETS.map((s) => s.envVar), { force: true });
   }
 
   // Open 1Password on startup if not running
   pi.on("session_start", async (_event, _ctx) => {
-    open1Password();
+    await open1Password();
   });
 
   // On-demand via command (allows retry after failure)
@@ -107,7 +165,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // Auto-load on first use (no retry after failure)
+  // Auto-load on first use; a failure backs off for RETRY_COOLDOWN_MS, /load-secrets retries immediately
   const HF_CMD = /\bhf\s+(download|cache|auth|models|env|cp|version|whoami)\b/;
   const PORTAINER_CMD = /portainer[\\/]scripts[\\/]portainer|rpi:9443/;
   pi.on("tool_call", async (event, ctx) => {
