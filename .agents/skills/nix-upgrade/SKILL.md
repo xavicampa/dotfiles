@@ -356,7 +356,7 @@ Then:
 
 After a confirmed Flow A or B (and ideally after the user verified the new system — rebooted if the kernel changed), offer:
 
-> "Want to reclaim the old store paths? I'll run `nix-collect-garbage -d` as the plain user (user profiles + home-manager) and as root via pkexec (system + root channels) — it deletes only unreachable store paths."
+> "Want to reclaim the old store paths? I'll run `nix-collect-garbage -d` as the plain user (user profiles + home-manager) and as root via pkexec (system + root channels) — it deletes only unreachable store paths — then a one-shot `fstrim.service` so the freed blocks are actually discarded to the disk. I'll report what was trimmed."
 
 If yes (the root invocation needs approval per the `elevated-permissions` skill):
 
@@ -366,6 +366,17 @@ pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrapper
   nix-collect-garbage -d   # root: system profile + root channels
 ```
 
+Then run the one-shot fstrim (pkexec, approval per the `elevated-permissions` skill) and report the summary (NixOS host only — not applicable on macOS, whose APFS handles discards automatically):
+
+```bash
+pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrappers/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  systemctl start fstrim.service
+journalctl -u fstrim.service --since "2 min ago" --no-pager | grep -i trimmed
+```
+
+- `fstrim.service` is a one-shot (trims all `/etc/fstab` filesystems and exits); the weekly `fstrim.timer` is normally already enabled and needs no touching — only the service start needs pkexec. Verify it ran: `systemctl status fstrim.service` shows `status=0/SUCCESS`.
+- The `journalctl` line prints per-filesystem `…: <size> (…) trimmed on <device>` lines — report them, e.g. "/: 123.9 GiB, /boot: 343.3 MiB".
+- The trimmed total covers **everything freed since the last trim** (the weekly timer), not just this upgrade's GC — it can dwarf the GC number (2026-09-30: 7.4 GiB GC'd, 124.2 GiB trimmed). Don't present the trim total as "this upgrade freed X".
 - `-d` = delete only — it never builds or activates anything, so the running system is untouched.
 - This reclaims the previous system toplevel, old channel revisions, and old home-manager generations — ~8 GiB on this host for a combined system + home upgrade (2026-09-17: user 3.6 GiB + root 4.7 GiB, `/nix/store` 35 → 30 GiB).
 - GC cannot break rollbacks: it only removes unreachable paths. But note Nix 2.34 auto-prunes profile generations on update (see Gotchas), so the old generations are usually already gone by the time this step runs — the one-command rollback of the finished upgrade is lost at the moment of the update, not by the GC.
