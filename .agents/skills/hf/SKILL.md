@@ -124,7 +124,7 @@ hf cache rm model/org/repo     # whole repo (all revisions)
 hf cache rm <revision_hash>    # single revision
 ```
 
-Protocol: 1) show what will be removed + size (`hf cache ls --revisions`), 2) `--dry-run`, 3) `--yes` (never answer prompts blindly). Cache deletion doesn't touch `--local-dir` copies.
+Protocol: 1) show what will be removed + size (`hf cache ls --revisions`), 2) `--dry-run`, 3) `--yes` (never answer prompts blindly). Cache deletion doesn't touch `--local-dir` copies. Afterwards: see "After cleanup: fstrim".
 
 ## Pruning (semi-safe)
 
@@ -134,6 +134,22 @@ Removes unreferenced revisions + incomplete downloads; never touches `refs/`-ref
 hf cache prune --dry-run       # preview, report reclaimed size
 hf cache prune --yes
 ```
+
+Afterwards: see "After cleanup: fstrim".
+
+## After cleanup: fstrim
+
+Whenever models are cleaned up (`hf cache rm` or `hf cache prune` freed space), run the one-shot fstrim so the freed blocks are actually discarded to the disk (the weekly `fstrim.timer` would otherwise only pick them up on its next trigger), and report what was trimmed. NixOS host only — not applicable on macOS (APFS handles discards automatically):
+
+```bash
+pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrappers/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  systemctl start fstrim.service
+journalctl -u fstrim.service --since "2 min ago" --no-pager | grep -i trimmed
+```
+
+- `fstrim.service` is a one-shot (trims all `/etc/fstab` filesystems and exits); the weekly timer is normally already enabled — only the service start needs pkexec (approval per the `elevated-permissions` skill). Verify: `systemctl status fstrim.service` shows `status=0/SUCCESS`.
+- The `journalctl` line prints per-filesystem `…: <size> (…) trimmed on <device>` lines — report them, e.g. "/: 12.3 GiB, /boot: 343.3 MiB".
+- The trimmed total covers **everything freed since the last trim**, not just this cleanup — it can dwarf the rm/prune size. Don't present it as "this cleanup freed X".
 
 ## Verifying integrity
 
@@ -167,7 +183,7 @@ done | sort
 | hub status | "Hub status" section — `hf cache ls` **and** `scan_cache_dir()` snippet, present as per-quant table |
 | quants in X (remote) | `hf models ls org/repo` (sizes); `--dry-run` also shows what's cached |
 | quants of X cached locally | `scan_cache_dir()` snippet above |
-| free space | `hf cache prune --dry-run` → `--yes` |
-| delete X | confirm → `hf cache rm model/X --dry-run` → `--yes` |
+| free space | `hf cache prune --dry-run` → `--yes` → fstrim ("After cleanup") |
+| delete X | confirm → `hf cache rm model/X --dry-run` → `--yes` → fstrim ("After cleanup") |
 | X won't load | `hf cache verify X` → `rm` + re-download |
 | cache on wrong disk | `hf env` |
