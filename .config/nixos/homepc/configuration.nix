@@ -111,10 +111,23 @@ in
 
   # Boot configuration
   boot = {
-    initrd.kernelModules = [ ];
+    # pci-stub claims the two headless NVIDIA HDMI-audio functions (GB203
+    # 10de:22e9 on the 5070 Ti, GA102 10de:1aef on the 3090 Ti) so that
+    # snd_hda_intel can never bind them. Their codecs are power-gated (no
+    # display is plugged into either GPU), so the first HDA verb times out:
+    #   snd_hda_intel 0000:03:00.1: azx_get_response timeout, switching to polling mode
+    #   irq 17: nobody cared ... Disabling IRQ #17
+    # MSI is disabled for both (vga_switcheroo audio client), forcing them onto
+    # the shared legacy PIC IRQ 17, which the kernel masked after ~200k
+    # unhandled interrupts. Loaded in the initrd so the claim happens before
+    # snd_hda_intel is even loadable. Audio output is unaffected: the sinks are
+    # the iGPU/PCH ACE HDMI (card3) plus the USB Audio interface. To revert,
+    # drop these entries and the pci-stub.ids / driver_override rules below.
+    initrd.availableKernelModules = [ "pci-stub" ];
+    initrd.kernelModules = [ "pci-stub" ];
     initrd.systemd.enable = true;
     initrd.verbose = false;
-    kernelModules = [ "i2c-dev" ];
+    kernelModules = [ "i2c-dev" "pci-stub" ];
     # boot.extraModulePackages = [ ];
     loader.systemd-boot.consoleMode = "max";
     loader.timeout = 0;
@@ -125,6 +138,9 @@ in
       "rd.systemd.show_status=auto"
       "udev.log_priority=3"
       "reboot=pci,cold"
+      # IDs for pci-stub to claim when it loads (the cmdline reaches it in both
+      # the initrd and the root system). See the pci-stub comment above.
+      "pci-stub.ids=10de:22e9,10de:1aef"
       # "pcie_aspm.policy=performance"
       # "pcie_aspm.policy=powersupersave"
       # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
@@ -207,6 +223,11 @@ in
       # station interface name is not functionally important.
       SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="e8:bf:b8:5a:41:55", NAME="wlan0"
       SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="e8:bf:b8:5a:41:56", NAME="wlan1"
+      # Belt and braces for the pci-stub claim above: only pci-stub may ever
+      # match these two HDA functions, so a manual `echo 1 > /sys/bus/pci/rescan`
+      # or a hot re-bind can't put snd_hda_intel back on the legacy IRQ 17.
+      SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{device}=="0x22e9", ATTR{driver_override}="pci-stub"
+      SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{device}=="0x1aef", ATTR{driver_override}="pci-stub"
     '';
 
     xserver = {
