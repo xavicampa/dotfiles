@@ -324,7 +324,7 @@ in
           podman run \
             --replace \
             --name llamacpp \
-            --network host \
+            -p 8080:8080 \
             --device nvidia.com/gpu=all \
             -e GGML_CUDA_ALLREDUCE=internal \
             -e CUDA_VISIBLE_DEVICES=1,0 \
