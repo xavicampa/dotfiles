@@ -74,7 +74,7 @@ nix-shell -p nodejs_22 python312
 | pkg-config | `pkg-config` |
 | curl | `curl` |
 | wget | `wget` |
-| tree | `tree` |
+| telnet | `inetutils` |
 | ripgrep | `ripgrep` |
 | fzf | `fzf` |
 | tmux | `tmux` |
