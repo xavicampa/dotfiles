@@ -174,6 +174,12 @@ in
   nixpkgs.config.cudaSupport = true;
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
+  # Filesystems
+  fileSystems."/mnt/scratch" = {
+    device = "UUID=f35b18d6-2d87-43f3-a8be-6a5c91abb95c";
+    fsType = "ext4";
+  };
+
   # Virtualisation configuration
   # Run QEMU as unprivileged user qemu-libvirtd (fixes the libvirt
   # "tainted: running with undesirable elevated privileges" warning).
