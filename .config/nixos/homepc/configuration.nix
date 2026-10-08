@@ -336,7 +336,7 @@ in
             -e CUDA_VISIBLE_DEVICES=1,0 \
             -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
             -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-            localhost/llama-cuda:mtmd-fix-mtp \
+            localhost/llama-cuda:mtmd-fix \
             --models-preset /app/llama-preset.ini \
             --models-max 1 \
             -lv 4 \
@@ -391,8 +391,13 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          ExecStart = "-${config.systemd.package}/bin/systemctl stop llamacpp.service";
-          ExecStop = "-${pkgs.systemd}/bin/systemctl start llamacpp.service";
+          # llamacpp is a rootless container: point podman at javi's socket so
+          # the (root-run) guard stops the right container. Stopping the
+          # container makes `podman run` exit 0, so the service goes inactive
+          # without tripping Restart=on-failure.
+          Environment = [ "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock" ];
+          ExecStart = "-${config.virtualisation.podman.package}/bin/podman stop llamacpp";
+          ExecStop = "-${config.systemd.package}/bin/systemctl restart llamacpp.service";
         };
         wantedBy = [ "sleep.target" ];
       };
