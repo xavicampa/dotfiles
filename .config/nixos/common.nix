@@ -52,6 +52,7 @@ in
   };
 
   networking = {
+    # nameservers = [ "172.16.99.1" ];
     enableIPv6 = false;
     useDHCP = true;
     wireless = {
@@ -226,7 +227,7 @@ in
         psmisc
         rofi
         rofimoji
-        transmission_4-qt
+        transmission_4-gtk
         unstable.kiro-cli
         unstable.rpi-imager
         slack
