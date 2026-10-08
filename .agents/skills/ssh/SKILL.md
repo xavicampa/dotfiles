@@ -49,6 +49,7 @@ ssh -o BatchMode=yes <host> '<command>'
 | Host | Address | User | Working key (1Password item) |
 |---|---|---|---|
 | `rpi` | 172.16.99.2 (in `/etc/hosts`) | `javi` | `homepc` (fingerprint `SHA256:i257BWt8wtR8w2p6TbnyuI3HbRdqIe3X167AXRfWShc`) |
+| `readynas` | 172.16.99.6 (in `/etc/hosts`) | `root` (NOT `admin` — key is only authorized for root) | `homepc` |
 
 When a new host starts working, add a row here (host, address, user, key item).
 
