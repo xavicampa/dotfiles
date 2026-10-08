@@ -36,6 +36,7 @@ in
     systemPackages = [
       pkgs.dig
       pkgs.efibootmgr
+      pkgs.gftp
       pkgs.spice-gtk
       pkgs.librepods
       pkgs.lsof
