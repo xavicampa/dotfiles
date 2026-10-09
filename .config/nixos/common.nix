@@ -36,10 +36,12 @@ in
     systemPackages = [
       pkgs.dig
       pkgs.efibootmgr
+      pkgs.gedit
       pkgs.gftp
       pkgs.spice-gtk
       pkgs.librepods
       pkgs.lsof
+      pkgs.nautilus
       (pkgs.catppuccin-sddm.override {
         flavor = "mocha";
         accent = "mauve";
@@ -237,7 +239,6 @@ in
         wtype
         xdg-user-dirs
         xdg-utils
-        nautilus
         # pkgs.thunar
       ];
     };

@@ -290,9 +290,11 @@ in
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
 
     services = {
+      # llama.cpp server: on-demand only (no wantedBy) - start it with
+      # `systemctl start llamacpp`. Takes the same :8080 as strata, so the two
+      # are mutually exclusive; strata is the one enabled at boot now.
       llamacpp = {
         description = "llama.cpp server container";
-        wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "simple";
           Restart = "on-failure";
@@ -345,6 +347,42 @@ in
         '';
       };
 
+      # Strata: Qwen3.8-Flash-Next (125B) on the NVIDIA cards. Enabled at boot
+      # (takes over :8080 from llamacpp, which is now on-demand only).
+      # Image is built from ~/dev/personal/Strata (`docker build -t strata .`);
+      # the model is reused from ~/.cache/huggingface (no download), the pack
+      # and MTP layer are built into the strata-data volume on first start.
+      strata = {
+        description = "Strata (Qwen3.8-Flash-Next) container";
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "simple";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          User = "javi";
+          Group = "users";
+          Environment = [
+            "PATH=/run/current-system/sw/bin"
+            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
+          ];
+        };
+
+        script = ''
+          podman run \
+            --replace \
+            --name strata \
+            -p 8080:8080 \
+            --device nvidia.com/gpu=all \
+            --ulimit memlock=-1 \
+            -v strata-data:/data \
+            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro \
+            -e HF_CACHE=/hf-cache \
+            -e MODEL=IQ3_S \
+            -e CONTEXT=131072 \
+            localhost/strata:latest
+        '';
+      };
+
       # llamacpp-npu = {
       #   description = "llama.cpp server container on Intel NPU (OpenVINO backend)";
       #   wantedBy = [ "multi-user.target" ];
@@ -382,8 +420,11 @@ in
       #   '';
       # };
 
+      # Stops whichever LLM container is running before suspend (both hold the
+      # NVIDIA cards + :8080) and brings back only the ones that were running,
+      # so on-demand llamacpp does not resurrect itself after resume.
       llamacpp-sleep-guard = {
-        description = "Stop llamacpp before NVIDIA suspend, restart after resume";
+        description = "Stop running LLM containers before NVIDIA suspend, restart after resume";
         unitConfig = {
           Before = [ "nvidia-suspend.service" "sleep.target" ];
           StopWhenUnneeded = true;
@@ -396,8 +437,22 @@ in
           # container makes `podman run` exit 0, so the service goes inactive
           # without tripping Restart=on-failure.
           Environment = [ "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock" ];
-          ExecStart = "-${config.virtualisation.podman.package}/bin/podman stop llamacpp";
-          ExecStop = "-${config.systemd.package}/bin/systemctl restart llamacpp.service";
+          # systemd ExecStart is not run through a shell, so the bookkeeping
+          # (which units were active before suspend) lives in a script.
+          ExecStart = "-${pkgs.writeShellScript "llm-sleep-guard-pre" ''
+            for u in llamacpp strata; do
+              if ${config.systemd.package}/bin/systemctl is-active --quiet "$u.service"; then
+                echo "$u"
+              fi
+            done > /run/llm-sleep-guard.active
+            ${config.virtualisation.podman.package}/bin/podman stop llamacpp strata || true
+          ''}";
+          ExecStop = "-${pkgs.writeShellScript "llm-sleep-guard-post" ''
+            if [ -s /run/llm-sleep-guard.active ]; then
+              ${config.systemd.package}/bin/systemctl restart $(cat /run/llm-sleep-guard.active)
+            fi
+            rm -f /run/llm-sleep-guard.active
+          ''}";
         };
         wantedBy = [ "sleep.target" ];
       };
