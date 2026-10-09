@@ -166,6 +166,9 @@ in
   networking = {
     hostName = "homepc"; # Define your hostname.
     useDHCP = lib.mkDefault true;
+    # :8080 is published by the strata/llamacpp podman containers (rootless
+    # pasta binds 0.0.0.0 in the host netns, so inbound hits nixos-fw).
+    firewall.allowedTCPPorts = [ 8080 ];
     # interfaces.enp3s0.mtu = 9000;
     # wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
   };
@@ -352,9 +355,18 @@ in
       # Image is built from ~/dev/personal/Strata (`docker build -t strata .`);
       # the model is reused from ~/.cache/huggingface (no download), the pack
       # and MTP layer are built into the strata-data volume on first start.
+      # --network host on purpose: with the default pasta mode the namespace
+      # address/subnet is snapshotted from the host routes at container start,
+      # and if wlan0 has no route yet (Wi-Fi still associating) pasta mirrors
+      # libvirt's virbr0 subnet 192.168.122.0/24 with no default route - the
+      # container then cannot reply to LAN clients and inbound requests hang
+      # until passt resets them (~10s). Host networking avoids the race; access
+      # is gated by networking.firewall.allowedTCPPorts.
       strata = {
         description = "Strata (Qwen3.8-Flash-Next) container";
         wantedBy = [ "multi-user.target" ];
+        wants = [ "network-online.target" ];
+        after = [ "network-online.target" ];
         serviceConfig = {
           Type = "simple";
           Restart = "on-failure";
@@ -371,7 +383,7 @@ in
           podman run \
             --replace \
             --name strata \
-            -p 8080:8080 \
+            --network host \
             --device nvidia.com/gpu=all \
             --ulimit memlock=-1 \
             -v strata-data:/data \
