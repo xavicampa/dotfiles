@@ -5,6 +5,9 @@
       { "minVramGiB": 40, "model": "bartowski/Qwen3.8-27B-GGUF:Q8_0" }
     ]
   },
+  "qwen3.8-flash-next-iq3_s": {
+    "supportsReasoningEffort": true
+  },
   "bartowski/Qwen3.8-27B-GGUF:Q8_0": {
     "supportsReasoningEffort": true,
     "thinkingFormat": "qwen-chat-template"
