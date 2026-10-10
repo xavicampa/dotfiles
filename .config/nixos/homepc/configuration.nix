@@ -141,6 +141,18 @@ in
       # IDs for pci-stub to claim when it loads (the cmdline reaches it in both
       # the initrd and the root system). See the pci-stub comment above.
       "pci-stub.ids=10de:22e9,10de:1aef"
+      # 2 MB hugepages for Strata's expert arena: it asks for
+      # MAP_HUGETLB|MAP_HUGE_2MB (src/core/pinned.cu) and falls back to 4 KB
+      # pages when no pool exists, which costs 12.2M first-touch faults +
+      # zeroing on the 46.84 GiB load and lets expert pages be swapped. The
+      # arena is 50,294,502,400 B = 23,983 pages; 24,064 (47 GiB) leaves
+      # ~15 GiB of the 62 GiB for everything else. See the memlock block below.
+      # NOTE: the count must be "hugepages=N" immediately after its
+      # "hugepagesz=" -- vm.nr_hugepages= on the cmdline is a sysctl name and is
+      # silently ignored (dmesg then shows "pre-allocated 0 pages").
+      "default_hugepagesz=2M"
+      "hugepagesz=2M"
+      "hugepages=24064"
       # "pcie_aspm.policy=performance"
       # "pcie_aspm.policy=powersupersave"
       # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
@@ -161,6 +173,20 @@ in
       "vm.blockdev.readahead" = "2048";
     };
   };
+
+  # RLIMIT_MEMLOCK for Strata: both mlock() of the expert arena and
+  # MAP_HUGETLB need it (a rootless container's CAP_IPC_LOCK does not count
+  # against init_user_ns). Rootless podman inherits the user manager's 8 MiB
+  # default, so the unit's `--ulimit memlock=-1` is silently dropped and the
+  # engine logs "mlock failed (raise ulimit -l)". PAM raises javi's hard limit
+  # at login; the user manager then hands it to its units (podman.service ->
+  # crun -> the container). Needs a re-login (the hugepages need a reboot).
+  security.pam.loginLimits = [
+    { domain = "javi"; type = "-"; item = "memlock"; value = "unlimited"; }
+  ];
+  systemd.user.extraConfig = ''
+    DefaultLimitMEMLOCK=infinity
+  '';
 
   # Network configuration
   networking = {
