@@ -147,7 +147,7 @@ pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrapper
 journalctl -u fstrim.service --since "2 min ago" --no-pager | grep -i trimmed
 ```
 
-- `fstrim.service` is a one-shot (trims all `/etc/fstab` filesystems and exits); the weekly timer is normally already enabled — only the service start needs pkexec (approval per the `elevated-permissions` skill). Verify: `systemctl status fstrim.service` shows `status=0/SUCCESS`.
+- `fstrim.service` is a one-shot (trims all `/etc/fstab` filesystems and exits); the weekly timer is normally already enabled — only the service start needs pkexec (approval, env-PATH rationale and failure modes: see the `elevated-permissions` skill — that file is the source of truth for the `pkexec env PATH=…` form used above). Verify: `systemctl status fstrim.service` shows `status=0/SUCCESS`.
 - The `journalctl` line prints per-filesystem `…: <size> (…) trimmed on <device>` lines — report them, e.g. "/: 12.3 GiB, /boot: 343.3 MiB".
 - The trimmed total covers **everything freed since the last trim**, not just this cleanup — it can dwarf the rm/prune size. Don't present it as "this cleanup freed X".
 
