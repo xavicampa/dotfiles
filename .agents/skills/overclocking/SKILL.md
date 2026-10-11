@@ -1,6 +1,7 @@
 ---
 name: overclocking
 description: CPU undervolting, overclocking, and stability stress testing on this machine (Intel Core Ultra 7 270K Plus, ASRock Z890I Nova WiFi, Linux/NixOS). Use when the user asks to undervolt/overclock the CPU, change CPU voltage/LLC/offset in BIOS, tune power limits, or validate stability after tuning changes (stress test + monitor). Also covers interpreting temps/power/freq under load and diagnosing thermal throttling vs instability.
+disable-model-invocation: true
 ---
 
 # CPU Overclocking / Undervolting

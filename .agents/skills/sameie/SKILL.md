@@ -1,6 +1,7 @@
 ---
 name: sameie
 description: The owners' association (sameiet) of the user's building. Load on any mention of sameie or sameiet.
+disable-model-invocation: true
 ---
 
 # Sameiet — Clemenskvartalet (Bjørvika, Oslo)
