@@ -393,9 +393,19 @@ in
         wantedBy = [ "multi-user.target" ];
         wants = [ "network-online.target" ];
         after = [ "network-online.target" ];
+        unitConfig = {
+          # The engine dies on its own from time to time (e.g. the CUDA OOM that
+          # kills the serve process mid-request), and `podman run` then exits
+          # non-zero. Lift the default start-rate limit (5 starts / 10s) so a
+          # crash-loop keeps retrying instead of landing in the failed state.
+          StartLimitIntervalSec = 0;
+        };
         serviceConfig = {
           Type = "simple";
-          Restart = "on-failure";
+          # always, not on-failure: the engine also exits 0 after its own
+          # watchdog gives up ("the engine stopped unexpectedly (exit code 0)"),
+          # which on-failure would leave the service inactive.
+          Restart = "always";
           RestartSec = "5s";
           User = "javi";
           Group = "users";
@@ -471,10 +481,11 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          # llamacpp is a rootless container: point podman at javi's socket so
-          # the (root-run) guard stops the right container. Stopping the
-          # container makes `podman run` exit 0, so the service goes inactive
-          # without tripping Restart=on-failure.
+          # Stop the *units*, not just the containers: strata has Restart=always
+          # (it also exits 0 when its own engine watchdog gives up), so a bare
+          # `podman stop` would have systemd bring it straight back mid-suspend.
+          # `systemctl stop` takes the unit out of the active set, which is also
+          # what the ExecStop bookkeeping below keys on.
           Environment = [ "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock" ];
           # systemd ExecStart is not run through a shell, so the bookkeeping
           # (which units were active before suspend) lives in a script.
@@ -484,7 +495,7 @@ in
                 echo "$u"
               fi
             done > /run/llm-sleep-guard.active
-            ${config.virtualisation.podman.package}/bin/podman stop llamacpp strata || true
+            ${config.systemd.package}/bin/systemctl stop llamacpp strata || true
           ''}";
           ExecStop = "-${pkgs.writeShellScript "llm-sleep-guard-post" ''
             if [ -s /run/llm-sleep-guard.active ]; then
