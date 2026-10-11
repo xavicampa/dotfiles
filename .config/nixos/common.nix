@@ -233,6 +233,7 @@ in
         transmission_4-gtk
         unstable.kiro-cli
         unstable.rpi-imager
+        unstable.telegram-desktop
         slack
         stow
         wl-clipboard
