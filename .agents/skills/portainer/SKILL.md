@@ -28,7 +28,7 @@ Subcommands: `status`, `containers`, `create FILE.json`, `start/stop/rm <id>`,
 `logs <id>`, `images`, `volumes`, `templates [filter]`,
 `deploy <templateId> NAME [ENV=VAL ...]`, `raw <METHOD> <PATH> [body]`.
 
-## Critical API quirks (Portainer 2.39.1)
+## Critical API quirks (Portainer 2.45.1; re-verified 2026-10)
 
 1. **Auth header**: API keys (`ptr_...`) go in the **`X-API-KEY`** header, NOT
    `Authorization: Bearer` (that's only for JWTs). Bearer + API key →
@@ -52,11 +52,25 @@ Subcommands: `status`, `containers`, `create FILE.json`, `start/stop/rm <id>`,
 9. **Images must be pulled first** — container create fails with "no such image" if the
    image is not in the local store (no implicit pull through this route).
 10. **`exec` sub-routes are not proxied** — `POST /containers/{id}/exec` works (201), but everything under it (`.../exec/{eid}/start`, `.../exec/{eid}/json`) returns a plain `Not Found` 404. To run a command inside a container's filesystem, create a **one-shot busybox container** mounting the same volume(s) (busybox is already local), start it, read `/logs`, then `DELETE ...?force=true`.
+    For a non-busybox app image: override `"Entrypoint":["/bin/bash"]` (bypasses s6 `/init` etc.), mount with
+    `"HostConfig":{"Binds":["<volume>:<mnt>"]}`, set `AttachStdout:false` and read `/logs`. Pass the script as
+    a **base64 env var** (`Cmd:["-lc","echo $B64 | base64 -d | bash"]`) — nesting shell quotes through
+    jq→JSON→bash corrupts `sed`/`awk` programs. `/logs` arrives with s6/control-char padding:
+    `tr -d '\000' | sed 's/\x1b\[[0-9;]*[A-Za-z]//g; s/^[[:cntrl:]]*//'`. Use the app's own interpreter
+    (e.g. the image's own venv interpreter under `/opt/…`), not system `python3` — system python lacks the app's deps.
 11. **App Store templates**: `GET /api/templates` → `.templates[]` with `.id`, `.title`, `.image`.
    Deploy: `POST /api/templates/{id}/deploy` with
    `{"name":"<app>","hostId":<localId>,"env":[{"name":..,"value":..}],"volumes":[{"Container":..,"Host":..}]}`.
    Template deploy is all-or-nothing on its config; for fine control (compose, custom
    networks/volumes), prefer `containers/create` or stacks.
+12. **Empty compose env values vanish** — `environment: FOO:` with an empty value is dropped from
+    `Config.Env` entirely, so the app silently runs unconfigured. Every `bash` tool call is a **fresh
+    shell**: source a creds file and consume it in the *same* command, then verify with
+    `GET .../containers/{id}/json | jq -r '.Config.Env[]'` before reporting success.
+13. **App-generated secrets in the data volume can outrank container env** — some app images have a
+    first-boot hook that writes its own generated `API_SERVER_KEY`-style secret into the volume's `.env`,
+    and that value wins over the compose `environment:` value. Rewrite the volume's `.env` from a
+    one-shot container (quirk 10) and restart the container.
 
 ## Stacks (compose) via the global API
 
@@ -77,6 +91,10 @@ Quirks learned the hard way:
 - **Port conflict = hard fail, but nothing is persisted** — if `compose up` fails (e.g. `bind: address already in use`), the API returns 500 and **no stack row is created** (`GET /api/stacks` stays clean). Free the ports (stop/remove the squatter containers), then re-POST — no cleanup of a half-created stack needed.
 - Storing a reference copy of the compose locally (e.g. `~/<name>stack.yml`) is handy for re-deploys.
 - `StackFileContent` is the compose YAML **as a JSON string** (`\n`-escaped); easiest to build the body with a heredoc + `jq -n`/a pre-escaped file.
+- **Pre-pull large images before creating the stack** —
+  `POST /endpoints/2/docker/images/create?fromImage=docker.io/<org>/<img>&tag=latest`. A compose pull
+  inside `stacks/create` blows past the HTTP request timeout. Run the pull in the **foreground** of a
+  bash call: a `nohup … &` pull is killed when that tool call's shell exits and leaves a partial store.
 - **Compose prefixes top-level named volumes with the project name** (project name = stack `Name`): a stack `jelly` with volume `jellyfin-media` uses podman volume **`jelly_jellyfin-media`**, not `jellyfin-media`. Consequences: volumes created before the stack (e.g. for standalone containers) are NOT reused by the stack — pre-populate the prefixed name; and to inspect/prepare a stack volume, use the prefixed name in a one-shot busybox container.
 
 ## Verified working example (token test, 2026-08)
