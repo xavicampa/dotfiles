@@ -426,8 +426,8 @@ in
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro \
             -e HF_CACHE=/hf-cache \
             -e MODEL=IQ3_S \
-            -e VISION=yes \
-            -e CONTEXT=131072 \
+            -e VISION=cpu \
+            -e CONTEXT=262144 \
             localhost/strata:latest
         '';
       };

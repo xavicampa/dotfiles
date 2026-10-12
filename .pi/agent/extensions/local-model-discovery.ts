@@ -143,11 +143,19 @@ function loadLocalModelsConfig(): LocalModelsConfig {
   return { overrides, vramTiers };
 }
 
-function extractContextSize(status: Record<string, unknown>): number {
-  const meta = (status as any)?.meta;
-  if (typeof meta?.n_ctx === "number") return meta.n_ctx;
+/**
+ * Read the served context window from a llama.cpp-style model record.
+ * `meta.n_ctx` lives at the top level of the /v1/models entry (siblings of
+ * `status`), but some routers nest it under `status`, so check both. The
+ * launch-args fallback (`--ctx-size`) is checked the same way.
+ */
+function extractContextSize(model: Record<string, unknown>): number {
+  const status = (model as any)?.status ?? {};
+  for (const meta of [(model as any)?.meta, status?.meta]) {
+    if (typeof meta?.n_ctx === "number") return meta.n_ctx;
+  }
 
-  const args = (status as any)?.args as string[] | undefined;
+  const args = ((model as any)?.args ?? status?.args) as string[] | undefined;
   if (Array.isArray(args)) {
     const ctxSizeArg = args.find((a: string) => a.startsWith("--ctx-size="));
     if (ctxSizeArg) {
@@ -215,7 +223,7 @@ function buildModels(provider: ProviderConfig, data: any[]): ProviderModelConfig
     return data.map((model) => {
       const override = overrides.get(model.id) ?? {};
       const thinkingFormat = override.thinkingFormat;
-      const contextWindow = extractContextSize(model.status ?? {});
+      const contextWindow = extractContextSize(model);
       // Output-token cap: half the context window (so long prompts stay
       // usable), capped so huge contexts don't imply absurdly long outputs.
       const maxTokens = override.maxTokens ?? Math.min(Math.floor(contextWindow / 2), 65536);
@@ -279,7 +287,10 @@ async function fetchModelsImpl(
 
   const payload = (await response.json()) as { data: any[] };
   const models = buildModels(provider, payload.data);
-  log(`${tag} Discovered ${models.length} models from ${provider.baseUrl}`);
+  // One line per refresh — keep it short (the rpi catalog has hundreds of models).
+  const shown = models.slice(0, 8).map((m) => ("contextWindow" in m ? `${m.id}=${m.contextWindow}` : m.id));
+  if (models.length > shown.length) shown.push(`+${models.length - shown.length} more`);
+  log(`${tag} Discovered ${models.length} models from ${provider.baseUrl} (${shown.join(", ")})`);
   return models;
 }
 
