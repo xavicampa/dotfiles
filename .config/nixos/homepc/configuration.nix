@@ -388,6 +388,21 @@ in
       # container then cannot reply to LAN clients and inbound requests hang
       # until passt resets them (~10s). Host networking avoids the race; access
       # is gated by networking.firewall.allowedTCPPorts.
+      # The model config lives on the host: ~/.config/strata/strata-iq3_s.json,
+      # bind-mounted over the volume's /data/config. docker-entrypoint.sh builds
+      # the path as $STRATA_DATA/config/strata-<model>.json, so shadowing that one
+      # directory keeps the config editable from the host and independent of the
+      # image, while strata-data still holds the pack, the MTP layer and the GGUF
+      # links. Mount the directory, not the config file: setup.py saves a config
+      # as <name>.tmp + os.replace, and a rename over a bind-mounted file fails
+      # with EBUSY (checked with mount --bind). The directory does reach the host
+      # as javi: the container is rootless.
+      # The second mount is the web app's Chat settings: serve/server.py puts them
+      # next to the --config path, which is the /opt/strata link rather than the
+      # config itself, so they would otherwise be written into the container's own
+      # layer and lost when it is replaced. That one is a single file - it is
+      # written with write_text, no rename - and it has to exist on the host
+      # before the start, or podman creates a directory at the mount point.
       strata = {
         description = "Strata (Qwen3.8-Flash-Next) container";
         wantedBy = [ "multi-user.target" ];
@@ -409,6 +424,14 @@ in
           RestartSec = "5s";
           User = "javi";
           Group = "users";
+          # both mounts need their host side to exist as the right kind: an absent
+          # directory makes podman create an empty one, and an empty /data/config
+          # sends the entrypoint through a full setup pass instead of reading the
+          # config that is already in the volume; an absent file becomes a directory.
+          ExecStartPre = [
+            "/run/current-system/sw/bin/mkdir -p /home/javi/.config/strata"
+            "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-iq3_s.shared-settings.json"
+          ];
           Environment = [
             "PATH=/run/current-system/sw/bin"
             "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
@@ -423,10 +446,12 @@ in
             --device nvidia.com/gpu=all \
             --ulimit memlock=-1 \
             -v strata-data:/data \
+            -v /home/javi/.config/strata:/data/config \
+            -v /home/javi/.config/strata/strata-iq3_s.shared-settings.json:/opt/strata/strata-iq3_s.shared-settings.json \
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro \
             -e HF_CACHE=/hf-cache \
             -e MODEL=IQ3_S \
-            -e VISION=cpu \
+            -e VISION=yes \
             localhost/strata:latest
         '';
       };
