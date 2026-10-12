@@ -1,0 +1,5 @@
+# setup.py keeps a copy of the model config beside it every time it changes one
+# (setup.py:3968 writes strata-<model>.json.bak): artifacts of a setup run, not
+# settings anyone chose. strata-<model>.shared-settings.json IS tracked - the
+# container bind-mounts it as a single file, so it has to exist as a file.
+strata-*.json.bak*
