@@ -1,8 +1,41 @@
 {
   "_vram": {
     "tiers": [
-      { "minVramGiB": 16, "model": "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S" },
-      { "minVramGiB": 40, "model": "bartowski/Qwen3.8-27B-GGUF:Q8_0" }
+      {
+        "minVramGiB": 16,
+        "model": "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S",
+        "note": "11.0 GiB IQ3_S weights + 4.5 GiB q8_0 KV at ctx 65536 + ~2 GiB buffers = ~17.5 GiB. 16 is optimistic: on a single 16 GiB card llama.cpp retries with partial offload. Kept as the floor tier so a 16 GiB machine still has an eligible pick."
+      },
+      {
+        "minVramGiB": 36,
+        "model": "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF:Q6_K_L",
+        "note": "29.1 GiB Q6_K_L + 0.8 GiB mmproj + 1.1 GiB MTP draft + 2.9 GiB q8_0 KV at ctx 131072 + buffers = ~36 GiB."
+      },
+      {
+        "minVramGiB": 40,
+        "model": "bartowski/Qwen3.8-27B-GGUF:Q8_0",
+        "note": "27.1 GiB Q8_0 + 0.5 GiB dflash draft + 9.1 GiB q8_0 KV at ctx 131072 + buffers = ~39 GiB. First 40 GiB entry on purpose: resolvePreferredLocalModel keeps the earliest entry on ties, so this stays the pick on a 40 GiB pool."
+      },
+      {
+        "minVramGiB": 40,
+        "model": "qwen3.8-flash-next-iq3_s",
+        "note": "77.9 GiB IQ3_S weights (2 shards) served by strata with deliberate CPU/RAM offload, so the VRAM footprint is not the file size: measured 15.4 + 23.3 = 38.8 GiB used across both cards at ctx 262144. Needs a ~40 GiB pool as configured."
+      },
+      {
+        "minVramGiB": 40,
+        "model": "qwen3.8-flash-next-abliterated-iq3_s",
+        "note": "Same SC117 Flash-Next IQ3_S weights/offload profile as qwen3.8-flash-next-iq3_s."
+      },
+      {
+        "minVramGiB": 40,
+        "model": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_S",
+        "note": "Same 77.9 GiB Flash-Next IQ3_S weights through the llama.cpp preset (ctx 131072, load-mode=none, fit-target=0,0): partial offload by design, ~40 GiB pool."
+      },
+      {
+        "minVramGiB": 40,
+        "model": "bartowski/Qwen3.8-27B-GGUF:MTP_1P_180K",
+        "note": "Same 27.1 GiB Q8_0 weights as the entry above but ctx 180224: q8_0 KV ~12.6 GiB (head_dim 128; up to ~21 GiB if qwen35 head_dim is 5120/24) => ~42-49 GiB. Deliberately left at 40 so the warning fires only when the model is clearly over, not at the margin."
+      }
     ]
   },
   "qwen3.8-flash-next-iq3_s": {

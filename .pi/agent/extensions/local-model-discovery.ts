@@ -25,10 +25,20 @@
  *
  * An explicit choice always wins over the heuristic: a `defaultModel` set in
  * settings.json, a `--model`/`--models` CLI pick, and sessions that already
- * contain a conversation are left untouched.
+ * contain a conversation are left untouched — even when the pick needs more
+ * VRAM than this machine has. Such a mismatch is visible only to the router, so
+ * it is surfaced as a startup warning (warnIfLocalModelTooBig) instead of
+ * silently turning the first prompt into a load failure or a CPU-offload crawl.
+ * Models that no VRAM tier names are not checked: the tier list is the only
+ * size information available (llama-swap reports no file sizes).
  */
 
-import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ProviderConfig as PiProviderConfig,
+  ProviderModelConfig,
+} from "@earendil-works/pi-coding-agent";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
@@ -56,6 +66,19 @@ interface ProviderConfig {
   baseUrl: string;
   apiKey: string;
 }
+
+// pi's provider composer merges a provider-level `compat` into every model
+// (mergeCompat(providerConfig.compat, model.compat)), but the extension-facing
+// ProviderConfig type omits the field — hence this local widening type instead
+// of a cast, which would silence the checks on the rest of the literal.
+type RegisteredProviderConfig = PiProviderConfig & {
+  compat?: {
+    supportsDeveloperRole?: boolean;
+    supportsReasoningEffort?: boolean;
+    thinkingFormat?: string;
+    [key: string]: unknown;
+  };
+};
 
 const PROVIDERS: ProviderConfig[] = [
   {
@@ -102,6 +125,8 @@ interface ModelOverride {
 interface VramTier {
   minVramGiB: number;
   model: string;
+  /** Documentation only — how minVramGiB was derived. Ignored by the loader. */
+  note?: string;
 }
 
 interface LocalModelsConfig {
@@ -152,6 +177,11 @@ function loadLocalModelsConfig(): LocalModelsConfig {
  * `meta.n_ctx` lives at the top level of the /v1/models entry (siblings of
  * `status`), but some routers nest it under `status`, so check both. The
  * launch-args fallback (`--ctx-size`) is checked the same way.
+ *
+ * llama-swap carries neither: it builds its listing from config and reports the
+ * window as a top-level `context_length` (from a model's `capabilities.context`),
+ * with `max_model_len` being the vLLM spelling. Read those before giving up,
+ * or every llama-swap model silently lands on the 128000 default.
  */
 function extractContextSize(model: Record<string, unknown>): number {
   const status = (model as any)?.status ?? {};
@@ -170,6 +200,13 @@ function extractContextSize(model: Record<string, unknown>): number {
     if (idx >= 0 && idx + 1 < args.length) {
       const parsed = parseInt(args[idx + 1], 10);
       if (!isNaN(parsed)) return parsed;
+    }
+  }
+
+  for (const field of ["context_length", "max_model_len", "n_ctx"]) {
+    for (const source of [model as any, status]) {
+      const value = source?.[field];
+      if (typeof value === "number" && Number.isInteger(value) && value > 0) return value;
     }
   }
 
@@ -257,7 +294,9 @@ function buildModels(provider: ProviderConfig, data: any[]): ProviderModelConfig
       input: extractRpiInputTypes(model),
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: model.context_length ?? 200000,
-      ...(model.max_output_tokens && { maxTokens: model.max_output_tokens }),
+      // maxTokens is required on a chat model config; 16384 is pi's own default
+      // for models that omit it, so this keeps behaviour identical.
+      maxTokens: model.max_output_tokens ?? 16384,
       compat: { supportsDeveloperRole: true, supportsReasoningEffort: false },
     }));
   }
@@ -372,6 +411,47 @@ function detectLocalVramGiB(): number | undefined {
   return undefined;
 }
 
+// Model ids already warned about this process: session_start fires on startup,
+// reload, /new, /resume and /fork, and refreshModels fires even more often.
+const warnedOversizedModels = new Set<string>();
+
+/**
+ * VRAM a model needs, taken from the tier that names it in local-models.json.
+ * undefined for models no tier names — there is no size metadata to fall back
+ * to (llama-swap's /v1/models carries neither file size nor n_ctx metadata).
+ */
+function requiredVramGiBFor(modelId: string): number | undefined {
+  const { vramTiers } = loadLocalModelsConfig();
+  const matching = vramTiers.filter((tier) => tier.model === modelId);
+  if (matching.length === 0) return undefined;
+  return matching.reduce((a, b) => (b.minVramGiB < a.minVramGiB ? b : a)).minVramGiB;
+}
+
+/**
+ * Warn — never override — when the session's local model needs more VRAM than
+ * this machine has. An explicit pick always beats the tier heuristic, so
+ * without this the mismatch only shows up as a llama.cpp allocation failure or
+ * a CPU-offload crawl on the first prompt.
+ */
+function warnIfLocalModelTooBig(modelId: string, ctx: ExtensionContext): void {
+  const required = requiredVramGiBFor(modelId);
+  if (required === undefined) return;
+  const vramGiB = detectLocalVramGiB();
+  if (vramGiB === undefined) return;
+  if (vramGiB + VRAM_TOLERANCE_GIB >= required) return;
+  if (warnedOversizedModels.has(modelId)) return;
+  warnedOversizedModels.add(modelId);
+  log(
+    `Local model ${modelId} needs >=${required} GiB VRAM but only ${vramGiB} GiB ` +
+      "detected; keeping it (explicit choice) — expect a load failure or CPU offload",
+  );
+  ctx.ui.notify(
+    `${modelId} needs ~${required} GiB VRAM, this machine has ${vramGiB} GiB. ` +
+      "Expect a load failure or heavy CPU offload; /model to pick a smaller local model.",
+    "warning",
+  );
+}
+
 /**
  * Pick the default local model for this GPU: the tier with the largest
  * nominal minVramGiB the detected usable VRAM satisfies (with driver-loss
@@ -421,20 +501,28 @@ export default async function (pi: ExtensionAPI) {
   );
 
   for (const [index, provider] of PROVIDERS.entries()) {
-    pi.registerProvider(provider.id, {
+    const config: RegisteredProviderConfig = {
       name: provider.label,
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       api: "openai-completions",
       models: discovered[index],
       compat: { supportsDeveloperRole: true, supportsReasoningEffort: false },
+      // pi's provider composer merges this provider-level compat into every
+      // model; buildModels() also sets both flags per model, so the two agree.
       async refreshModels({ allowNetwork, stored, signal }) {
         // Offline phase: never touch the network. Serve the last known-good
         // catalog (stale is fine). Never return [] here: the returned list
         // replaces the provider catalog, and the offline phase runs after
         // startup registration.
+        const cached = lastDiscovered.get(provider.id);
         if (!allowNetwork) {
-          return lastDiscovered.get(provider.id) ?? stored?.models ?? [];
+          if (cached) return cached;
+          // No discovery succeeded in this process: hand back pi's stored
+          // snapshot. It holds normalized model records rather than
+          // ProviderModelConfig inputs — pi accepts both here, the cast only
+          // papers over the declared type (and drops the readonly marker).
+          return stored ? ([...stored.models] as ProviderModelConfig[]) : [];
         }
         const models = await fetchModels(
           provider,
@@ -443,7 +531,8 @@ export default async function (pi: ExtensionAPI) {
         lastDiscovered.set(provider.id, models);
         return models;
       },
-    });
+    };
+    pi.registerProvider(provider.id, config);
   }
 
   // VRAM-based local default. Pi resolves the configured defaultModel before
@@ -459,22 +548,44 @@ export default async function (pi: ExtensionAPI) {
 
     // The VRAM heuristic exists only to choose a sensible local default when
     // the user has not chosen one. An explicit pick wins:
+    //  - a scoped model (`--models` / settings `enabledModels`): pi makes the
+    //    first scoped model the session model, ahead of settings.defaultModel.
     //  - `defaultModel` in settings.json (pi resolves it before session_start,
-    //    so current.id === defaultModel means "the user asked for this").
-    //  - `--model` / `--models`: current.id differs from the configured
-    //    default, or matches the first scoped model.
-    // Only when no default is configured — or the configured one is not
-    // available and pi fell back to an arbitrary model — do we pick a tier.
-    const configured = pi.getSettings().defaultModel;
-    if (configured) {
-      if (configured === current.id) {
+    //    so current === configured means "the user asked for this").
+    //  - `--model` / a resumed session's model: current differs from the
+    //    configured default, which makes it a *fallback* only when the
+    //    configured default is itself unresolvable. Pi's priority is CLI args
+    //    → scoped models → session state → settings default, and getSettings()
+    //    reports only the settings value, so "current !== configured" alone
+    //    does not imply a fallback — require the configured default to be
+    //    missing from the registry (same test pi applies: find + auth).
+    const settings = pi.getSettings();
+    const configured = settings.defaultModel;
+    const configuredProvider = settings.defaultProvider;
+
+    if (ctx.scopedModels.some((scoped) => scoped.model.provider === current.provider && scoped.model.id === current.id)) {
+      log(`Session ${event.reason}: keeping scoped model ${current.id} (VRAM override skipped)`);
+      warnIfLocalModelTooBig(current.id, ctx);
+      return;
+    }
+
+    // Pi only honours a saved default when both provider and model are set.
+    if (configured && configuredProvider) {
+      if (current.provider === configuredProvider && current.id === configured) {
         log(`Session ${event.reason}: keeping configured default ${current.id} (VRAM override skipped)`);
+        warnIfLocalModelTooBig(current.id, ctx);
         return;
       }
-      log(`Session ${event.reason}: configured default ${configured} unavailable, pi resolved ${current.id}`);
-    } else if (ctx.scopedModels.some((scoped) => scoped.model.id === current.id)) {
-      log(`Session ${event.reason}: keeping scoped model ${current.id} (VRAM override skipped)`);
-      return;
+      const configuredModel = ctx.modelRegistry.find(configuredProvider, configured);
+      if (configuredModel && ctx.modelRegistry.hasConfiguredAuth(configuredModel)) {
+        log(
+          `Session ${event.reason}: ${current.id} is an explicit pick (settings default ` +
+            `${configuredProvider}/${configured} is still resolvable); VRAM override skipped`,
+        );
+        warnIfLocalModelTooBig(current.id, ctx);
+        return;
+      }
+      log(`Session ${event.reason}: configured default ${configuredProvider}/${configured} unavailable, pi resolved ${current.id}`);
     }
 
     const preferredId = resolvePreferredLocalModel();
