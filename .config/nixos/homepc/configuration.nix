@@ -192,8 +192,8 @@ in
   networking = {
     hostName = "homepc"; # Define your hostname.
     useDHCP = lib.mkDefault true;
-    # :8080 is published by the strata/llamacpp podman containers (rootless
-    # pasta binds 0.0.0.0 in the host netns, so inbound hits nixos-fw).
+    # :8080 is llama-swap (the single front door); it publishes the backend
+    # containers on 5800+ (startPort), which the firewall leaves closed.
     firewall.allowedTCPPorts = [ 8080 ];
     # interfaces.enp3s0.mtu = 9000;
     # wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
@@ -306,6 +306,192 @@ in
   #   ''}/bin/iwlwifi-reload";
   # };
 
+  # llama-swap: one front door on :8080 that picks the engine by the requested
+  # model name and swaps the container behind it. Topology A: llama-swap owns
+  # the `podman run` of every backend, so only one of them holds the two cards
+  # at a time. Verified against llama-swap v249 (unstable).
+  #
+  # llama.cpp keeps its own router mode (--models-preset, --models-max 1): the
+  # preset names are aliases of the ONE llamacpp entry and llama-swap forwards
+  # the requested name untouched (it rewrites `model` only when useModelName is
+  # set - internal/server/filters.go), so switching GGUF inside llama.cpp costs
+  # a weight reload, while switching engine costs a container restart.
+  #
+  # `${MODEL_ID}` / `${PORT}` are llama-swap macros: inside a Nix indented
+  # string they must be written ''${...} or they reach the YAML doubled.
+  services.llama-swap = {
+    enable = true;
+    package = unstable.llama-swap;   # v249: routing.groups, sendLoadingState, cmdStop
+    listenAddress = "0.0.0.0";       # LAN clients already use homepc:8080
+    port = 8080;
+
+    settings = {
+      logLevel = "info";
+
+      # engine output into journald. llama-swap captures the upstream process
+      # (the `podman run` client, so the container's stdout/stderr) in its log
+      # monitors either way - /logs/stream/upstream - but only writes it to
+      # stdout when asked, and `podman run --replace` destroys the container on
+      # every swap, so without this the previous engine's log is simply gone.
+      # v249 takes exactly one of proxy | upstream | both | none - the comma
+      # list ("proxy,upstream", "proxy,http") is newer and llama-swap refuses to
+      # start on it: "logToStdout must be one of: proxy, upstream, both, none",
+      # which fails the unit and aborts the switch. "both" = proxy + upstream +
+      # one access line per request.
+      logToStdout = "both";
+      logTimeFormat = "rfc3339";
+
+      # Strata binds its port only once the model is in memory, so this has to
+      # cover a cold load. Measured on a Tesla V100 with the GGUFs on a SATA
+      # SSD: 80 s, 105 s while a download used the disk (Strata docs/LLAMA_SWAP.md).
+      healthCheckTimeout = 300;
+
+      # graceful stop of the `podman run` client and the container
+      unloadTimeout = 40;
+
+      # backends get 5800+; only 8080 stays open in the firewall
+      startPort = 5800;
+
+      # a client that waits through a swap sees "loading ..." in the reasoning
+      # field instead of a silent stall
+      sendLoadingState = true;
+
+      # the llama.cpp presets are aliases of one entry, so list them
+      includeAliasesInList = true;
+
+      # nothing is evicted by a timer; the group swaps on demand
+      globalTTL = 0;
+
+      models = {
+        # Strata runs --network host, so the container itself needs the port
+        # llama-swap assigned (docker-entrypoint.sh passes PORT to serve/server.py).
+        strata = {
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            --network host
+            --device nvidia.com/gpu=all
+            --ulimit memlock=-1
+            -v strata-data:/data
+            -v /home/javi/.config/strata:/data/config
+            -v /home/javi/.config/strata/strata-iq3_s.shared-settings.json:/opt/strata/strata-iq3_s.shared-settings.json
+            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
+            -e HF_CACHE=/hf-cache
+            -e MODEL=IQ3_S
+            -e VISION=yes
+            -e PORT=''${PORT}
+            localhost/strata:latest
+          '';
+          cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
+          checkEndpoint = "/health";
+          ttl = 0;
+          aliases = [ "qwen3.8-flash-next-iq3_s" ];
+        };
+
+        # The same IQ3_S tier abliterated: SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF.
+        # Same engine, same tuning, same strata-data volume - but its own GGUFs, its
+        # own pack and its own config. The pack cannot be shared: the transplant
+        # moved tensor offsets, so the upstream pack's native_experts.txt does not
+        # match this file ("ArenaExpertSource: the pack's native_experts.txt does
+        # not match the model"). --mtp stays /data/mtp/rt: the draft layer comes
+        # from the stock Qwen checkpoint (no abliterated MTP head is published),
+        # so both Strata models use the same one.
+        #
+        # MODEL only names the tag here: SC117-IQ3_S -> tag sc117-iq3_s, so the
+        # entrypoint takes /data/config/strata-sc117-iq3_s.json (already written:
+        # no setup pass, and an unknown --model would fail loudly rather than
+        # re-download) and serve/server.py keeps the Chat settings beside it -
+        # hence the strata-sc117-iq3_s.shared-settings.json mount.
+        #
+        # One-time prep already done in the strata-data volume (2026-10-15):
+        #   gguf:  /data/gguf/sc117-iq3_s/{shard1,shard2,mmproj} symlinked into
+        #          the (read-only) /hf-cache mount, same trick as seed_gguf_dir
+        #   pack:  podman run --rm -v strata-data:/data \
+        #            -v ~/.cache/huggingface/hub:/hf-cache:ro \
+        #            --entrypoint .venv/bin/python localhost/strata:latest \
+        #            tools/iq_pack.py --gguf /data/gguf/sc117-iq3_s/<shard1> \
+        #            --out /data/packs/sc117_iq3_s
+        strata-abliterated = {
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            --network host
+            --device nvidia.com/gpu=all
+            --ulimit memlock=-1
+            -v strata-data:/data
+            -v /home/javi/.config/strata:/data/config
+            -v /home/javi/.config/strata/strata-sc117-iq3_s.shared-settings.json:/opt/strata/strata-sc117-iq3_s.shared-settings.json
+            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
+            -e HF_CACHE=/hf-cache
+            -e MODEL=SC117-IQ3_S
+            -e VISION=yes
+            -e PORT=''${PORT}
+            localhost/strata:latest
+          '';
+          cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
+          checkEndpoint = "/health";
+          ttl = 0;
+          # distinct from strata's qwen3.8-flash-next-iq3_s: the two run the same
+          # architecture and the same quant, only the weights differ
+          aliases = [ "qwen3.8-flash-next-abliterated-iq3_s" ];
+        };
+
+        llamacpp = {
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            -p ''${PORT}:8080
+            --device nvidia.com/gpu=all
+            -e GGML_CUDA_ALLREDUCE=internal
+            -e CUDA_VISIBLE_DEVICES=1,0
+            -v /home/javi/.cache/huggingface:/root/.cache/huggingface
+            -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro
+            localhost/llama-cuda:mtmd-fix
+            --models-preset /app/llama-preset.ini
+            --models-max 1
+            -lv 4
+            -t 8
+            -tb 8
+          '';
+          cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
+          checkEndpoint = "/health";
+          ttl = 0;
+          # must match the [sections] in ~/.config/llamacpp/llama-preset.ini, and
+          # stay unique across llama-swap: the Flash-Next IQ3_S name is the same
+          # GGUF Strata runs, so Strata answers to qwen3.8-flash-next-iq3_s only.
+          aliases = [
+            "bartowski/Qwen3.8-27B-GGUF:MTP_1P_180K"
+            "bartowski/Qwen3.8-27B-GGUF:Q8_0"
+            "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF:Q6_K_L"
+            "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_S"
+            "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S"
+          ];
+        };
+      };
+
+      routing.router = {
+        use = "group";
+        settings.groups = {
+          # both engines want both cards: llama.cpp tensor-splits 17,23 over the
+          # 3090 Ti + 5070 Ti, Strata runs gpu [0,1] with layer_split 32
+          gpu = {
+            swap = true;        # one at a time
+            exclusive = true;   # and it evicts every other group
+            members = [ "strata" "strata-abliterated" "llamacpp" ];
+          };
+        };
+      };
+
+      # the UI Activity page and /api/metrics/activity keep their records in a
+      # sqlite file instead of the in-memory ring (metricsMaxInMemory then has no
+      # effect). Text logs (/logs, /logs/stream/*) stay in-memory ring buffers
+      # either way. The directory comes from StateDirectory in the unit below:
+      # ProtectSystem=strict leaves /var read-only apart from what systemd opens.
+      store.path = "/var/lib/llama-swap/activity.sqlite";
+
+      # keep today's behaviour: Strata is loaded at boot, not on first request
+      hooks.on_startup.preload = [ "strata" ];
+    };
+  };
+
+
   # Systemd configuration
   systemd = {
     sleep.settings.Sleep = {
@@ -319,9 +505,46 @@ in
     tmpfiles.rules = [ "Z /sys/class/powercap/intel-rapl:0/energy_uj 0444 root root - -" ];
 
     services = {
-      # llama.cpp server: on-demand only (no wantedBy) - start it with
-      # `systemctl start llamacpp`. Takes the same :8080 as strata, so the two
-      # are mutually exclusive; strata is the one enabled at boot now.
+
+      # The module's unit is hardened for a self-contained Go server (DynamicUser,
+      # PrivateUsers, ProtectHome, a syscall deny list). Here llama-swap must exec
+      # the podman client against javi's rootless socket (/run/user/1000/podman/
+      # podman.sock, javi:users), so it runs as javi with those turned off - the
+      # same shape as the llamacpp/strata units below.
+      llama-swap = {
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+        serviceConfig = {
+          User = "javi";
+          Group = "users";
+          # /var/lib/llama-swap: created owned by javi, writable through
+          # ProtectSystem=strict. Holds store.path's activity.sqlite.
+          StateDirectory = "llama-swap";
+          DynamicUser = lib.mkForce false;
+          PrivateUsers = lib.mkForce false;
+          ProtectHome = lib.mkForce false;
+          NoNewPrivileges = lib.mkForce false;
+          RestrictNamespaces = lib.mkForce false;
+          SystemCallFilter = lib.mkForce [ "@system-service" ];
+          Environment = [
+            "PATH=/run/current-system/sw/bin"
+            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
+          ];
+          # same as the strata unit: an absent host side becomes an empty directory
+          # (which sends the entrypoint through a full setup pass) or a directory
+          ExecStartPre = [
+            "/run/current-system/sw/bin/mkdir -p /home/javi/.config/strata"
+            "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-iq3_s.shared-settings.json"
+            "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-sc117-iq3_s.shared-settings.json"
+          ];
+        };
+      };
+
+      # llama.cpp server: on-demand only (no wantedBy) - llama-swap owns the
+      # container now (podman run --replace --name llamacpp). Kept as a manual
+      # fallback: starting it while llama-swap runs steals the container and the
+      # two fight over :8080 and the cards. Takes the same :8080 as strata, so
+      # the two are mutually exclusive.
       llamacpp = {
         description = "llama.cpp server container";
         serviceConfig = {
@@ -376,8 +599,9 @@ in
         '';
       };
 
-      # Strata: Qwen3.8-Flash-Next (125B) on the NVIDIA cards. Enabled at boot
-      # (takes over :8080 from llamacpp, which is now on-demand only).
+      # Strata: Qwen3.8-Flash-Next (125B) on the NVIDIA cards. On-demand only
+      # (no wantedBy) - llama-swap preloads it at boot and owns the container.
+      # Kept as a manual fallback; see the llamacpp comment above.
       # Image is built from ~/dev/personal/Strata (`docker build -t strata .`);
       # the model is reused from ~/.cache/huggingface (no download), the pack
       # and MTP layer are built into the strata-data volume on first start.
@@ -405,9 +629,6 @@ in
       # before the start, or podman creates a directory at the mount point.
       strata = {
         description = "Strata (Qwen3.8-Flash-Next) container";
-        wantedBy = [ "multi-user.target" ];
-        wants = [ "network-online.target" ];
-        after = [ "network-online.target" ];
         unitConfig = {
           # The engine dies on its own from time to time (e.g. the CUDA OOM that
           # kills the serve process mid-request), and `podman run` then exits
@@ -493,11 +714,12 @@ in
       #   '';
       # };
 
-      # Stops whichever LLM container is running before suspend (both hold the
-      # NVIDIA cards + :8080) and brings back only the ones that were running,
-      # so on-demand llamacpp does not resurrect itself after resume.
+      # Stops llama-swap (and with it whichever backend container it is holding)
+      # before suspend, and brings it back after resume. llama-swap stops its
+      # upstream process on SIGTERM, so stopping the unit is enough; the
+      # preloaded Strata comes back with it.
       llamacpp-sleep-guard = {
-        description = "Stop running LLM containers before NVIDIA suspend, restart after resume";
+        description = "Stop the running LLM container before NVIDIA suspend, restart after resume";
         unitConfig = {
           Before = [ "nvidia-suspend.service" "sleep.target" ];
           StopWhenUnneeded = true;
@@ -505,21 +727,18 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          # Stop the *units*, not just the containers: strata has Restart=always
-          # (it also exits 0 when its own engine watchdog gives up), so a bare
-          # `podman stop` would have systemd bring it straight back mid-suspend.
-          # `systemctl stop` takes the unit out of the active set, which is also
-          # what the ExecStop bookkeeping below keys on.
+          # Stop the *unit*, not just the container: llama-swap has Restart=on-failure,
+          # so a bare `podman stop` would have systemd bring it straight back
+          # mid-suspend. `systemctl stop` takes it out of the active set, which is
+          # also what the ExecStop bookkeeping below keys on.
           Environment = [ "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock" ];
           # systemd ExecStart is not run through a shell, so the bookkeeping
           # (which units were active before suspend) lives in a script.
           ExecStart = "-${pkgs.writeShellScript "llm-sleep-guard-pre" ''
-            for u in llamacpp strata; do
-              if ${config.systemd.package}/bin/systemctl is-active --quiet "$u.service"; then
-                echo "$u"
-              fi
-            done > /run/llm-sleep-guard.active
-            ${config.systemd.package}/bin/systemctl stop llamacpp strata || true
+            if ${config.systemd.package}/bin/systemctl is-active --quiet llama-swap.service; then
+              echo llama-swap
+            fi > /run/llm-sleep-guard.active
+            ${config.systemd.package}/bin/systemctl stop llama-swap || true
           ''}";
           ExecStop = "-${pkgs.writeShellScript "llm-sleep-guard-post" ''
             if [ -s /run/llm-sleep-guard.active ]; then
