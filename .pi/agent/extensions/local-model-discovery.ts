@@ -611,7 +611,10 @@ export default async function (pi: ExtensionAPI) {
   pi.registerCommand("refresh-local-models", {
     description: "Re-discover and refresh models from all local APIs",
     handler: async (_args, ctx) => {
-      ctx.ui.setStatus("local-models", "Refreshing models...");
+      // Published on the shared bus rather than setStatus(): context-bar owns the
+      // footer's status line with a full-width bar, and a setStatus() value here
+      // would be truncated off the end of it.
+      pi.events.emit("status-bar:text", { key: "local-models", text: "Refreshing models…" });
       try {
         const result = await ctx.modelRegistry.refresh({
           allowNetwork: true,
@@ -634,7 +637,7 @@ export default async function (pi: ExtensionAPI) {
       } catch (err) {
         ctx.ui.notify(`Model refresh failed: ${(err as Error)?.message ?? err}`, "error");
       } finally {
-        ctx.ui.setStatus("local-models", "");
+        pi.events.emit("status-bar:text", { key: "local-models", text: "" });
       }
     },
   });
