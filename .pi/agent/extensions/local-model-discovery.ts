@@ -15,13 +15,17 @@
  * phase. Failures are surfaced by pi ("Could not refresh <provider>; showing
  * cached models") instead of dialogs.
  *
- * VRAM-based local default: on a fresh session (startup or /new) where pi's
- * configured default resolved to the "local" provider, the session model is
- * switched to the tier model from local-models.json (`_vram.tiers`) that fits
- * this machine's GPUs (VRAM from all GPUs is summed; largest tier whose
- * nominal minVramGiB the detected usable VRAM satisfies, with a tolerance
- * for driver loss; falls back to the model the router currently has loaded).
- * Sessions that already contain a conversation are left untouched.
+ * VRAM-based local default: on a fresh session (startup or /new) where pi had
+ * to pick a local model *for us* — no `defaultModel` in settings.json (or the
+ * configured one is unavailable) and no `--models` scoping — the session model
+ * is switched to the tier model from local-models.json (`_vram.tiers`) that
+ * fits this machine's GPUs (VRAM from all GPUs is summed; largest tier whose
+ * nominal minVramGiB the detected usable VRAM satisfies, with a tolerance for
+ * driver loss; falls back to the model the router currently has loaded).
+ *
+ * An explicit choice always wins over the heuristic: a `defaultModel` set in
+ * settings.json, a `--model`/`--models` CLI pick, and sessions that already
+ * contain a conversation are left untouched.
  */
 
 import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
@@ -446,13 +450,35 @@ export default async function (pi: ExtensionAPI) {
   // session_start and records it as the session's initial model_change (even
   // on fresh sessions), so model_change entries can't distinguish a
   // user-picked model from the default. Instead: only swap when the session
-  // has no conversation yet — continuing, resumed, and forked sessions keep
+  // has no conversation yet AND the current model is not an explicit pick
+  // (settings default / CLI) — continuing, resumed, and forked sessions keep
   // their own model (including any model the user picked in them).
   pi.on("session_start", async (event, ctx) => {
-    const preferredId = resolvePreferredLocalModel();
-    if (!preferredId) return;
     const current = ctx.model;
-    if (!current || current.provider !== "local" || current.id === preferredId) return;
+    if (!current || current.provider !== "local") return;
+
+    // The VRAM heuristic exists only to choose a sensible local default when
+    // the user has not chosen one. An explicit pick wins:
+    //  - `defaultModel` in settings.json (pi resolves it before session_start,
+    //    so current.id === defaultModel means "the user asked for this").
+    //  - `--model` / `--models`: current.id differs from the configured
+    //    default, or matches the first scoped model.
+    // Only when no default is configured — or the configured one is not
+    // available and pi fell back to an arbitrary model — do we pick a tier.
+    const configured = pi.getSettings().defaultModel;
+    if (configured) {
+      if (configured === current.id) {
+        log(`Session ${event.reason}: keeping configured default ${current.id} (VRAM override skipped)`);
+        return;
+      }
+      log(`Session ${event.reason}: configured default ${configured} unavailable, pi resolved ${current.id}`);
+    } else if (ctx.scopedModels.some((scoped) => scoped.model.id === current.id)) {
+      log(`Session ${event.reason}: keeping scoped model ${current.id} (VRAM override skipped)`);
+      return;
+    }
+
+    const preferredId = resolvePreferredLocalModel();
+    if (!preferredId || current.id === preferredId) return;
     const hasConversation = ctx.sessionManager
       .getBranch()
       .some((entry) => entry.type === "message");
