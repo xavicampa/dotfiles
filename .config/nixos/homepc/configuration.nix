@@ -181,6 +181,32 @@ in
     fsType = "ext4";
   };
 
+  # ReadyNAS "Media" share.  Mounted on first access (noauto + x-systemd.automount),
+  # never at boot, so an absent NAS cannot slow or fail boot (nofail + 30 s timeout);
+  # it unmounts itself after 10 min idle.  NFSv3 because the NAS runs nfsd with
+  # --no-nfs-version 4; nolock avoids needing rpc.statd.  Address by IP because
+  # "readynas" resolves via DNS only (not /etc/hosts).
+  fileSystems."/mnt/readynas-media" = {
+    device = "172.16.99.6:/READYNAS/Media";
+    fsType = "nfs";
+    options = [
+      "vers=3"
+      "nolock"
+      "proto=tcp"
+      "hard"
+      "timeo=600"
+      "retrans=2"
+      "noatime"
+      "rw"
+      "_netdev"
+      "nofail"
+      "noauto"
+      "x-systemd.automount"
+      "x-systemd.mount-timeout=30"
+      "x-systemd.idle-timeout=10min"
+    ];
+  };
+
   # Virtualisation configuration
   # Unprivileged qemu (fixes libvirt's "tainted: running with undesirable
   # elevated privileges" warning); guest files must be owned by qemu-libvirtd.
