@@ -96,16 +96,45 @@ function ensureContrast(text: Color, bg: Color, min: number): Color {
   return out;
 }
 
+/** CIE L* (0-100): perceptual lightness, what the eye actually compares. */
+function lightness(c: Color): number {
+  const y = luminance(c);
+  return y <= 0.008856 ? y * 903.3 : 116 * Math.cbrt(y) - 16;
+}
+
+// The fill and the track have to differ in lightness, not just hue: a saturated
+// green and a neutral grey 4 L* points apart read as one flat band, because hue
+// discrimination collapses at these levels (WCAG's 1.1:1 understates it badly).
+// TRACK_MIN_GAP is how far apart they must be; TRACK_PAGE_GAP stops the track
+// from darkening so far that the unfilled part of the bar dissolves into the
+// terminal background and the bar looks half-width again.
+const TRACK_MIN_GAP = 12;
+const TRACK_PAGE_GAP = 6;
+
+/** Darken (or lighten, on a light theme) the track until it separates from `fill`. */
+function trackFor(fill: Color, base: Color, page: Color): Color {
+  const pageL = lightness(page);
+  let out = mixColors(base, page, 0.5);
+  for (let t = 0.55; t <= 0.9; t += 0.05) {
+    if (Math.abs(lightness(out) - lightness(fill)) >= TRACK_MIN_GAP) break;
+    const next = mixColors(base, page, t);
+    if (Math.abs(lightness(next) - pageL) < TRACK_PAGE_GAP) break;
+    out = next;
+  }
+  return out;
+}
+
 function palette(theme: Theme, state: UsageState): Palette {
   const mode = theme.getColorMode();
   const base = theme.colors[state === "high" ? "error" : state === "warn" ? "warning" : "success"];
   const dark = theme.appearance !== "light";
   // Stand-in for the terminal's own background, which the theme is tuned against.
   const page = dark ? BLACK : WHITE;
-  // The bar is a background element, so mute both halves toward the page: the
-  // raw tokens are mid-tones that swallow any number drawn on top of them.
+  // The bar is a background element, so mute the fill toward the page: the raw
+  // token is a mid-tone that swallows any number drawn on top of it. The track
+  // is then derived from the fill, so the green is always the loud half.
   const fill = mixColors(base, page, 0.55);
-  const track = mixColors(theme.colors.borderMuted, page, 0.5);
+  const track = trackFor(fill, theme.colors.borderMuted, page);
   // Everything on the bar is quiet footer text, not a headline: the theme's own
   // muted/dim tokens match how pi styles the stats line above it. Muted carries
   // the settled values, dim marks the provisional in-flight ones.
