@@ -52,42 +52,20 @@ in
       # Modesetting is required.
       # modesetting.enable = true;
 
-      # Nvidia power management. Experimental, and can cause sleep/suspend to fail.
-      # Enable this if you have graphical corruption issues or application crashes after waking
-      # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead
-      # of just the bare essentials.
+      # Experimental, can break sleep/suspend; saves the whole VRAM to /tmp on
+      # suspend, which fixes corruption/crashes after wake.
       powerManagement.enable = true;
-
-      # Fine-grained power management. Turns off GPU when not in use.
-      # Experimental and only works on modern Nvidia GPUs (Turing or newer).
-      powerManagement.finegrained = false;
-
-      # Use the NVidia open source kernel module (not to be confused with the
-      # independent third-party "nouveau" open source driver).
-      # Support is limited to the Turing and later architectures. Full list of
-      # supported GPUs is at:
-      # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus
-      # Only available from driver 515.43.04+
-      # Currently alpha-quality/buggy, so false is currently the recommended setting.
+      powerManagement.finegrained = false;  # per-GPU off; Turing+ only
+      # Open kernel module (Turing+, driver >= 515.43.04) - not nouveau.
       open = true;
-
-      # Enable the Nvidia settings menu,
-      # accessible via `nvidia-settings`.
       nvidiaSettings = true;
 
-      # Optionally, you may need to select the appropriate driver version for your specific GPU.
-      # 2026-09-24: kernel AND driver both from `unstable.linuxPackages_6_18`
-      # (6.18.53 LTS + nvidia 615.71.09 / CUDA 13.4) — LTS kernel (no EOL
-      # whiplash) with the newest driver branch, both prebuilt on
-      # cache.nixos.org (verified: 6.18 open module = fetch-only).
-      # History: 2026-09-22 this was `unstable.linuxPackages_7_2` (7.2.7 +
-      # 615.71.09) — fully prebuilt, but 7.2 is non-LTS: no upstream patches
-      # once 7.3 lands, and nixpkgs drops EOL series (7.0 already gone).
-      # The nixos-26.05 release channel prebuilds nvidia for 6.12/6.18 but
-      # only at 595.71.05 (CUDA 12.x) — a downgrade that would break the
-      # CUDA-13 llama-cuda container — so the driver must come from unstable.
-      # Kernel + driver must stay from the SAME set (mixing once broke with
-      # "inconsistent kernel versions" in the modules aggregator).
+      # Kernel AND driver must come from the same linuxPackages set (mixing them
+      # once failed with "inconsistent kernel versions" in the modules
+      # aggregator). 6.18.53 LTS + nvidia 615.71.09 / CUDA 13.4, both prebuilt on
+      # cache.nixos.org. The release channel prebuilds nvidia only for 6.12/6.18
+      # at 595.71.05 (CUDA 12.x), which would break the CUDA-13 llama-cuda
+      # container - hence unstable. (2026-09-22: was linuxPackages_7_2, non-LTS.)
       package = unstable.linuxPackages_6_18.nvidiaPackages.latest;
       # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
@@ -163,7 +141,7 @@ in
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
-    kernelPackages = unstable.linuxPackages_6_18; # 2026-09-24: 6.18 LTS (6.18.53) from unstable — must match hardware.nvidia.package (same linuxPackages_6_18 set); see the comment there for the full history (was 7.2 non-LTS)
+    kernelPackages = unstable.linuxPackages_6_18; # 6.18.53 LTS; must match hardware.nvidia.package (same set)
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
     #   options nvidia NVreg_PreserveVideoMemoryAllocations=0
@@ -192,9 +170,9 @@ in
   networking = {
     hostName = "homepc"; # Define your hostname.
     useDHCP = lib.mkDefault true;
-    # :8080 is llama-swap (the single front door); it publishes the backend
-    # containers on 5800+ (startPort), which the firewall leaves closed.
-    firewall.allowedTCPPorts = [ 8080 ];
+    # :8080 is llama-swap, the single front door; it publishes the backends on
+    # 5800+ (startPort), which the firewall leaves closed. 8080 itself is opened
+    # by services.llama-swap.openFirewall - one place to change the port.
     # interfaces.enp3s0.mtu = 9000;
     # wireless.enable = lib.mkForce false; # Enables wireless support via wpa_supplicant.
   };
@@ -307,43 +285,47 @@ in
   # };
 
   # llama-swap: one front door on :8080 that picks the engine by the requested
-  # model name and swaps the container behind it. Topology A: llama-swap owns
-  # the `podman run` of every backend, so only one of them holds the two cards
-  # at a time. Verified against llama-swap v249 (unstable).
-  #
-  # llama.cpp keeps its own router mode (--models-preset, --models-max 1): the
-  # preset names are aliases of the ONE llamacpp entry and llama-swap forwards
-  # the requested name untouched (it rewrites `model` only when useModelName is
-  # set - internal/server/filters.go), so switching GGUF inside llama.cpp costs
-  # a weight reload, while switching engine costs a container restart.
-  #
-  # `${MODEL_ID}` / `${PORT}` are llama-swap macros: inside a Nix indented
-  # string they must be written ''${...} or they reach the YAML doubled.
+  # model name and swaps the container behind it (topology A: it owns every
+  # `podman run`, so only one backend holds the two cards at a time). Verified
+  # against llama-swap v249 (unstable).
+  #   - `models` keys are model names, never engine names: handleListModels
+  #     (internal/server/api.go) always emits a record for the key, and
+  #     `unlisted: true` continues *before* the alias loop - it hides the aliases
+  #     with it. There is no "hide the primary, keep the aliases" switch.
+  #   - llama.cpp keeps its own router mode (--models-preset, --models-max 1): the
+  #     preset names are aliases of the ONE entry and the requested name is
+  #     forwarded untouched (filters.go rewrites `model` only when useModelName is
+  #     set), so switching GGUF inside llama.cpp costs a weight reload while
+  #     switching engine costs a container restart.
+  #   - `${MODEL_ID}` / `${PORT}` are llama-swap macros: inside a Nix indented
+  #     string they must be written ''${...} or they reach the YAML doubled.
   services.llama-swap = {
     enable = true;
-    package = unstable.llama-swap;   # v249: routing.groups, sendLoadingState, cmdStop
+    # Must be unstable (249): `capabilities` needs llama-swap >= 225 and the
+    # channel's pkgs.llama-swap is 224, which drops the unknown key silently -
+    # the YAML carries the block but /v1/models never renders it.
+    package = unstable.llama-swap;
+    openFirewall = true;   # opens 8080; the backend ports (5800+) stay closed
     listenAddress = "0.0.0.0";       # LAN clients already use homepc:8080
     port = 8080;
 
     settings = {
       logLevel = "info";
 
-      # engine output into journald. llama-swap captures the upstream process
-      # (the `podman run` client, so the container's stdout/stderr) in its log
-      # monitors either way - /logs/stream/upstream - but only writes it to
-      # stdout when asked, and `podman run --replace` destroys the container on
-      # every swap, so without this the previous engine's log is simply gone.
-      # v249 takes exactly one of proxy | upstream | both | none - the comma
-      # list ("proxy,upstream", "proxy,http") is newer and llama-swap refuses to
-      # start on it: "logToStdout must be one of: proxy, upstream, both, none",
-      # which fails the unit and aborts the switch. "both" = proxy + upstream +
-      # one access line per request.
+      # Engine output into journald: llama-swap always captures upstream (the
+      # `podman run` client, so the container's stdout/stderr) in its monitors
+      # (/logs/stream/upstream) but only echoes it to stdout when asked, and
+      # `podman run --replace` destroys the container on every swap - without
+      # this the previous engine's log is simply gone. v249 accepts exactly one
+      # of proxy | upstream | both | none; a comma list ("proxy,upstream") is a
+      # newer spelling that fails the unit with "logToStdout must be one of:
+      # proxy, upstream, both, none". "both" also emits one access line/request.
       logToStdout = "both";
       logTimeFormat = "rfc3339";
 
-      # Strata binds its port only once the model is in memory, so this has to
-      # cover a cold load. Measured on a Tesla V100 with the GGUFs on a SATA
-      # SSD: 80 s, 105 s while a download used the disk (Strata docs/LLAMA_SWAP.md).
+      # Strata binds its port only once the model is in memory, so this must
+      # cover a cold load (Strata docs/LLAMA_SWAP.md: 80 s on a Tesla V100 with
+      # the GGUFs on a SATA SSD, 105 s while a download used the disk).
       healthCheckTimeout = 300;
 
       # graceful stop of the `podman run` client and the container
@@ -363,9 +345,11 @@ in
       globalTTL = 0;
 
       models = {
-        # Strata runs --network host, so the container itself needs the port
-        # llama-swap assigned (docker-entrypoint.sh passes PORT to serve/server.py).
-        strata = {
+        # --network host, so the container needs the port llama-swap assigned
+        # (docker-entrypoint.sh passes PORT to serve/server.py). The key doubles as
+        # the podman name via ${MODEL_ID} - legal under podman's
+        # [a-zA-Z0-9][a-zA-Z0-9_.-]*, unlike the llama.cpp key below.
+        "qwen3.8-flash-next-iq3_s" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
@@ -384,33 +368,38 @@ in
           cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
-          aliases = [ "qwen3.8-flash-next-iq3_s" ];
+          # `tools` renders as capabilities.function_calling = true plus
+          # supported_parameters ["tools","tool_choice"] (api.go
+          # renderCapabilities); without it Strata under-reports itself to clients
+          # doing capability discovery.
+          capabilities = {
+            context = 262144;
+            "in" = [ "text" "image" ];
+            out = [ "text" ];
+            tools = true;
+          };
+          # No aliases: the key is the public name, and every alias is listed too
+          # (includeAliasesInList) - so the old engine name "strata" is dropped.
         };
 
-        # The same IQ3_S tier abliterated: SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF.
-        # Same engine, same tuning, same strata-data volume - but its own GGUFs, its
-        # own pack and its own config. The pack cannot be shared: the transplant
-        # moved tensor offsets, so the upstream pack's native_experts.txt does not
-        # match this file ("ArenaExpertSource: the pack's native_experts.txt does
-        # not match the model"). --mtp stays /data/mtp/rt: the draft layer comes
-        # from the stock Qwen checkpoint (no abliterated MTP head is published),
-        # so both Strata models use the same one.
-        #
-        # MODEL only names the tag here: SC117-IQ3_S -> tag sc117-iq3_s, so the
-        # entrypoint takes /data/config/strata-sc117-iq3_s.json (already written:
-        # no setup pass, and an unknown --model would fail loudly rather than
-        # re-download) and serve/server.py keeps the Chat settings beside it -
-        # hence the strata-sc117-iq3_s.shared-settings.json mount.
-        #
-        # One-time prep already done in the strata-data volume (2026-10-15):
-        #   gguf:  /data/gguf/sc117-iq3_s/{shard1,shard2,mmproj} symlinked into
-        #          the (read-only) /hf-cache mount, same trick as seed_gguf_dir
-        #   pack:  podman run --rm -v strata-data:/data \
-        #            -v ~/.cache/huggingface/hub:/hf-cache:ro \
-        #            --entrypoint .venv/bin/python localhost/strata:latest \
-        #            tools/iq_pack.py --gguf /data/gguf/sc117-iq3_s/<shard1> \
-        #            --out /data/packs/sc117_iq3_s
-        strata-abliterated = {
+        # The same IQ3_S tier abliterated (SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF):
+        # same engine, tuning and strata-data volume, but its own GGUFs, pack and
+        # config. The pack cannot be shared - the transplant moved tensor offsets,
+        # so the upstream pack fails with "ArenaExpertSource: the pack's
+        # native_experts.txt does not match the model". --mtp stays /data/mtp/rt:
+        # the draft layer comes from the stock Qwen checkpoint (no abliterated MTP
+        # head is published), so both Strata models share it.
+        # MODEL names only the tag: SC117-IQ3_S -> sc117-iq3_s, so the entrypoint
+        # reads /data/config/strata-sc117-iq3_s.json (already written: no setup
+        # pass, and an unknown --model fails loudly instead of re-downloading) and
+        # serve/server.py keeps the Chat settings beside it - hence the
+        # strata-sc117-iq3_s.shared-settings.json mount.
+        # One-time prep already done in strata-data (2026-10-15): the GGUFs at
+        # /data/gguf/sc117-iq3_s/{shard1,shard2,mmproj} are symlinked into the
+        # read-only /hf-cache (same trick as seed_gguf_dir), and the pack was built
+        # with tools/iq_pack.py --gguf /data/gguf/sc117-iq3_s/<shard1>
+        #      --out /data/packs/sc117_iq3_s
+        "qwen3.8-flash-next-abliterated-iq3_s" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
@@ -429,14 +418,25 @@ in
           cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
-          # distinct from strata's qwen3.8-flash-next-iq3_s: the two run the same
-          # architecture and the same quant, only the weights differ
-          aliases = [ "qwen3.8-flash-next-abliterated-iq3_s" ];
+          # distinct from the other Strata entry (qwen3.8-flash-next-iq3_s): the
+          # two run the same architecture and the same quant, only the weights
+          # differ
+          capabilities = {
+            context = 262144;
+            "in" = [ "text" "image" ];
+            out = [ "text" ];
+            tools = true;
+          };
+          # no aliases, see the note on the other Strata entry
         };
 
-        llamacpp = {
+        # One entry, five preset names: the key is itself a real preset section, so
+        # the primary name resolves inside llama.cpp's router too and the other
+        # four stay aliases. Container name is literal, not ${MODEL_ID}: podman
+        # rejects `/` and `:` in names.
+        "bartowski/Qwen3.8-27B-GGUF:Q8_0" = {
           cmd = ''
-            podman run --replace --name ''${MODEL_ID}
+            podman run --replace --name llama-swap-llamacpp
             -p ''${PORT}:8080
             --device nvidia.com/gpu=all
             -e GGML_CUDA_ALLREDUCE=internal
@@ -450,15 +450,14 @@ in
             -t 8
             -tb 8
           '';
-          cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
+          cmdStop = ''podman stop -t 30 llama-swap-llamacpp'';
           checkEndpoint = "/health";
           ttl = 0;
-          # must match the [sections] in ~/.config/llamacpp/llama-preset.ini, and
-          # stay unique across llama-swap: the Flash-Next IQ3_S name is the same
-          # GGUF Strata runs, so Strata answers to qwen3.8-flash-next-iq3_s only.
+          # Every name (the key included) must match a [section] in
+          # ~/.config/llamacpp/llama-preset.ini and stay unique across llama-swap:
+          # the Flash-Next IQ3_S name belongs to the Strata entry only.
           aliases = [
             "bartowski/Qwen3.8-27B-GGUF:MTP_1P_180K"
-            "bartowski/Qwen3.8-27B-GGUF:Q8_0"
             "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF:Q6_K_L"
             "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_S"
             "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S"
@@ -474,20 +473,24 @@ in
           gpu = {
             swap = true;        # one at a time
             exclusive = true;   # and it evicts every other group
-            members = [ "strata" "strata-abliterated" "llamacpp" ];
+            members = [
+              "qwen3.8-flash-next-iq3_s"
+              "qwen3.8-flash-next-abliterated-iq3_s"
+              "bartowski/Qwen3.8-27B-GGUF:Q8_0"
+            ];
           };
         };
       };
 
-      # the UI Activity page and /api/metrics/activity keep their records in a
-      # sqlite file instead of the in-memory ring (metricsMaxInMemory then has no
-      # effect). Text logs (/logs, /logs/stream/*) stay in-memory ring buffers
-      # either way. The directory comes from StateDirectory in the unit below:
-      # ProtectSystem=strict leaves /var read-only apart from what systemd opens.
+      # The Activity page and /api/metrics/activity record to sqlite instead of the
+      # in-memory ring (metricsMaxInMemory then has no effect); text logs
+      # (/logs, /logs/stream/*) stay in-memory ring buffers either way. The
+      # directory comes from StateDirectory in the unit below: ProtectSystem=strict
+      # leaves /var read-only apart from what systemd opens.
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
       # keep today's behaviour: Strata is loaded at boot, not on first request
-      hooks.on_startup.preload = [ "strata" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
     };
   };
 
@@ -583,7 +586,7 @@ in
           # Rebuild via ~/dev/personal/llama.cpp/build-patched.sh <tag>.
           podman run \
             --replace \
-            --name llamacpp \
+            --name llama-swap-llamacpp \
             -p 8080:8080 \
             --device nvidia.com/gpu=all \
             -e GGML_CUDA_ALLREDUCE=internal \
@@ -662,7 +665,7 @@ in
         script = ''
           podman run \
             --replace \
-            --name strata \
+            --name qwen3.8-flash-next-iq3_s \
             --network host \
             --device nvidia.com/gpu=all \
             --ulimit memlock=-1 \
