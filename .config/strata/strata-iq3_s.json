@@ -56,5 +56,6 @@
   "max_tokens": 300,
   "cuda_device": 1
  },
- "parallel": 1
+ "parallel": 1,
+ "fit_max_tokens": true
 }
