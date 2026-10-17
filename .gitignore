@@ -8,6 +8,7 @@
 .config/hypr/dms/layout.lua
 .config/hypr/dms/outputs.lua
 .config/hypr/dms/cursor.lua
+.config/hypr/dms/input.lua
 .config/hypr/dms/windowrules.lua
 .config/DankMaterialShell/firefox.css
 .config/DankMaterialShell/settings.json.bak
