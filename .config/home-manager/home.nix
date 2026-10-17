@@ -116,7 +116,11 @@ in {
 
   fonts.fontconfig.enable = lib.mkForce true;
 
-  services.dunst = { enable = if macos then false else true; };
+  # DMS's unit is Type=dbus with BusName=org.freedesktop.Notifications - it IS
+  # the notification daemon, and it cannot start while dunst owns that name
+  # (busctl showed dunst holding it). Off for the DMS trial; flip back to
+  # `if macos then false else true` if you drop DMS.
+  services.dunst = { enable = false; };
   services.hyprpolkitagent = { enable = if macos then false else true; };
 
   # Let Home Manager install and manage itself.

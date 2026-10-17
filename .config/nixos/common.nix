@@ -56,6 +56,14 @@ in
         flavor = "mocha";
         accent = "mauve";
       })
+      # Login-screen cursor. The dms-greeter serviceAccount has no per-user
+      # profile (/etc/profiles/per-user/ only contains javi), and apple-cursor is
+      # otherwise only in users.users.javi.packages, so the greeter's Hyprland
+      # cannot resolve the theme at all. In the system profile it lands in
+      # /run/current-system/sw/share/icons/macOS, which every XCURSOR_PATH
+      # includes. Keep in sync with users.users.javi.packages (apple-cursor),
+      # DMS's cursorSettings (macOS/24) and the greeter's customConfig env.
+      pkgs.apple-cursor
       pkgs.unrar
     ];
   };
@@ -132,6 +140,41 @@ in
         ];
       };
     };
+    dms-shell = {
+      # DankMaterialShell - quickshell-based desktop shell (bar, notifications,
+      # launcher, lock screen, OSD) for the hyprland session. Trial config; the
+      # shell's own settings live imperatively in ~/.config/quickshell/ii/ and
+      # ~/.config/hypr (deployed by `dms setup`), only the package/service here.
+      enable = true;
+
+      # The nixos-26.05 channel build is 1.4.6, two majors behind upstream, and
+      # the module's feature toggles track it. Take the shell and quickshell from
+      # <nixpkgs-unstable> together so the QML API (1.6.2) and the `qs` binary
+      # (0.3.1) agree - mixing 1.6.2 with the channel's quickshell 0.3.0 risks
+      # QML calling into qs APIs that do not exist yet.
+      package = unstable.dms-shell;
+      quickshell.package = unstable.quickshell;
+
+      # dms.service ships in the package (lib/systemd/user/dms.service) and the
+      # module pulls it in through systemd.packages. uwsm brings up
+      # graphical-session.target, which is what the unit is PartOf/Requisite of,
+      # so the module default target is correct for the uwsm hyprland session.
+      systemd = {
+        enable = true;
+        restartIfChanged = true;
+      };
+
+      enableSystemMonitoring = true; # dgop: CPU/RAM/net widgets + process list
+      enableDynamicTheming = true; # matugen: wallpaper -> DMS/rofi/gtk palette
+      enableCalendarEvents = true; # khal (calendar widget; needs ~/.config/khal)
+      enableClipboardPaste = true; # wtype for Shift+Return in clipboard history
+
+      # The VPN widget drives NetworkManager, which is inactive here (plain iwd).
+      enableVPN = false;
+      # cava spectrum widget - flip to true if you want the visualizer.
+      enableAudioWavelength = false;
+    };
+
     firefox = {
       enable = true;
       package = pkgs.firefox-bin;
@@ -141,9 +184,11 @@ in
       xwayland.enable = true;
       withUWSM = true;
     };
-    hyprlock = {
-      enable = true;
-    };
+    # hyprlock dropped: DMS owns the lock screen (Settings -> Power & Security
+    # -> Lock Screen; `dms ipc call lock lock`, SUPER+ALT+L). It authenticates
+    # through PAM - on NixOS DMS resolves a sanitized password-only stack into
+    # ~/.local/state/DankMaterialShell/pam/dankshell (see `dms auth list-services`).
+    # Re-add `programs.hyprlock.enable = true;` to go back.
     nix-ld = {
       enable = true;
       libraries = with pkgs; [ stdenv.cc.cc.lib ];
@@ -161,6 +206,11 @@ in
     };
     zsh.enable = true;
   };
+
+  # DMS draws its own bar, so drop the waybar module's WantedBy instead of
+  # disabling programs.waybar - the package and ~/.config/waybar/${host}.jsonc
+  # stay, and deleting this line brings the bar straight back.
+  systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
 
   security.polkit.enable = true;
 
@@ -190,9 +240,13 @@ in
     libinput = {
       enable = true;
     };
-    hypridle = {
-      enable = true;
-    };
+    # hypridle dropped: DMS's IdleService (Quickshell IdleMonitor) does the same
+    # job with AC/battery split timeouts, honours the idle-inhibitor tile, and
+    # reacts to `loginctl lock-session` (loginctlLockIntegration). Timeouts live
+    # imperatively in ~/.config/DankMaterialShell/settings.json - this box runs
+    # acLockTimeout=300 + acPostLockMonitorTimeout=300, monitor/suspend off.
+    # Re-add `services.hypridle.enable = true;` (plus ~/.config/hypr/legacy/
+    # hypridle.conf, where the Lua migration parked it) to go back.
     udisks2.enable = true;
   };
 
@@ -230,7 +284,7 @@ in
         autotiling
         baobab # windirstat equivalent
         bashmount
-        blueman
+        # blueman
         bruno
         unstable.btop-cuda
         ddcutil
@@ -244,7 +298,7 @@ in
         hyprshot
         # nix-du
         pamixer
-        pasystray
+        # pasystray
         pavucontrol
         psmisc
         rofi

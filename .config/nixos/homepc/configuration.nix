@@ -230,6 +230,78 @@ in
 
   # Services
   services = {
+    # DMS greeter (greetd-backed) replaces SDDM on this machine. Scoped to homepc
+    # while trialing: a broken greeter means no graphical login, so dell keeps
+    # sddm until this is proven. To roll out, move this block into common.nix and
+    # drop the sddm mkForce there instead.
+    displayManager = {
+      # sddm is enabled in common.nix; override per-machine.
+      sddm.enable = lib.mkForce false;
+
+      dms-greeter = {
+        enable = true;
+        # 1.6.x ships the greeter as its own package (bin/dms-greeter). The
+        # module default would be programs.dms-shell's package, whose 1.6.x
+        # build no longer contains the Greetd assets this module execs.
+        package = unstable.dms-greeter;
+        # The greeter runs inside hyprland (the module asserts
+        # programs.hyprland.enable and uses programs.hyprland.package).
+        compositor.name = "hyprland";
+        # The greeter runs hyprland as the dms-greeter user, which has no config of
+        # its own, so Hyprland would default to a US layout at the login screen.
+        compositor.customConfig = ''
+          # Cursor theme must come from env here: the greeter's Hyprland loads no
+          # DMS fragment (dms/cursor.lua belongs to the session), and Hyprland 0.55
+          # has no cursor:theme option at all -- HYPRCURSOR_*/XCURSOR_* are the only
+          # mechanism. XCursor only: apple-cursor ships XCursor, not hyprcursor.
+          # Theme itself comes from environment.systemPackages (pkgs.apple-cursor),
+          # since this serviceAccount has no per-user profile.
+          env = XCURSOR_THEME,macOS
+          env = XCURSOR_SIZE,24
+          input {
+              kb_layout = no
+              kb_options = altwin:swap_lalt_lwin
+          }
+        '';
+        # Copies ~/.config/DankMaterialShell/settings.json,
+        # ~/.local/state/DankMaterialShell/session.json and
+        # ~/.cache/DankMaterialShell/dms-colors.json - plus the wallpapers they
+        # reference - into /var/lib/dms-greeter at greetd preStart, so the
+        # greeter shows your wallpaper/theme.
+        configHome = "/home/javi";
+      };
+
+      # hyprland-uwsm, not hyprland: uwsm is what brings up
+      # graphical-session.target, which dms.service is PartOf/Requisite of.
+      # Plain hyprland.desktop would log in with no DMS bar.
+      defaultSession = "hyprland-uwsm";
+    };
+
+    # The 26.05 dms-greeter module execs
+    #   ${package}/share/quickshell/dms/Modules/Greetd/assets/dms-greeter
+    # which only exists in dms-shell <= 1.4.x, so with 1.6.2 greetd loops on
+    # "greeter exited without creating a session" until it hits start-limit-hit.
+    # Replicate the newer (unstable) module's invocation: ${package}/bin/dms-greeter.
+    # Delete this override once the system channel's module uses bin/dms-greeter.
+    greetd.settings.default_session.command = lib.mkForce (
+      lib.getExe (
+        pkgs.writeShellScriptBin "dms-greeter-start" ''
+          export PATH=$PATH:${
+            lib.makeBinPath [
+              unstable.quickshell
+              config.programs.hyprland.package
+              pkgs.glib # gdbus: fprintd probe + portal reads
+            ]
+          }
+          ${lib.getExe unstable.dms-greeter} --cache-dir /var/lib/dms-greeter --command hyprland${
+            lib.optionalString (
+              config.services.displayManager.dms-greeter.compositor.customConfig != ""
+            ) " -C ${pkgs.writeText "dmsgreeter-compositor-config" config.services.displayManager.dms-greeter.compositor.customConfig}"
+          }
+        ''
+      )
+    );
+
     hardware.bolt.enable = true;
     lact = {
       enable = true;
