@@ -121,7 +121,32 @@ hl.window_rule({
 hl.workspace_rule({ workspace = "special:magic",
                     on_created_empty = "/home/javi/.local/bin/dms-scratch" })
 
-require("dms.outputs")
+-- ─── Host identity ─────────────────────────────────────────────────────────
+-- This file is shared by every host in the dotfiles repo (homepc, dell), but the
+-- monitor block below is per-host: DMS regenerates ~/.config/hypr/dms/outputs.lua
+-- for whatever panels are attached to the machine it runs on, and that ONE tracked
+-- file would otherwise leak homepc's HDMI-A-1/DP-3 layout onto the dell (and vice
+-- versa). /etc/hostname is the primary source — NixOS writes it from
+-- networking.hostName — because HOSTNAME is a shell variable and is not guaranteed
+-- in a uwsm/systemd-user spawned Hyprland. os.getenv is available in the Lua
+-- config; os.execute is not (upstream bug), so do not shell out for this.
+local function hostname()
+    local f = io.open("/etc/hostname", "r")
+    local h = f and f:read("l") or nil
+    if f then f:close() end
+    h = (h and h ~= "") and h or os.getenv("HOSTNAME")
+    return (h or ""):gsub("%s+$", "")
+end
+local HOST = hostname()
+
+-- DMS's auto-generated monitor block (mode/position/scale/VRR). Tracked in the
+-- repo because it is the ONLY durable home of the display scale — settings.json
+-- never carries it. Guarded per host; add a `elseif HOST == "dell"` branch with a
+-- hand-written hl.monitor() if that laptop starts running DMS (its old monitor +
+-- touchpad stanzas are parked in legacy/dell.conf, currently inert).
+if HOST == "homepc" then
+    require("dms.outputs")
+end
 
 -- ─── Kill the ghost DP-3 output ────────────────────────────────────────────
 -- Only HDMI-A-1 (Microstep MPG321UX) is physically attached, but the DP-3 port
@@ -130,8 +155,11 @@ require("dms.outputs")
 -- at 2880x0. Hyprland then spreads workspaces across two "monitors": ws 1/2/3 live
 -- on the invisible DP-3, so `SUPER + 1/2/3` switch *there* (nothing visible) while
 -- `SUPER + 4+` create fresh workspaces on HDMI-A-1 (looks like it "works from 4").
--- The legacy hyprland.conf had `monitor=DP-3, disable` (see hypr/homepc.conf:9);
--- that was lost in the Lua migration. Kept AFTER require("dms.outputs") so it wins
+-- The legacy hyprland.conf had `monitor=DP-3, disable` (see
+-- legacy/homepc.conf:9, inert since the Lua migration); that was lost in the
+-- migration. Kept AFTER require("dms.outputs") so it wins
 -- over the auto-generated stanza and survives DMS rewriting that file.
 -- Remove this when a second panel actually goes on the DP port.
-hl.monitor({ output = "DP-3", disabled = true })
+if HOST == "homepc" then
+    hl.monitor({ output = "DP-3", disabled = true })
+end

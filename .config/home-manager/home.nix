@@ -44,6 +44,12 @@ in {
     # TERM = "xterm-256color";
     SSH_AUTH_SOCK = if macos then "${config.home.homeDirectory}/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock" else "${config.home.homeDirectory}/.1password/agent.sock";
     NIXPKGS_ALLOW_UNFREE = 1;
+    # VA-API driver for the Arrow Lake iGPU. Was `env = LIBVA_DRIVER_NAME,iHD` in
+    # ~/.config/hypr/homepc.conf, which stopped being sourced when hyprland.lua
+    # replaced hyprland.conf; moved here so it covers the whole session (browsers,
+    # mpv, ffmpeg) instead of only Hyprland's children. File now lives in
+    # .config/hypr/legacy/.
+    LIBVA_DRIVER_NAME = "iHD";
     ANTHROPIC_CONSOLE_KEY = "sk-1234";
     ANTHROPIC_BASE_URL = "http://localhost:8080";
   };
