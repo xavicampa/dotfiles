@@ -19,7 +19,7 @@
 # (HOST == "homepc") because this generated file is per-host — expect a dirty diff
 # whenever displays are reconfigured, and commit it from the host it belongs to.
 .config/DankMaterialShell/firefox.css
-.config/DankMaterialShell/settings.json.bak
+.config/DankMaterialShell/settings.json.bak*
 .config/DankMaterialShell/.changelog-*
 .config/DankMaterialShell/.firstlaunch
 .config/hypr/hyprland.lua.bak

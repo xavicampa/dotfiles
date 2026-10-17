@@ -121,6 +121,32 @@ hl.window_rule({
 hl.workspace_rule({ workspace = "special:magic",
                     on_created_empty = "/home/javi/.local/bin/dms-scratch" })
 
+-- ─── No wallpapers / no Hyprland chrome ────────────────────────────────────
+-- Hyprland is not a wallpaper daemon, but it still paints a background layer of
+-- its own: with force_default_wallpaper = -1 (the default) it picks a random
+-- image out of $XDG_DATA_HOME/../share/hypr/wall{0,1,2}.png — nixpkgs ships the
+-- anime mascots there (/run/current-system/sw/share/hypr), so they DO render on
+-- this box — and disable_hyprland_logo = false adds the random Hyprland logo /
+-- anime-girl background on top of that. Both off => plain background_color
+-- (misc.background_color, default 0xff111111). No wallpaper daemon runs here
+-- (hyprpaper/swww/swaybg are all absent from the session), so this is the only
+-- thing between the panels and flat dark grey. Kept hand-owned: DMS never
+-- writes misc.*.
+-- Live equivalent while a session is up — `hyprctl keyword` is REJECTED for a
+-- Lua config ("keyword can't work with non-legacy parsers. Use eval."):
+--   hyprctl eval 'hl.config({ misc = { force_default_wallpaper = 0, disable_hyprland_logo = true, disable_splash_rendering = true } })'
+-- ~/.config/hypr/hyprpaper.conf (preload/wallpaper = ~/.config/i3/tokyonight.jpg)
+-- was moved to ~/.config/hypr/legacy/hyprpaper.conf.disabled — nothing started
+-- hyprpaper anyway, and DMS's Wallpaper page (SUPER + comma) / dash wallpaper tab
+-- (SUPER + Y) no longer have a config to pick up. The jpg itself is untouched.
+hl.config({
+    misc = {
+        force_default_wallpaper  = 0,
+        disable_hyprland_logo    = true,
+        disable_splash_rendering = true, -- no "Hyprland" splash text on boot
+    },
+})
+
 -- ─── Host identity ─────────────────────────────────────────────────────────
 -- This file is shared by every host in the dotfiles repo (homepc, dell), but the
 -- monitor block below is per-host: DMS regenerates ~/.config/hypr/dms/outputs.lua

@@ -80,6 +80,11 @@
       "icon": "memory"
     }
   ],
+  "screenPreferences": {
+    "wallpaper": [
+      "all"
+    ]
+  },
   "barConfigs": [
     {
       "id": "default",
