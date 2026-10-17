@@ -3,13 +3,20 @@
 *.swp
 
 # --- DMS / Hyprland generated artifacts (derived from .config/DankMaterialShell/settings.json) ---
+# These are all re-derived by DMS from the tracked settings.json, so they are noise.
 .config/hypr/dms/binds.lua
 .config/hypr/dms/colors.lua
 .config/hypr/dms/layout.lua
-.config/hypr/dms/outputs.lua
 .config/hypr/dms/cursor.lua
 .config/hypr/dms/input.lua
 .config/hypr/dms/windowrules.lua
+
+# EXCEPTION — do NOT ignore .config/hypr/dms/outputs.lua: DMS's Settings -> Displays
+# page writes monitor mode/position/scale/VRR only there (and in the untracked
+# ~/.local/state/DankMaterialShell/session.json under hyprlandOutputSettings), never
+# in settings.json. It is the only durable, source-controllable record of the display
+# scale (HDMI-A-1 scale = 1.3333) and is require()d by hyprland.lua:124.
+# Regenerated whenever displays are reconfigured in the DMS UI -> commit the diff.
 .config/DankMaterialShell/firefox.css
 .config/DankMaterialShell/settings.json.bak
 .config/DankMaterialShell/.changelog-*
