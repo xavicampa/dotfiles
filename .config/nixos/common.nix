@@ -20,7 +20,17 @@ in
     plymouth.enable = true;
   };
 
-  console.keyMap = "no";
+  # TTY keymap derives from services.xserver.xkb below (layout + options), so the
+  # Alt<->Win swap applies on the console too. console.keyMap would be ignored
+  # once useXkbConfig is on, hence it is gone rather than left as a decoy.
+  console.useXkbConfig = true;
+
+  # Norwegian formats/collation, English app messages (LC_MESSAGES override is the
+  # documented NixOS pattern for keeping UI strings in English).
+  i18n = {
+    defaultLocale = "nb_NO.UTF-8";
+    extraLocaleSettings.LC_MESSAGES = "en_US.UTF-8";
+  };
 
   environment = {
     etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
@@ -162,6 +172,15 @@ in
         theme = "catppuccin-mocha-mauve";
         wayland.enable = true;
       };
+    };
+    # Writes /etc/X11/xorg.conf.d/00-keyboard.conf, which systemd-localed reads -
+    # this is what DMS's "system" keyboard setting reports. Hyprland does NOT read
+    # it; that needs input:kb_layout/kb_options in ~/.config/hypr/hyprland.lua.
+    xserver.xkb = {
+      layout = "no";
+      # Left Alt <-> Left Win, so DMS's SUPER binds fire on the physical Alt key and
+      # app Alt+Tab / Alt+PgDn move to the physical Win key.
+      options = "terminate:ctrl_alt_bksp,altwin:swap_lalt_lwin";
     };
     fstrim = {
       enable = true;
