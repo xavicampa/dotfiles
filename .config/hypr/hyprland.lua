@@ -97,6 +97,57 @@ hl.config({
 -- Current pointers: logitech-g-pro--1, ducky-ducky-one-3-mini-rgb-2 (keyboard HID).
 hl.device({ name = "logitech-g-pro--1", natural_scroll = true })
 
+-- ─── Animations (hand-owned; DMS never writes animations.*) ────────────────
+-- Hyprland 0.55 `speed` is a DURATION IN DECISECONDS (1ds = 100ms): speed = 2
+-- => 200ms, LOWER = FASTER. Verified against hyprutils
+-- src/animation/AnimatedVariable.cpp:78 -> percent = (msElapsed / 100) / speed.
+-- This is the OPPOSITE of the old hyprlang-era formula (duration = 1000/speed),
+-- so the numbers in legacy/hyprland.conf (`animation = windows, 1, 2, myBezier`)
+-- must NOT be copied forward: `2` used to mean 500ms, it now means 200ms.
+-- Nothing here set any animation before, so every leaf inherited Hyprland's
+-- built-in default (`hyprctl animations`: global = enabled, speed 8, bezier
+-- "default") => 800ms for every window move, and the `default` bezier
+-- (0, .75, .15, 1) has a long tail that made it feel slower still.
+-- Live preview without a restart (`hyprctl keyword` is rejected for Lua configs):
+--   hyprctl eval 'hl.animation({ leaf = "windows", enabled = true, speed = 1, bezier = "snap" })'
+-- Tune per-leaf later; `hyprctl animations` shows what actually landed.
+hl.curve("snap", { type = "bezier", points = { {0.1, 1}, {0.2, 1} } }) -- crisp ease-out, no overshoot
+-- Fades/scales need a DIFFERENT curve than slides. `snap` is so front-loaded that at
+-- speed 1.2 (120ms) it crosses 10%->90% of the value in ~31ms = 2 frames on this 60Hz
+-- panel (3840x2160@59.997) => an invisible fade; the scratchpad looked "instant" even
+-- though it was animating. Slides survive snap because the pixel distance is huge (3840px
+-- of travel still shows big jumps in 2 frames); opacity/scale have no distance to hide
+-- behind. Rule of thumb: snap for POSITION, fadeSmooth for OPACITY.
+-- frames showing 10-90% @60Hz, fadeSmooth: speed 1.5=5.1 | 1.2=4.1 | 1.1=3.8 | 1.0=3.4 | 0.8=2.7
+-- floor: below ~3 frames (speed <1.0 on this 60Hz panel) a fade reads as a hard cut again.
+-- snap for comparison: 1.9 frames at 120ms — hence the split curves.
+hl.curve("fadeSmooth", { type = "bezier", points = { {0.4, 0}, {0.6, 1} } }) -- ease-in-out (Material "standard")
+
+hl.config({ animations = { enabled = true } })
+
+-- `global` is the fallback every unset leaf inherits — set it, or every leaf not
+-- listed below (zoomFactor, monitorAdded, fadeDim, ...) falls back to Hyprland's
+-- built-in 800ms.
+hl.animation({ leaf = "global",      enabled = true, speed = 2,   bezier = "snap" })
+hl.animation({ leaf = "windows",     enabled = true, speed = 2,   bezier = "snap" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 1.5, bezier = "snap" }) -- move/drag/resize
+hl.animation({ leaf = "windowsIn",   enabled = true, speed = 2,   bezier = "snap", style = "popin 92%" })
+hl.animation({ leaf = "windowsOut",  enabled = true, speed = 1.5, bezier = "snap", style = "popin 92%" })
+hl.animation({ leaf = "workspaces",  enabled = true, speed = 2,   bezier = "snap" }) -- regular ws switches
+-- Scratch (special:magic): fade in place instead of sliding a full screen-width in from
+-- the right. The slide direction is NOT a config knob — Hyprland hardcodes it in the
+-- caller (Monitor.cpp:1627 enterSpecialWorkspace passes left=true, :1543/:1579 pass false)
+-- and startAnimation() then re-parses THIS style string (DesktopAnimationManager.cpp:272-290),
+-- so "fade" overrides the default slide. Special workspaces always animate alpha as well
+-- (DesktopAnimationManager.cpp:359-368), which is why fade is a real no-travel option here.
+-- Other styles: "slide left"/"right"/"top"/"bottom", "slidefade 25%", "slidevert"; the
+-- trailing % is travel distance ((monitor + general:gaps_workspaces) * pct/100).
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 1.1, bezier = "fadeSmooth", style = "fade" })
+hl.animation({ leaf = "fade",        enabled = true, speed = 1.1, bezier = "fadeSmooth" }) -- window open/close opacity
+hl.animation({ leaf = "layers",      enabled = true, speed = 1.1, bezier = "fadeSmooth" }) -- DMS popouts/dash
+hl.animation({ leaf = "border",      enabled = true, speed = 2,   bezier = "snap" })
+-- borderangle stays off (Hyprland's own default) — it is the expensive one.
+
 -- ─── Window rules (ported from legacy/hyprland.lua.bak) ───────────────────
 -- The .bak applied these via `hyprctl keyword` to keep legacy names working;
 -- stay_focused / dim_around are native hl.window_rule effects in 0.55, so the
