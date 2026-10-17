@@ -20,6 +20,28 @@
   "customAnimationDuration": 125,
   "controlCenterShowMicPercent": true,
   "appIdSubstitutions": [],
+  "dashTabs": [
+    {
+      "id": "overview",
+      "enabled": true
+    },
+    {
+      "id": "media",
+      "enabled": true
+    },
+    {
+      "id": "weather",
+      "enabled": true
+    },
+    {
+      "id": "settings",
+      "enabled": true
+    },
+    {
+      "id": "wallpaper",
+      "enabled": true
+    }
+  ],
   "cursorSettings": {
     "theme": "macOS",
     "size": 24,
@@ -37,6 +59,9 @@
     }
   },
   "textRenderType": 1,
+  "acLockTimeout": 300,
+  "acPostLockMonitorTimeout": 300,
+  "lockBeforeSuspend": true,
   "osdPowerProfileEnabled": true,
   "customPowerButtons": [
     {
@@ -72,7 +97,11 @@
       ],
       "centerWidgets": [
         "music",
-        "clock",
+        {
+          "id": "clock",
+          "enabled": true,
+          "clockCompactMode": false
+        },
         "weather"
       ],
       "rightWidgets": [
