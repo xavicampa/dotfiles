@@ -124,7 +124,6 @@ no `grave`).
 | `CTRL+Print` | `dms screenshot full` |
 | `ALT+Print` | `dms screenshot window` |
 | `ALT+space` | `dms ipc call spotlight-bar toggle` |
-| `CTRL+SHIFT+R` | `dms ipc call workspace-rename open` |
 | `CTRL+ALT+Delete` | `dms ipc call processlist focusOrToggle` |
 | `SUPER+ALT+L` | `dms ipc call lock lock` |
 | `CTRL + XF86AudioRaise/LowerVolume` | mpris volume ±3 |
@@ -134,6 +133,10 @@ no `grave`).
 ## Gone / intentionally unbound
 
 - **`SUPER+T`** — DMS's terminal default; unbound in favour of `SUPER+Return`.
+- **`CTRL+SHIFT+R`** — DMS's `workspace-rename open` default; Chrome/Chromium (and Firefox)
+  own it as hard-reload — upstream [DMS #3485](https://github.com/AvengeMedia/DankMaterialShell/issues/3485).
+  Rename on demand with `dms ipc call workspace-rename open`, or re-bind it elsewhere
+  (`dms keybinds set hyprland <key> ...`).
 - **`F1`–`F4` per-monitor brightness** — dropped in the Lua migration (survive only in
   `legacy/hyprland.lua.bak`). Moot: both MPG321UX panels share EDID serial `0x01010101`, so
   `--display 1`, `--display 2` and `--bus 16` all move *both* panels — there is no
