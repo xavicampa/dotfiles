@@ -81,7 +81,7 @@ no `grave`).
 | `M` | process list |
 | `X` | powermenu |
 | `O` / `TAB` | overview |
-| `Y` | dash → wallpaper tab |
+| `Y` | dash → overview tab |
 | `P` | `dms ipc outputs cycleProfile` |
 
 ### SUPER+SHIFT
