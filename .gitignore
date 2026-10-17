@@ -1,3 +1,18 @@
 .pi/agent/settings.json
 .DS_Store
 *.swp
+
+# --- DMS / Hyprland generated artifacts (derived from .config/DankMaterialShell/settings.json) ---
+.config/hypr/dms/binds.lua
+.config/hypr/dms/colors.lua
+.config/hypr/dms/layout.lua
+.config/hypr/dms/outputs.lua
+.config/hypr/dms/cursor.lua
+.config/hypr/dms/windowrules.lua
+.config/DankMaterialShell/firefox.css
+.config/DankMaterialShell/settings.json.bak
+.config/DankMaterialShell/.changelog-*
+.config/DankMaterialShell/.firstlaunch
+.config/hypr/hyprland.lua.bak
+.config/hypr/hyprland.lua.backup*
+.config/hypr/.dms-backups/
