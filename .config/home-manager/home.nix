@@ -102,6 +102,14 @@ in {
     pkgs.uv
     pkgs.wget
     pythonEnv
+  ] ++ lib.optionals (!macos) [
+    # Icon themes DMS resolves named icons from (only `hicolor` was installed, so
+    # the shell logged `Cannot load icon "audio-volume-low" / "blueman-disabled"`).
+    # Adwaita = freedesktop icon names for the bar/OSD; Material Symbols is the
+    # icon font DMS's QML references by name. Linux-only: macOS apps use CoreText
+    # and their own asset catalogs - neither XDG icon themes nor fontconfig apply.
+    pkgs.adwaita-icon-theme
+    pkgs.material-symbols
   ];
 
   # This value determines the Home Manager release that your
