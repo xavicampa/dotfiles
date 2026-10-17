@@ -2,8 +2,9 @@
 --
 -- Your legacy settings are disabled: the full port of the old hyprlang config
 -- (env vars, ALT mainMod binds, animations, input, windowrules, ddcutil media
--- keys) is parked in ~/.config/hypr/hyprland.lua.bak — rename it back over this
--- file to restore. Keybind inventory: ~/.config/hypr/keybinds.md
+-- keys) is parked in ~/.config/hypr/legacy/hyprland.lua.bak — `cp` it over this file to
+-- restore. The pre-Lua hyprlang original sits beside it as legacy/hyprland.conf (both are
+-- versioned in the dotfiles repo). Keybind inventory: ~/.config/hypr/keybinds.md
 --
 -- Hyprland loads hyprland.lua *instead of* hyprland.conf when this file exists,
 -- and DMS keeps hyprland.conf as a stub, so this file is the only entry point.
@@ -54,7 +55,7 @@ hl.config({
         -- for the greeter + console via services.xserver.xkb.options; Hyprland needs
         -- its own copy. Left out terminate:ctrl_alt_bksp (X11-only).
         kb_options = "altwin:swap_lalt_lwin",
-        -- Ported from hyprland.lua.bak. It said -1.9, but Hyprland clamps
+        -- Ported from legacy/hyprland.lua.bak. It said -1.9, but Hyprland clamps
         -- sensitivity to [-1.0, 1.0], so -1.9 was already landing on -1.0.
         -- Raise toward 0 if it feels too slow.
         sensitivity  = -1.0,
@@ -67,7 +68,7 @@ hl.config({
 -- Current pointers: logitech-g-pro--1, ducky-ducky-one-3-mini-rgb-2 (keyboard HID).
 hl.device({ name = "logitech-g-pro--1", natural_scroll = true })
 
--- ─── Window rules (ported from hyprland.lua.bak) ──────────────────────────
+-- ─── Window rules (ported from legacy/hyprland.lua.bak) ───────────────────
 -- The .bak applied these via `hyprctl keyword` to keep legacy names working;
 -- stay_focused / dim_around are native hl.window_rule effects in 0.55, so the
 -- shim is gone. DMS's own rules live in dms/windowrules.lua.

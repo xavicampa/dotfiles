@@ -135,15 +135,17 @@ no `grave`).
 
 - **`SUPER+T`** — DMS's terminal default; unbound in favour of `SUPER+Return`.
 - **`F1`–`F4` per-monitor brightness** — dropped in the Lua migration (survive only in
-  `hyprland.lua.bak`). Moot: both MPG321UX panels share EDID serial `0x01010101`, so
+  `legacy/hyprland.lua.bak`). Moot: both MPG321UX panels share EDID serial `0x01010101`, so
   `--display 1`, `--display 2` and `--bus 16` all move *both* panels — there is no
   per-output DDC split on this box.
 - **rofi, waybar, pamixer/dunstify binds** — died with the hyprlang config. The old
   `ALT+space` → rofi drun collision is resolved by simply not existing: DMS's
   `spotlight-bar` owns `ALT+space` now.
-- Full old config for reference: `~/.config/hypr/hyprland.lua.bak` (rename over
-  `hyprland.lua` to restore) and `~/.config/hypr/.dms-backups/*/hyprland.conf`
-  (git-ignored — copy into the repo if you want it versioned).
+- Full old config for reference, both **versioned** in the dotfiles repo:
+  `~/.config/hypr/legacy/hyprland.lua.bak` (the full Lua port of the old config — `cp` it over
+  `hyprland.lua` to restore) and `~/.config/hypr/legacy/hyprland.conf` (the last hyprlang
+  config). DMS's own rolling copies in `~/.config/hypr/.dms-backups/*/` are git-ignored and
+  were byte-identical, so the repo keeps one.
 
 ---
 
@@ -230,7 +232,7 @@ Modmask bits: `1` SHIFT · `4` CTRL · `8` ALT · `64` SUPER (Mod4) — so `65` 
 ## Historical: pre-DMS hyprlang binds (`mainMod = ALT`, now deleted)
 
 Kept only so old muscle memory has a paper trail. Source:
-`~/.config/hypr/.dms-backups/2026-10-16_11-49-28/hyprland.conf`.
+`~/.config/hypr/legacy/hyprland.conf` (repo copy of DMS's `.dms-backups` snapshot).
 
 | Modifier | Keys → action |
 |---|---|
