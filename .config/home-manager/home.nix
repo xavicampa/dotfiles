@@ -200,8 +200,20 @@ in {
         remember_window_size = "no";
         initial_window_width = "80c";
         initial_window_height = "25c";
-        # background_opacity = "0.90";
-        # background_blur = 24;
+        # Transparency: kitty paints its own background at this alpha (text
+        # stays fully opaque), so whatever is behind the window shows through.
+        # background_blur is the client-side request for the blur: kitty asks
+        # the compositor over ext-background-effect-v1, which needs Hyprland
+        # 0.56+ (homepc pins 0.56.2 from <nixpkgs-unstable>; the dell keeps the
+        # 26.05 channel's 0.55.4, where the value is a no-op and only the
+        # opacity applies - and Hyprland's own blur is off there anyway, see
+        # hosts/dell.lua decoration.blur.enabled = false). On macOS the value is
+        # the blur radius and works natively. Blur amount comes from this number
+        # rather than decoration.blur.size/passes (the protocol is client-driven;
+        # verified on homepc: Hyprland 0.56.2 + kitty 0.49.1, 40 blurred the
+        # window behind it, 24 is milder). Needs background_opacity < 1.
+        background_opacity = "0.85";
+        background_blur = 24;
         tab_bar_style = "powerline";
         # tab_powerline_style = "slanted";
         tab_title_template =
