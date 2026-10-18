@@ -1,6 +1,6 @@
 {
-  "currentThemeName": "dynamic",
-  "currentThemeCategory": "dynamic",
+  "currentThemeName": "custom",
+  "currentThemeCategory": "registry",
   "customThemeFile": "/home/javi/.config/DankMaterialShell/themes/catppuccin/theme.json",
   "registryThemeVariants": {
     "catppuccin": {
@@ -9,12 +9,16 @@
         "accent": "mauve"
       }
     },
-    "gruvboxMaterial": "medium"
+    "gruvboxMaterial": "medium",
+    "gnomeAdwaita": "slate",
+    "oxocarbon": "blue",
+    "flexoki": "blue"
   },
   "cornerRadius": 12,
   "hyprlandLayoutGapsOverride": 0,
   "hyprlandLayoutGapsOutOverride": 0,
   "hyprlandLayoutRadiusOverride": 0,
+  "hyprlandLayoutBorderSize": 2,
   "customAnimationDuration": 125,
   "blurEnabled": true,
   "controlCenterShowMicPercent": true,
