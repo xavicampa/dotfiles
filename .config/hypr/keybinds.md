@@ -1,5 +1,8 @@
 # Keybinds — homepc (Hyprland Lua + DMS)
 
+> Scope: **homepc only.** The dell runs no DMS and has its own bind file —
+> see [dell — bare Hyprland](#dell--bare-hyprland-no-dms-confighyprhostsdelllua) at the end.
+
 Live inventory, regenerated 2026-10-17 from `dms keybinds show hyprland`:
 **125 active binds = 112 DMS defaults + 13 user overrides.**
 
@@ -245,3 +248,46 @@ Kept only so old muscle memory has a paper trail. Source:
 | ALT+CTRL | `Return` `kitty pi` · `Space` rofimoji · `H`/`L` movecurrentworkspacetomonitor · `1`–`4` workspace 1–4 |
 | ALT+CTRL+SHIFT | `1`–`4` movetoworkspace 1–4 · `code:61` movetoworkspace `special:magic` |
 | none | `F1`–`F4` ddcutil per-monitor · `XF86Audio*` pamixer + dunstify |
+
+---
+
+## dell — bare Hyprland, no DMS (`~/.config/hypr/hosts/dell.lua`)
+
+Hand-owned, loaded by `hyprland.lua` only when the hostname is `dell`. The `dms/*`
+fragments are DMS-generated **and** gitignored, so they do not exist on that laptop —
+this file is the dell's entire keybind set (plus its monitor/cursor/gaps/touchpad rows).
+Values ported from `legacy/hyprland.conf` + `legacy/dell.conf`; shape mirrors homepc
+where a plain-Hyprland equivalent exists.
+
+| Key | Action |
+|---|---|
+| `SUPER + Return` · `SUPER + CTRL + Return` | `kitty` · `kitty pi` |
+| `SUPER + E` | `nautilus --new-window` |
+| `SUPER + Space` · `SUPER + Tab` · `SUPER + CTRL + Space` | rofi drun · rofi `-show` · `rofimoji --action clipboard` |
+| `SUPER + X` · `SUPER + SHIFT + P` | `~/.config/rofi/powermenu.sh` · `displaymenu_dell.sh` |
+| `SUPER + Q` · `F` · `SHIFT+F` · `SHIFT+T` · `P` · `R` · `W` · `SHIFT+E` | close · maximize · fullscreen · float · pseudo · togglesplit · group · exit |
+| `SUPER + H J K L` / arrows (＋`SHIFT` = move) | focus / move window |
+| `SUPER + CTRL + H/L` · `SUPER + SHIFT + CTRL + H/L` | focus monitor · move window to monitor |
+| `SUPER + 1…9` · `SUPER + SHIFT + 1…9` · wheel | workspace · move to workspace · `e±1` |
+| `SUPER + S` · `SUPER + SHIFT + S` | scratch `special:magic` (created empty → `kitty`) |
+| `SUPER + ALT + L` | `loginctl lock-session` → hypridle `lock_cmd` → hyprlock |
+| `SUPER + B` | `systemctl restart --user waybar.service` (legacy was `pkill -SIGUSR1 waybar`) |
+| `code:121/122/123` | `pamixer -t` · `-d 5` · `+i 5`, each with `dunstify` |
+| `code:232/233` | `light -U 25` · `light -A 25` |
+| `SUPER + SHIFT + 4` · `SUPER + SHIFT + 5` | `hyprshot -m region` · `-m window` |
+| `SUPER + mouse:272` · `SUPER + mouse:273` | drag · resize |
+| 3-finger horizontal swipe | workspace change |
+
+`SUPER` is the physical **Alt** key on the dell as well — `kb_options =
+altwin:swap_lalt_lwin` is set host-wide in `hyprland.lua`, not per host.
+
+### Verify either host's config from any machine
+
+```bash
+Hyprland --verify-config                  # this host (homepc: loads the dms/* fragments)
+HYPR_HOST=dell Hyprland --verify-config    # the dell branch: hosts/dell.lua
+```
+
+`--verify-config` is not a syntax-only check: it reports unknown config keys, nil API
+fields and unparsable keysyms (`attempt to call a nil value`, `hl.bind: failed to parse
+key string: Unknown keysym`, `unknown config key '…'`).
