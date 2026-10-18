@@ -265,7 +265,6 @@ in
         git
         google-chrome
         hyprpaper
-        hyprshot
         # nix-du
         pamixer
         # pasystray
@@ -284,6 +283,16 @@ in
         xdg-user-dirs
         xdg-utils
         # pkgs.thunar
+      ] ++ lib.optionals (config.networking.hostName == "dell") [
+        # hyprshot = dell only. Nothing on homepc calls it: its only keybinds are
+        # SUPER+SHIFT+4/5 in ~/.config/hypr/hosts/dell.lua, and homepc screenshots
+        # go through DMS (Print -> `dms screenshot`, its own wlr-screencopy in
+        # core/internal/screenshot, hyprctl only for geometry). Worth dropping on
+        # homepc because hyprshot depends on the *channel* hyprland for hyprctl, so
+        # it kept hyprland-0.55.4 in a closure that now runs 0.56.2. Kept inline +
+        # hostName-gated rather than moved to dell/configuration.nix (see the
+        # apple-cursor note above for why position churn matters).
+        hyprshot
       ];
     };
   };
