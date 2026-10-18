@@ -153,7 +153,14 @@ in {
   # holding it). The dell has no DMS (programs.dms-shell is host-scoped), so it
   # needs its notification daemon back; macOS has no wayland session at all.
   services.dunst = { enable = !macos && !isHomepc; };
-  services.hyprpolkitagent = { enable = if macos then false else true; };
+
+  # Same story for polkit: polkitd allows one agent per subject, and on homepc
+  # DMS's built-in agent (since DMS 1.0, no option to turn it off short of
+  # DMS_DISABLE_POLKIT=1) loses that registration race to this unit -
+  # "An authentication agent already exists for the given subject" in
+  # journalctl --user -u dms.service. The dell is bare hyprland (no DMS), so it
+  # still needs an external agent; macOS has no polkitd at all.
+  services.hyprpolkitagent = { enable = !macos && !isHomepc; };
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
