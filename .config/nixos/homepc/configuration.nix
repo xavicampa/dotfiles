@@ -269,8 +269,35 @@ in
 
       # The VPN widget drives NetworkManager, which is inactive here (plain iwd).
       enableVPN = false;
-      # cava spectrum widget - flip to true if you want the visualizer.
-      enableAudioWavelength = false;
+      # enableAudioWavelength is deliberately left at its default (true -> the
+      # module installs cava). It was pinned to false here until 2026-10-18,
+      # which is the only reason `dms doctor` reported "cava: Missing" (the
+      # doctor treats cava as an important dep and warns whenever it is off
+      # PATH, whether or not the visualizer widget is used). Do not re-add it:
+      # newer nixpkgs removes the option entirely (cava is unconditional in
+      # programs.dms-shell's environment), so the assignment breaks the build
+      # on the next channel bump. CavaService.qml still gates the process on
+      # the widget actually asking for it, and DMS_DISABLE_CAVA=1 disables it.
+    };
+
+    # Hyprland 0.56+ for DMS compositor blur (ext-background-effect-v1).
+    # The channel (nixos-26.05) ships 0.55.4, which predates
+    # src/protocols/BackgroundEffect.cpp; 0.56.2 is the first release with the
+    # global, so `dms doctor` "Background Blur: Unsupported" is unfixable by
+    # config on 0.55 - DMS probes the Wayland registry for
+    # ext_background_effect_manager_v1 (core/internal/blur/probe.go).
+    # Same package/channel-mixing trick as programs.dms-shell above: take the
+    # compositor and its portal from <nixpkgs-unstable> as a pair (0.56.2 +
+    # xdg-desktop-portal-hyprland 1.4.1) while the *module* stays the channel's
+    # (0.56.2 adds no breaking config changes, and the Lua hyprland.lua works).
+    # Scoped to homepc: the dell keeps the bare channel stack. Note this also
+    # moves the DMS greeter's compositor, because
+    # services.displayManager.dms-greeter builds its session from
+    # config.programs.hyprland.package - if 0.56 misbehaves at the login
+    # screen, drop these two lines and rebuild to get 0.55.4 back.
+    hyprland = {
+      package = unstable.hyprland;
+      portalPackage = unstable.xdg-desktop-portal-hyprland;
     };
   };
 
