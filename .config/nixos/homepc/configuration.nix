@@ -522,6 +522,7 @@ in
             --network host
             --device nvidia.com/gpu=all
             --ulimit memlock=-1
+            -e STRATA_PF_FUSED=1
             -v strata-data:/data
             -v /home/javi/.config/strata:/data/config
             -v /home/javi/.config/strata/strata-iq3_s.shared-settings.json:/opt/strata/strata-iq3_s.shared-settings.json
