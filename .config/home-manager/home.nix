@@ -60,13 +60,14 @@ in {
     NIXPKGS_ALLOW_UNFREE = 1;
     ANTHROPIC_CONSOLE_KEY = "sk-1234";
     ANTHROPIC_BASE_URL = "http://localhost:8080";
-  } // lib.optionalAttrs isHomepc {
-    # VA-API driver for homepc's Arrow Lake iGPU - homepc only, the dell's older
-    # Intel iGPU must resolve its own driver. Was `env = LIBVA_DRIVER_NAME,iHD` in
-    # ~/.config/hypr/homepc.conf, which stopped being sourced when hyprland.lua
-    # replaced hyprland.conf; moved here so it covers the whole session (browsers,
-    # mpv, ffmpeg) instead of only Hyprland's children. File now lives in
-    # .config/hypr/legacy/.
+  } // lib.optionalAttrs (!macos) {
+    # VA-API driver: iHD = intel-media-driver, which is installed on both NixOS boxes
+    # (homepc's Arrow Lake iGPU; the dell via hardware.graphics.extraPackages in its
+    # own config). Linux-only - there is no VA-API in the macOS generation.
+    # Was `env = LIBVA_DRIVER_NAME,iHD` in ~/.config/hypr/homepc.conf, which stopped
+    # being sourced when hyprland.lua replaced hyprland.conf; moved here so it covers
+    # the whole session (browsers, mpv, ffmpeg) instead of only Hyprland's children.
+    # That file now lives in .config/hypr/legacy/.
     LIBVA_DRIVER_NAME = "iHD";
   };
 
