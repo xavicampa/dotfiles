@@ -31,6 +31,20 @@ let
   # flag on macos
   macos = builtins.pathExists "/Users/javi";
 
+  # Which NixOS box this is. home-manager is invoked standalone (no
+  # home-manager.users.<name> in common.nix), so there is no
+  # config.networking.hostName here - /etc/hostname is the same trick
+  # ~/.config/hypr/hyprland.lua already uses, and it is safe because standalone
+  # home-manager always evaluates on the machine it activates on. lib.fileContents
+  # strips the trailing newline. Guarded by `macos` first so the macOS eval never
+  # touches a path that does not exist there.
+  hostName = if macos then "macbook" else lib.fileContents "/etc/hostname";
+
+  # homepc runs DankMaterialShell (programs.dms-shell is declared in
+  # ~/.config/nixos/homepc/configuration.nix); the dell stays on the bare
+  # hyprland stack - waybar + dunst + hypridle + hyprlock.
+  isHomepc = hostName == "homepc";
+
 in {
 
   # Home Manager needs a bit of information about you and the
@@ -44,14 +58,16 @@ in {
     # TERM = "xterm-256color";
     SSH_AUTH_SOCK = if macos then "${config.home.homeDirectory}/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock" else "${config.home.homeDirectory}/.1password/agent.sock";
     NIXPKGS_ALLOW_UNFREE = 1;
-    # VA-API driver for the Arrow Lake iGPU. Was `env = LIBVA_DRIVER_NAME,iHD` in
+    ANTHROPIC_CONSOLE_KEY = "sk-1234";
+    ANTHROPIC_BASE_URL = "http://localhost:8080";
+  } // lib.optionalAttrs isHomepc {
+    # VA-API driver for homepc's Arrow Lake iGPU - homepc only, the dell's older
+    # Intel iGPU must resolve its own driver. Was `env = LIBVA_DRIVER_NAME,iHD` in
     # ~/.config/hypr/homepc.conf, which stopped being sourced when hyprland.lua
     # replaced hyprland.conf; moved here so it covers the whole session (browsers,
     # mpv, ffmpeg) instead of only Hyprland's children. File now lives in
     # .config/hypr/legacy/.
     LIBVA_DRIVER_NAME = "iHD";
-    ANTHROPIC_CONSOLE_KEY = "sk-1234";
-    ANTHROPIC_BASE_URL = "http://localhost:8080";
   };
 
   home.file = if macos then {
@@ -130,11 +146,12 @@ in {
 
   fonts.fontconfig.enable = lib.mkForce true;
 
-  # DMS's unit is Type=dbus with BusName=org.freedesktop.Notifications - it IS
-  # the notification daemon, and it cannot start while dunst owns that name
-  # (busctl showed dunst holding it). Off for the DMS trial; flip back to
-  # `if macos then false else true` if you drop DMS.
-  services.dunst = { enable = false; };
+  # dunst is for the bare-hyprland hosts only. On homepc DMS's own unit is
+  # Type=dbus with BusName=org.freedesktop.Notifications - it IS the notification
+  # daemon, and it cannot start while dunst owns that name (busctl showed dunst
+  # holding it). The dell has no DMS (programs.dms-shell is host-scoped), so it
+  # needs its notification daemon back; macOS has no wayland session at all.
+  services.dunst = { enable = !macos && !isHomepc; };
   services.hyprpolkitagent = { enable = if macos then false else true; };
 
   # Let Home Manager install and manage itself.
