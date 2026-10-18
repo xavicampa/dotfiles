@@ -123,5 +123,19 @@
 
   programs.light.enable = true;
 
+  # Bare hyprland stack on this box. programs.hyprland itself comes from
+  # common.nix; the idle + lock pair is declared here because common.nix no
+  # longer carries it - on homepc DMS owns the bar, notifications, lock screen
+  # and idle handling, and enabling that shell for every host is what made the
+  # dell lose its own waybar/dunst/hypridle/hyprlock (b1548a9).
+  #
+  # Caveat: no config files for these on the dell yet. ~/.config/hypr/hypridle.conf
+  # is parked in ~/.config/hypr/legacy/ (its lock_cmd runs `hyprlock`), and a
+  # hyprlock config has never existed here - hypridle will start and exit, and
+  # `hyprlock` will refuse to lock, until ~/.config/hypr/hypridle.conf and
+  # ~/.config/hypr/hyprlock.cfg are put in place.
+  programs.hyprlock.enable = true;
+  services.hypridle.enable = true;
+
   users.users.javi.packages = with pkgs; [ intel-gpu-tools ];
 }
