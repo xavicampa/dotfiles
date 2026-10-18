@@ -200,15 +200,40 @@ hl.window_rule({
     float = true,
 })
 hl.window_rule({
-    match = { title = "Hyprland Polkit Agent" },
-    stay_focused = true,
-    dim_around   = true,
-})
-hl.window_rule({
     match = { title = "Unlock Login Keyring" },
     stay_focused = true,
     dim_around   = true,
 })
+-- (The "Hyprland Polkit Agent" rule that used to sit here is gone: DMS
+-- registers the only polkit agent on homepc and services.hyprpolkitagent is off
+-- there, so it could never match — see the DMS polkit prompt block below,
+-- which replaces it. Re-add a rule only if you ever flip back to an external
+-- agent: upstream hyprpolkitagent uses class "hyprpolkitagent" and title
+-- "Authentication Required"; older builds titled it "Hyprland Polkit Agent".)
+
+-- ─── DMS polkit prompt ─────────────────────────────────────────────────────
+-- The polkit agent on homepc is DMS's own (services.hyprpolkitagent is off
+-- here, see home.nix), and the prompt this build shows is an xdg toplevel, not a
+-- layer surface — measured live with a pending `pkcheck -u` request:
+--   class/initialClass com.danklinux.dms   title/initialTitle Authentication
+--   size 460x220, floating true, pid = the quickshell (dms) process
+-- (Quickshell's PanelWindow namespace "dms:polkit-auth-surface" from
+-- dist/Modals/PolkitAuthSurfaceModal.qml never appears in `hyprctl layers` in
+-- 1.6.3, so an hl.layer_rule on that namespace would be inert — verified: while
+-- the prompt was up the only layers were `quickshell` and `dms:bar`.)
+-- DMS already grabs the keyboard itself (HyprlandFocusGrab) and Hyprland
+-- auto-floats the fixed-size window. stay_focused is kept as a belt-and-braces
+-- compositor-side hint, but it is not absolute here: measured live, a directional
+-- focus dispatcher left focus on the prompt, while hl.dsp.window.cycle_next()
+-- still moved focus off it. If you ever need the prompt to be genuinely
+-- untabbable that has to come from DMS's focus grab, not this rule.
+hl.window_rule({
+    name         = "dms-polkit-dialog",
+    match        = { class = "com\\.danklinux\\.dms", title = "Authentication" },
+    dim_around   = true,
+    stay_focused = true,
+})
+
 -- Scratch workspace. On homepc DMS fills it with its own scratch helper; the dell
 -- gets `kitty` (hosts/dell.lua), same as the pre-Lua hyprlang config had.
 if HOST == "homepc" then
