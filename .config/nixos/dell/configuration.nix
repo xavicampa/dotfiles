@@ -129,11 +129,13 @@
   # and idle handling, and enabling that shell for every host is what made the
   # dell lose its own waybar/dunst/hypridle/hyprlock (b1548a9).
   #
-  # Caveat: no config files for these on the dell yet. ~/.config/hypr/hypridle.conf
-  # is parked in ~/.config/hypr/legacy/ (its lock_cmd runs `hyprlock`), and a
-  # hyprlock config has never existed here - hypridle will start and exit, and
-  # `hyprlock` will refuse to lock, until ~/.config/hypr/hypridle.conf and
-  # ~/.config/hypr/hyprlock.cfg are put in place.
+  # Configs live in the dotfiles: ~/.config/hypr/hypridle.conf (lock_cmd spawns
+  # hyprlock; 300s DPMS-off listener) and ~/.config/hypr/hyprlock.conf (screenshot
+  # background + password field, PAM service 'hyprlock'). Both are host-agnostic and
+  # inert on homepc, where neither binary is installed. hypridle's unit is
+  # ConditionEnvironment=WAYLAND_DISPLAY, so the dell's i3/X session skips it.
+  # programs.hyprlock.enable already implies services.hypridle.enable and
+  # security.pam.services.hyprlock - the hypridle line states the intent.
   programs.hyprlock.enable = true;
   services.hypridle.enable = true;
 

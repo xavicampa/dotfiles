@@ -208,9 +208,9 @@ in
     # timeouts, idle-inhibitor tile, `loginctl lock-session` integration, with
     # the timeouts in ~/.config/DankMaterialShell/settings.json (acLockTimeout=300
     # + acPostLockMonitorTimeout=300) - and the dell re-enables
-    # `services.hypridle.enable = true;` in its own file. The old config is parked
-    # in ~/.config/hypr/legacy/hypridle.conf (archived by the Lua migration), so
-    # the dell's hypridle currently starts with no config of its own.
+    # `services.hypridle.enable = true;` in its own file. Configs: ~/.config/hypr/hypridle.conf
+    # and ~/.config/hypr/hyprlock.conf (shared dotfiles, never read on homepc because
+    # neither binary is installed there). legacy/hypridle.conf came back with them.
     udisks2.enable = true;
   };
 
