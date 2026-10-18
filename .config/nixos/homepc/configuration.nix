@@ -233,6 +233,52 @@ in
     };
   };
 
+  # Desktop shell: DankMaterialShell is homepc-only. It was in common.nix until
+  # 2026-10-18; moving it here keeps the dell on the bare hyprland stack
+  # (waybar + dunst + hypridle + hyprlock) instead of having dms.service,
+  # matugen theming and DMS's org.freedesktop.Notifications owner everywhere.
+  programs = {
+    dms-shell = {
+      # quickshell-based desktop shell (bar, notifications, launcher, lock
+      # screen, OSD) for the hyprland session. Trial config; the shell's own
+      # settings live imperatively in ~/.config/quickshell/ii/ and ~/.config/hypr
+      # (deployed by `dms setup`), only the package/service here.
+      enable = true;
+
+      # The nixos-26.05 channel build is 1.4.6, two majors behind upstream, and
+      # the module's feature toggles track it. Take the shell and quickshell from
+      # <nixpkgs-unstable> together so the QML API (1.6.2) and the `qs` binary
+      # (0.3.1) agree - mixing 1.6.2 with the channel's quickshell 0.3.0 risks
+      # QML calling into qs APIs that do not exist yet.
+      package = unstable.dms-shell;
+      quickshell.package = unstable.quickshell;
+
+      # dms.service ships in the package (lib/systemd/user/dms.service) and the
+      # module pulls it in through systemd.packages. uwsm brings up
+      # graphical-session.target, which is what the unit is PartOf/Requisite of,
+      # so the module default target is correct for the uwsm hyprland session.
+      systemd = {
+        enable = true;
+        restartIfChanged = true;
+      };
+
+      enableSystemMonitoring = true; # dgop: CPU/RAM/net widgets + process list
+      enableDynamicTheming = true; # matugen: wallpaper -> DMS/rofi/gtk palette
+      enableCalendarEvents = true; # khal (calendar widget; needs ~/.config/khal)
+      enableClipboardPaste = true; # wtype for Shift+Return in clipboard history
+
+      # The VPN widget drives NetworkManager, which is inactive here (plain iwd).
+      enableVPN = false;
+      # cava spectrum widget - flip to true if you want the visualizer.
+      enableAudioWavelength = false;
+    };
+  };
+
+  # DMS draws its own bar, so drop the waybar module's WantedBy (programs.waybar
+  # stays enabled in common.nix) - the package and ~/.config/waybar/homepc.jsonc
+  # remain, and deleting this line brings the bar straight back on this host only.
+  systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
+
   # Services
   services = {
     # DMS greeter (greetd-backed) replaces SDDM on this machine. Scoped to homepc
@@ -862,6 +908,14 @@ in
 
   # Environment configuration
   environment.systemPackages = [
+    # Login-screen cursor. The dms-greeter serviceAccount has no per-user profile
+    # (/etc/profiles/per-user/ only contains javi), and apple-cursor is otherwise
+    # only in users.users.javi.packages, so the greeter's Hyprland cannot resolve
+    # the theme at all. In the system profile it lands in
+    # /run/current-system/sw/share/icons/macOS, which every XCURSOR_PATH includes.
+    # Keep in sync with users.users.javi.packages (apple-cursor), DMS's
+    # cursorSettings (macOS/24) and the greeter's customConfig env below.
+    pkgs.apple-cursor
     pkgs.jellyfin-media-player
     pkgs.level-zero
     pkgs.libmtp
