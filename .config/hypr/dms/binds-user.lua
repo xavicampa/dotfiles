@@ -17,9 +17,7 @@ hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("dms ipc call brightness decrem
 hl.unbind("XF86MonBrightnessUp")
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("dms ipc call brightness increment 5 \"ddc:i2c-11\""), { locked = true, repeating = true })
 hl.unbind("SUPER + S")
-hl.bind("SUPER + S", hl.dsp.workspace.toggle_special("magic"), { description = "toggle scratch (special:magic)" })
 hl.unbind("SUPER + SHIFT + S")
-hl.bind("SUPER + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }), { description = "move window to scratch" })
 hl.unbind("SUPER + E")
 hl.bind("SUPER + E", hl.dsp.exec_cmd("nautilus --new-window"), { description = "Files (Nautilus)" })
 hl.unbind("SUPER + CTRL + Return")
@@ -32,3 +30,20 @@ hl.unbind("SUPER + SHIFT + Slash")
 hl.unbind("SUPER + T")
 hl.unbind("SUPER + code:61")
 hl.unbind("SUPER + grave")
+
+-- SUPER + minus → scratch workspace. DMS's default here was
+-- resizeactive -100 0; keysym `minus` is only ever the printed `-` key on kb_layout=no
+-- (<AB10>, unshifted only), and width resize survives on the printed `+` (SUPER+code:20 =
+-- resizeactive -100 0) and printed `\` (SUPER+code:21 = resizeactive 100 0).
+hl.unbind("SUPER + minus")
+hl.bind("SUPER + minus", hl.dsp.workspace.toggle_special("magic"), { description = "toggle scratch (special:magic)" })
+
+-- SUPER + SHIFT + minus → window → scratch. (SUPER+S / SUPER+SHIFT+S are both unbound now, so
+-- this is the only window→scratch key; toggling scratch is SUPER+minus.)
+-- Keycode form is mandatory: on kb_layout=no the printed `-` key (<AB10>) emits keysym
+-- `underscore` with Shift down, so a `SUPER + SHIFT + minus` keysym bind can never fire;
+-- `code:61` matches the physical key and shift state is irrelevant to it.
+-- The unbind clears DMS's unaddressable default here (resizeactive 0 -100) and keeps that
+-- keysym slot dead across DMS updates.
+hl.unbind("SUPER + SHIFT + minus")
+hl.bind("SUPER + SHIFT + code:61", hl.dsp.window.move({ workspace = "special:magic" }), { description = "move window to scratch" })
