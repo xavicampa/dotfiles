@@ -135,6 +135,17 @@ in
       # "nvidia-drm.modeset=1"
       # "nvidia-drm.fbdev=1"
     ];
+    # Silence the two Intel DPTF/DTT "ACPI BIOS Error (bug)" pairs on the
+    # console (boot + reboot):
+    #   \_SB.PC00.LPCB.HEC.DPTF.FCHG AE_NOT_FOUND -> aborts \_SB.IETM.CHRG.PPSS
+    #   \_TZ.ETMD                     AE_NOT_FOUND -> aborts \_SB.IETM._OSC
+    # They are bugs in this BIOS' AML, not ours, and ACPICA prints them
+    # unconditionally at KERN_ERR (verified: acpi.debug_level=0 does not gate
+    # them - ACPI_MSG_BIOS_ERROR is hard-coded as KERN_ERR). Dropping the
+    # console loglevel 4 -> 3 hides exactly KERN_ERR from the console; KERN_CRIT
+    # and worse (panics) still print, and nothing is lost from the journal:
+    # journalctl -k -p err. Revert by deleting this line (back to default 4).
+    consoleLogLevel = 3;
     kernelPackages = unstable.linuxPackages_6_18; # 6.18.53 LTS; must match hardware.nvidia.package (same set)
     blacklistedKernelModules = [ "spd5118" ];
     # extraModprobeConfig = ''
