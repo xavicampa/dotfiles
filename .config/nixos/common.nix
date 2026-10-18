@@ -215,7 +215,6 @@ in
   security.polkit.enable = true;
 
   services = {
-    blueman.enable = true;
     displayManager = {
       sddm = {
         enable = true;
@@ -284,7 +283,6 @@ in
         autotiling
         baobab # windirstat equivalent
         bashmount
-        # blueman
         bruno
         unstable.btop-cuda
         ddcutil

@@ -71,6 +71,10 @@
   # bluetooth
   hardware.i2c.enable = true;
   hardware.bluetooth.enable = true;
+  # Moved out of common.nix: only this box has a Bluetooth adapter, so the
+  # Blueman GUI (tray applet + bluez D-Bus frontend) belongs here, not in the
+  # shared config.
+  services.blueman.enable = true;
 
   security.rtkit.enable = true;
 
