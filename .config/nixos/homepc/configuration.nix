@@ -908,14 +908,10 @@ in
 
   # Environment configuration
   environment.systemPackages = [
-    # Login-screen cursor. The dms-greeter serviceAccount has no per-user profile
-    # (/etc/profiles/per-user/ only contains javi), and apple-cursor is otherwise
-    # only in users.users.javi.packages, so the greeter's Hyprland cannot resolve
-    # the theme at all. In the system profile it lands in
-    # /run/current-system/sw/share/icons/macOS, which every XCURSOR_PATH includes.
-    # Keep in sync with users.users.javi.packages (apple-cursor), DMS's
-    # cursorSettings (macOS/24) and the greeter's customConfig env below.
-    pkgs.apple-cursor
+    # pkgs.apple-cursor used to live here — it now sits inline in common.nix's
+    # systemPackages list (hostName-gated to homepc), because moving it between
+    # module contributions re-hashes the system profile and drags a dbus restart
+    # into an otherwise byte-identical switch. See the comment there.
     pkgs.jellyfin-media-player
     pkgs.level-zero
     pkgs.libmtp

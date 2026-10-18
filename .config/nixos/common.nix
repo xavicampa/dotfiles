@@ -56,9 +56,16 @@ in
         flavor = "mocha";
         accent = "mauve";
       })
-      # apple-cursor lives in homepc/configuration.nix's systemPackages instead:
-      # only the dms-greeter serviceAccount needs it system-wide. The session
-      # gets it from users.users.javi.packages below.
+    ] ++ lib.optionals (config.networking.hostName == "homepc") [
+      # The dms-greeter's login-screen cursor — homepc only, but kept inline here
+      # rather than moved to homepc/configuration.nix. A package changing *position*
+      # in the merged environment.systemPackages order re-hashes the system-path
+      # buildEnv (byte-identical contents, different derivation), and that path is
+      # baked into /etc/dbus-1/{session,system}.conf plus the polkit and dbus-broker
+      # X-Restart-Triggers — so relocating it would restart the system bus for
+      # nothing. Same list, same slot, just absent on the dell.
+      pkgs.apple-cursor
+    ] ++ [
       pkgs.unrar
     ];
   };
