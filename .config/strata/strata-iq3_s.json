@@ -40,7 +40,9 @@
   "--pcie-frac",
   "0.20",
   "--pool-workers",
-  "15"
+  "15",
+  "--pipeline-windows",
+  "2"
  ],
  "cwd": "/opt/strata",
  "tokenizer": "/data/packs/iq3_s/tokenizer",

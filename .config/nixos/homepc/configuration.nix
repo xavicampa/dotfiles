@@ -524,6 +524,7 @@ in
             --ulimit memlock=-1
             -e STRATA_PF_FUSED=1
             -e STRATA_EXCHANGE_ROTATE=1
+            -e STRATA_ADAPT_LAG=2
             -v strata-data:/data
             -v /home/javi/.config/strata:/data/config
             -v /home/javi/.config/strata/strata-iq3_s.shared-settings.json:/opt/strata/strata-iq3_s.shared-settings.json
