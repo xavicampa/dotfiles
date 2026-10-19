@@ -35,6 +35,8 @@
   "160",
   "--adapt-decay",
   "0.97",
+  "--adapt-async",
+  "1",
   "--pcie-frac",
   "0.20",
   "--pool-workers",
