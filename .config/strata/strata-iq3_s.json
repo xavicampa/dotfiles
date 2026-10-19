@@ -25,9 +25,9 @@
   "int8",
   "--vision",
   "--vram-reserve-mib",
-  "960",
+  "1024",
   "--vram-reserve-later-mib",
-  "700",
+  "1024",
   "--trim-stage-weights",
   "--adapt-every",
   "1",
@@ -37,12 +37,12 @@
   "0.97",
   "--adapt-async",
   "1",
-  "--pcie-frac",
-  "0.20",
   "--pool-workers",
   "15",
   "--pipeline-windows",
-  "2"
+  "2",
+  "--pcie-frac",
+  "0.20"
  ],
  "cwd": "/opt/strata",
  "tokenizer": "/data/packs/iq3_s/tokenizer",
@@ -59,6 +59,11 @@
  ],
  "gpus_asked": true,
  "layer_split": "32",
+ "env": {
+   "STRATA_PF_FUSED": "1",
+   "STRATA_ADAPT_LAG": "2",
+   "STRATA_EXCHANGE_ROTATE": "1"
+ },
  "host": "0.0.0.0",
  "vision": {
   "exe": "/opt/strata/engine/strata-vision",
