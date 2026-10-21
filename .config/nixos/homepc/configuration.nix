@@ -113,27 +113,6 @@ in
       "reboot=pci,cold"
       # IDs for pci-stub to claim (reaches it in the initrd and the root system).
       "pci-stub.ids=10de:22e9,10de:1aef"
-      # 2 MB hugepages for Strata's expert arena: it requests
-      # MAP_HUGETLB|MAP_HUGE_2MB (src/core/pinned.cu) and falls back to 4 KB
-      # pages with no pool, costing 12.2M first-touch faults + zeroing on the
-      # 46.84 GiB load and letting expert pages be swapped. Arena =
-      # 50,294,502,400 B = 23,983 pages; 24,064 (47 GiB) leaves ~15 GiB of the
-      # 62 GiB for everything else. See the memlock block below.
-      # GOTCHA: the count must be "hugepages=N" directly after its "hugepagesz="
-      # - vm.nr_hugepages= on the cmdline is a sysctl name, silently ignored
-      # (dmesg then reports "pre-allocated 0 pages").
-      "default_hugepagesz=2M"
-      "hugepagesz=2M"
-      "hugepages=24064"
-      # "pcie_aspm.policy=performance"
-      # "pcie_aspm.policy=powersupersave"
-      # "pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=1G"
-      # "pci=realloc"
-      # "pcie_aspm=off"
-      # "pcie_port_pm=off"
-      # "nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-      # "nvidia-drm.modeset=1"
-      # "nvidia-drm.fbdev=1"
     ];
     # Silence the two Intel DPTF/DTT "ACPI BIOS Error (bug)" pairs on the
     # console (boot + reboot):
@@ -157,7 +136,7 @@ in
     };
   };
 
-  # RLIMIT_MEMLOCK for Strata: mlock() of the expert arena and MAP_HUGETLB both
+  # RLIMIT_MEMLOCK for Strata and Maya: mlock() of the expert arena and MAP_HUGETLB both
   # need it (a rootless container's CAP_IPC_LOCK does not count against
   # init_user_ns). Rootless podman inherits the user manager's 8 MiB default, so
   # the unit's `--ulimit memlock=-1` is dropped silently and the engine logs
@@ -459,11 +438,14 @@ in
   #     (internal/server/api.go) always emits a record for the key, and
   #     `unlisted: true` continues *before* the alias loop - it hides the aliases
   #     with it. There is no "hide the primary, keep the aliases" switch.
-  #   - llama.cpp keeps its own router mode (--models-preset, --models-max 1): the
-  #     preset names are aliases of the ONE entry and the requested name is
-  #     forwarded untouched (filters.go rewrites `model` only when useModelName is
-  #     set), so switching GGUF inside llama.cpp costs a weight reload while
-  #     switching engine costs a container restart.
+  #   - llama.cpp is not routed here any more (2026-10-20): its Qwen3.8-27B Q8_0,
+  #     the DFlash draft and the ggml-org MTP GGUF were deleted from the HF cache,
+  #     deleted from the HF cache, so the llama.cpp entry is parked commented-out
+  #     below, and the SC117 abliterated entry was deleted outright (same engine as
+  #     the live Strata entry, only its weights are gone). Strata's MTP
+  #     draft is its own (strata-data /data/mtp/rt, extracted from the BF16 Qwen
+  #     checkpoint), so it never needed those files. The llamacpp systemd unit below
+  #     is still a manual fallback if weights are re-downloaded.
   #   - `${MODEL_ID}` / `${PORT}` are llama-swap macros: inside a Nix indented
   #     string they must be written ''${...} or they reach the YAML doubled.
   services.llama-swap = {
@@ -493,7 +475,12 @@ in
       # Strata binds its port only once the model is in memory, so this must
       # cover a cold load (Strata docs/LLAMA_SWAP.md: 80 s on a Tesla V100 with
       # the GGUFs on a SATA SSD, 105 s while a download used the disk).
-      healthCheckTimeout = 300;
+      # It is global, not per-model (llama-swap v262's own embedded docs: "healthCheckTimeout is
+      # global (not per-model)"), so Maya's cold load sets the floor here: Maya pins its 44 GiB
+      # RAM tier, copies the starting expert profile into VRAM and warms its caches before the
+      # port opens - minutes, not seconds. Raising it costs nothing on the fast backends: it is
+      # an upper bound on the wait, not a delay.
+      healthCheckTimeout = 900;
 
       # graceful stop of the `podman run` client and the container
       unloadTimeout = 40;
@@ -505,7 +492,7 @@ in
       # field instead of a silent stall
       sendLoadingState = true;
 
-      # the llama.cpp presets are aliases of one entry, so list them
+      # no aliases right now, but keep them visible if a backend gets them back
       includeAliasesInList = true;
 
       # nothing is evicted by a timer; the group swaps on demand
@@ -515,7 +502,7 @@ in
         # --network host, so the container needs the port llama-swap assigned
         # (docker-entrypoint.sh passes PORT to serve/server.py). The key doubles as
         # the podman name via ${MODEL_ID} - legal under podman's
-        # [a-zA-Z0-9][a-zA-Z0-9_.-]*, unlike the llama.cpp key below.
+        # [a-zA-Z0-9][a-zA-Z0-9_.-]* (a llama.cpp-style `org/name:quant` key would not).
         "qwen3.8-flash-next-iq3_s" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
@@ -549,101 +536,121 @@ in
           # (includeAliasesInList) - so the old engine name "strata" is dropped.
         };
 
-        # The same IQ3_S tier abliterated (SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF):
-        # same engine, tuning and strata-data volume, but its own GGUFs, pack and
-        # config. The pack cannot be shared - the transplant moved tensor offsets,
-        # so the upstream pack fails with "ArenaExpertSource: the pack's
-        # native_experts.txt does not match the model". --mtp stays /data/mtp/rt:
-        # the draft layer comes from the stock Qwen checkpoint (no abliterated MTP
-        # head is published), so both Strata models share it.
-        # MODEL names only the tag: SC117-IQ3_S -> sc117-iq3_s, so the entrypoint
-        # reads /data/config/strata-sc117-iq3_s.json (already written: no setup
-        # pass, and an unknown --model fails loudly instead of re-downloading) and
-        # serve/server.py keeps the Chat settings beside it - hence the
-        # strata-sc117-iq3_s.shared-settings.json mount.
-        # One-time prep already done in strata-data (2026-10-15): the GGUFs at
-        # /data/gguf/sc117-iq3_s/{shard1,shard2,mmproj} are symlinked into the
-        # read-only /hf-cache (same trick as seed_gguf_dir), and the pack was built
-        # with tools/iq_pack.py --gguf /data/gguf/sc117-iq3_s/<shard1>
-        #      --out /data/packs/sc117_iq3_s
-        "qwen3.8-flash-next-abliterated-iq3_s" = {
+        # Project Maya: GLM-5.3-Flash (321 B MoE; the hottest experts in VRAM, the rest read
+        # through the page cache - RAM where they fit, NVMe otherwise). Image from
+        # ~/dev/personal/project-maya (`podman build -t maya .`).
+        #   - maya-data:/data holds the pack and the *links* to the model files, not their bytes;
+        #     /data/config is the host's ~/.config/maya. Unlike Strata, Maya keeps its state
+        #     next to its code (ROOT.glob("maya-*.json") in maya.py's configs(), and
+        #     write_config() writes ROOT/maya-<quant>.json), and /opt/maya is the image's own
+        #     throwaway layer - so docker-entrypoint.sh keeps the config, its .log and its
+        #     .shared-settings.json on the host bind and symlinks them into /opt/maya. Every
+        #     write to those paths is a plain write_text (no tmp + os.replace), so it follows
+        #     the link and lands in ~/.config/maya, where you can edit it.
+        #   - the model bytes live in the HF hub cache, not in the volume (like the Strata entry):
+        #     docker-seed-hf.py links peasantsmith/GLM-5.3-Flash-Maya-GGUF's files from /hf-cache
+        #     into maya-data's models folder, where maya.py's step 5 sees them as a finished
+        #     download; the cache is mounted :ro and never written to, and the pack plus the
+        #     .maya-verified.json record go beside the links. Keep mounting it after the setup:
+        #     the links in the volume only resolve while /hf-cache is mounted.
+        #     Get the files into the cache once with your usual HF downloader, e.g. (hf's --include
+        #     takes one pattern per flag; verified 5 files, 95.8 GB, sha256s matching maya.py's pins):
+        #       hf download peasantsmith/GLM-5.3-Flash-Maya-GGUF --include "Maya-S24/*" --include "vision/*"
+        #   - the model is NOT downloaded by llama-swap: if the cache has nothing usable and no
+        #     config exists, the entry point prints how to prime the volume and exits 1 rather than
+        #     pulling 95 GB inside a backend llama-swap is already timing out on.
+        #   - RAM_GB=44: see the hugepages block in kernelParams. Maya would otherwise size
+        #     the tier from MemAvailable (~15 GiB here, because the 47 GiB pool is already
+        #     charged against it) and stream the rest of the model on every token.
+        #   - no API key and HOST=0.0.0.0: :8080 is llama-swap, the backend port stays closed,
+        #     and --network host only works if the server binds outside loopback. Maya prints
+        #     its own "WARNING: no API key" line at start for the same reason; it is about
+        #     direct access, which is what the maya unit below is for.
+        "glm-5.3-flash-maya-s24" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
             --device nvidia.com/gpu=all
             --ulimit memlock=-1
-            -v strata-data:/data
-            -v /home/javi/.config/strata:/data/config
-            -v /home/javi/.config/strata/strata-sc117-iq3_s.shared-settings.json:/opt/strata/strata-sc117-iq3_s.shared-settings.json
+            -v maya-data:/data
+            -v /home/javi/.config/maya:/data/config
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
             -e HF_CACHE=/hf-cache
-            -e MODEL=SC117-IQ3_S
-            -e VISION=yes
+            -e MODEL=Maya-S24
+            -e HOST=0.0.0.0
             -e PORT=''${PORT}
-            localhost/strata:latest
+            localhost/maya:latest
           '';
-          cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
+          # 35 s, inside unloadTimeout above: podman's SIGTERM reaches maya.py (PID 1), which
+          # stops serve/server.py the way Ctrl+C does (stop_signals), and Maya's own stop waits
+          # up to 150 s for the request in flight plus the engine's QUIT (STOP_WAIT_S). A stop
+          # that outlives llama-swap's wait is untidy but survivable: the next cmd uses
+          # --replace, which removes whatever container is left.
+          cmdStop = ''podman stop -t 35 ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
-          # distinct from the other Strata entry (qwen3.8-flash-next-iq3_s): the
-          # two run the same architecture and the same quant, only the weights
-          # differ
+          # Maya's own defaults: maya.py's DEFAULT_CONTEXT (65536) and CONTEXT= above; keep the
+          # two in step, the pack and the config are written at setup time with it.
           capabilities = {
-            context = 262144;
-            "in" = [ "text" "image" ];
+            context = 131072;
+            "in" = [ "text" "image" ];   # the vision tower runs on GPU 0 beside the model
             out = [ "text" ];
-            tools = true;
+            tools = true;                # OpenAI + Anthropic tool calls (README, "Plugs into your tools")
           };
-          # no aliases, see the note on the other Strata entry
         };
 
-        # One entry, five preset names: the key is itself a real preset section, so
-        # the primary name resolves inside llama.cpp's router too and the other
-        # four stay aliases. Container name is literal, not ${MODEL_ID}: podman
-        # rejects `/` and `:` in names.
-        "bartowski/Qwen3.8-27B-GGUF:Q8_0" = {
-          cmd = ''
-            podman run --replace --name llama-swap-llamacpp
-            -p ''${PORT}:8080
-            --device nvidia.com/gpu=all
-            -e GGML_CUDA_ALLREDUCE=internal
-            -e CUDA_VISIBLE_DEVICES=1,0
-            -v /home/javi/.cache/huggingface:/root/.cache/huggingface
-            -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro
-            localhost/llama-cuda:mtmd-fix
-            --models-preset /app/llama-preset.ini
-            --models-max 1
-            -lv 4
-            -t 8
-            -tb 8
-          '';
-          cmdStop = ''podman stop -t 30 llama-swap-llamacpp'';
-          checkEndpoint = "/health";
-          ttl = 0;
-          # Every name (the key included) must match a [section] in
-          # ~/.config/llamacpp/llama-preset.ini and stay unique across llama-swap:
-          # the Flash-Next IQ3_S name belongs to the Strata entry only.
-          aliases = [
-            "bartowski/Qwen3.8-27B-GGUF:MTP_1P_180K"
-            "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF:Q6_K_L"
-            "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_S"
-            "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S"
-          ];
-        };
+        # llama.cpp backend PARKED 2026-10-20 (commented, not deleted): its weights
+        # are gone from the HF cache (bartowski Qwen3.8-27B Q8_0, the HermiHg DFlash2
+        # draft, and the ggml-org MTP draft), and the matching [sections] were dropped
+        # from ~/.config/llamacpp/llama-preset.ini. Strata is the only live backend.
+        # To bring it back: re-download the weights, restore the preset sections
+        # (from ~/.config/llamacpp/llama-preset.ini.bak-20261020-mtp-and-27b-removal),
+        # uncomment this entry *and* its group member below - note the ISTA names in
+        # `aliases` collide with the Strata entry's name space, so keep at most one of
+        # them claiming "ISTA-DASLab/...Flash-Next...:IQ3_S".
+        # "bartowski/Qwen3.8-27B-GGUF:Q8_0" = {
+        #   cmd = ''
+        #     podman run --replace --name llama-swap-llamacpp
+        #     -p ''${PORT}:8080
+        #     --device nvidia.com/gpu=all
+        #     -e GGML_CUDA_ALLREDUCE=internal
+        #     -e CUDA_VISIBLE_DEVICES=1,0
+        #     -v /home/javi/.cache/huggingface:/root/.cache/huggingface
+        #     -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro
+        #     localhost/llama-cuda:mtmd-fix
+        #     --models-preset /app/llama-preset.ini
+        #     --models-max 1
+        #     -lv 4
+        #     -t 8
+        #     -tb 8
+        #   '';
+        #   cmdStop = ''podman stop -t 30 llama-swap-llamacpp'';
+        #   checkEndpoint = "/health";
+        #   ttl = 0;
+        #   # Every name (the key included) must match a [section] in
+        #   # ~/.config/llamacpp/llama-preset.ini and stay unique across llama-swap:
+        #   # the Flash-Next IQ3_S name belongs to the Strata entry only.
+        #   aliases = [
+        #     "bartowski/Qwen3.8-27B-GGUF:MTP_1P_180K"
+        #     "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF:Q6_K_L"
+        #     "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_S"
+        #     "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S"
+        #   ];
+        # };
+
       };
 
       routing.router = {
         use = "group";
         settings.groups = {
-          # both engines want both cards: llama.cpp tensor-splits 17,23 over the
-          # 3090 Ti + 5070 Ti, Strata runs gpu [0,1] with layer_split 32
+          # Strata wants both cards: gpu [0,1] with layer_split 32
           gpu = {
             swap = true;        # one at a time
             exclusive = true;   # and it evicts every other group
             members = [
               "qwen3.8-flash-next-iq3_s"
-              "qwen3.8-flash-next-abliterated-iq3_s"
-              "bartowski/Qwen3.8-27B-GGUF:Q8_0"
+              "glm-5.3-flash-maya-s24"
+              # "bartowski/Qwen3.8-27B-GGUF:Q8_0"   # parked with the llama.cpp entry above
             ];
           };
         };
@@ -656,8 +663,10 @@ in
       # leaves /var read-only apart from what systemd opens.
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
-      # keep today's behaviour: Strata is loaded at boot, not on first request
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
+      # keep today's behaviour: Strata is loaded at boot, not on first request.
+      # Maya is deliberately not preloaded: its cold load is minutes and it pins 44 GiB,
+      # so it swaps in on request (its first request pays for that, sendLoadingState says so).
+      # hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
     };
   };
 
@@ -704,7 +713,8 @@ in
           ExecStartPre = [
             "/run/current-system/sw/bin/mkdir -p /home/javi/.config/strata"
             "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-iq3_s.shared-settings.json"
-            "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-sc117-iq3_s.shared-settings.json"
+            # Maya's config/log/dashboard-settings bind (the entrypoint symlinks into it)
+            "/run/current-system/sw/bin/mkdir -p /home/javi/.config/maya"
           ];
         };
       };
@@ -834,6 +844,60 @@ in
             -e MODEL=IQ3_S \
             -e VISION=yes \
             localhost/strata:latest
+        '';
+      };
+
+      # Project Maya: GLM-5.3-Flash (321 B) on the NVIDIA cards. On-demand only (no wantedBy) -
+      # llama-swap preloads Strata and owns the containers; this is the manual fallback, same
+      # role as the strata/llamacpp units above. It shares the container name with the
+      # llama-swap backend entry, so the two cannot both be up.
+      # PORT=5800 here instead of Maya's own 8080: llama-swap itself holds :8080 (it runs with
+      # --network host too), so a fallback on 8080 would steal the front door's port; 5800 is
+      # llama-swap's startPort and reaches this container directly while the router is up.
+      # First run only (the setup asks nothing, --yes; the model comes from the HF cache, so no
+      # download - the pack plus the links land in the volume):
+      #   podman run --rm -e SETUP=1 -v maya-data:/data \
+      #     -v "$HOME/.cache/huggingface/hub:/hf-cache:ro" -v "$HOME/.config/maya:/data/config" \
+      #     -e HF_CACHE=/hf-cache localhost/maya:latest
+      # Then start this unit, or let llama-swap swap to "glm-5.3-flash-maya-s24".
+      maya = {
+        description = "Project Maya (GLM-5.3-Flash) container";
+        unitConfig = {
+          # like the strata unit: no start-rate limit, so a crash-loop keeps retrying
+          StartLimitIntervalSec = 0;
+        };
+        serviceConfig = {
+          Type = "simple";
+          Restart = "always";
+          RestartSec = "5s";
+          User = "javi";
+          Group = "users";
+          # the host side of /data/config must exist as a directory, or podman makes one at the
+          # mount point of a missing path (and the entrypoint would then look for a config in it)
+          ExecStartPre = [
+            "/run/current-system/sw/bin/mkdir -p /home/javi/.config/maya"
+          ];
+          Environment = [
+            "PATH=/run/current-system/sw/bin"
+            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
+          ];
+        };
+
+        script = ''
+          podman run \
+            --replace \
+            --name glm-5.3-flash-maya-s24 \
+            --network host \
+            --device nvidia.com/gpu=all \
+            --ulimit memlock=-1 \
+            -v maya-data:/data \
+            -v /home/javi/.config/maya:/data/config \
+            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro \
+            -e HF_CACHE=/hf-cache \
+            -e MODEL=Maya-S24 \
+            -e HOST=0.0.0.0 \
+            -e PORT=5800 \
+            localhost/maya:latest
         '';
       };
 
