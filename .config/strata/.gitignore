@@ -17,3 +17,9 @@ third_party/
 # The web app's per-profile bookkeeping: flock files, .history/ of every edit and
 # .ops/<name>/.runs/<id>.json records. The <name>.json profiles themselves stay in.
 strata/profiles/.*
+
+# Left on disk on purpose, kept out of the repo: 0.1x/ is the parked pre-2.x run
+# settings (the real ones are in history), run-iq3_s.sh is the server.py command
+# line setup.py records from the container's entrypoint.
+0.1x/
+run-iq3_s.sh
