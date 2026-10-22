@@ -795,6 +795,5 @@ in
     ../common.nix
     ./hardware-configuration.nix
     # ./openvino.nix
-    # ./greencurve.nix
   ];
 }
