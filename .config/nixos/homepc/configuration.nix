@@ -443,9 +443,12 @@ in
   #     deleted from the HF cache, so the llama.cpp entry is parked commented-out
   #     below, and the SC117 abliterated entry was deleted outright (same engine as
   #     the live Strata entry, only its weights are gone). Strata's MTP
-  #     draft is its own (strata-data /data/mtp/rt, extracted from the BF16 Qwen
-  #     checkpoint), so it never needed those files. The llamacpp systemd unit below
-  #     is still a manual fallback if weights are re-downloaded.
+  #     draft is its own (strata-data /data/Strata-data/mtp/rt - the 0.2.x image
+  #     moves /data/models, /data/packs and /data/mtp under /data/Strata-data on its
+  #     first start, by rename - extracted from the BF16 Qwen
+  #     checkpoint), so it never needed those files. The llamacpp/strata/maya fallback
+  #     units are gone: llama-swap is the only thing that starts containers now, and a
+  #     hand-run podman is the fallback if weights are re-downloaded.
   #   - `${MODEL_ID}` / `${PORT}` are llama-swap macros: inside a Nix indented
   #     string they must be written ''${...} or they reach the YAML doubled.
   services.llama-swap = {
@@ -500,26 +503,41 @@ in
 
       models = {
         # --network host, so the container needs the port llama-swap assigned
-        # (docker-entrypoint.sh passes PORT to serve/server.py). The key doubles as
+        # (docker/entrypoint.sh passes PORT to `strata launch --port`). The key doubles as
         # the podman name via ${MODEL_ID} - legal under podman's
         # [a-zA-Z0-9][a-zA-Z0-9_.-]* (a llama.cpp-style `org/name:quant` key would not).
+        # The 0.2.x image reads MODEL_PATH, not HF_CACHE (the latter is unknown to it: no
+        # warning, just a fresh ~62 GB download into the volume). The mounts:
+        # strata-data:/data holds the pack, the MTP draft and /data/gguf/IQ3_S (whose
+        # shards are links into the read-only /hf-cache hub mount - keep both mounted or
+        # they dangle), and ~/.config/strata:/data/install (XDG_CONFIG_HOME) keeps the run
+        # settings and the web app's chat settings host-editable. Mount the directory, not
+        # the file: setup.py saves via <name>.tmp + os.replace, and renaming over a
+        # bind-mounted file fails with EBUSY.
+        # The cards and the layer split are deliberately NOT env here: passing GPUS makes setup
+        # re-derive the split, which writes layer_split back to "auto". They live in the run
+        # settings (/home/javi/.config/strata/strata-iq3_s.json: gpu [0,1], layer_split "32"),
+        # which also carries the hand-picked engine options in "user_args".
         "qwen3.8-flash-next-iq3_s" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
             --device nvidia.com/gpu=all
             --ulimit memlock=-1
+            --shm-size 2g
+            --stop-timeout 120
             -v strata-data:/data
-            -v /home/javi/.config/strata:/data/config
-            -v /home/javi/.config/strata/strata-iq3_s.shared-settings.json:/opt/strata/strata-iq3_s.shared-settings.json
+            -v /home/javi/.config/strata:/data/install
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
-            -e HF_CACHE=/hf-cache
+            -e XDG_CONFIG_HOME=/data/install
+            -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
-            -e VISION=yes
+            -e VISION=on
+            -e CONTEXT=256k
             -e PORT=''${PORT}
-            localhost/strata:latest
+            ghcr.io/niko1221/strata:0.2.2-cuda13
           '';
-          cmdStop = ''podman stop -t 30 ''${MODEL_ID}'';
+          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
           # `tools` renders as capabilities.function_calling = true plus
@@ -565,7 +583,7 @@ in
         #   - no API key and HOST=0.0.0.0: :8080 is llama-swap, the backend port stays closed,
         #     and --network host only works if the server binds outside loopback. Maya prints
         #     its own "WARNING: no API key" line at start for the same reason; it is about
-        #     direct access, which is what the maya unit below is for.
+        #     direct access on the backend port, which the firewall keeps closed anyway.
         "glm-5.3-flash-maya-s24" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
@@ -666,7 +684,7 @@ in
       # keep today's behaviour: Strata is loaded at boot, not on first request.
       # Maya is deliberately not preloaded: its cold load is minutes and it pins 44 GiB,
       # so it swaps in on request (its first request pays for that, sendLoadingState says so).
-      # hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
     };
   };
 
@@ -688,7 +706,8 @@ in
       # The module hardens its unit for a self-contained Go server (DynamicUser,
       # PrivateUsers, ProtectHome, syscall deny list). llama-swap must exec the
       # podman client against javi's rootless socket, so it runs as javi with those
-      # off - same shape as the llamacpp/strata units below.
+      # off. It starts every backend container itself (per-model cmd), so no separate
+      # container units live here any more - the manual fallback is a hand-run podman.
       llama-swap = {
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
@@ -708,235 +727,17 @@ in
             "PATH=/run/current-system/sw/bin"
             "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
           ];
-          # same as the strata unit: an absent host side becomes an empty directory
-          # (which sends the entrypoint through a full setup pass) or a directory
+          # Every bind here is a directory, and the host side must exist as one: an
+          # absent path becomes an empty directory, and an empty /data/install sends the
+          # strata entrypoint through a full setup pass with none of the tuned settings.
+          # No single-file binds are left, so there is nothing to touch.
           ExecStartPre = [
             "/run/current-system/sw/bin/mkdir -p /home/javi/.config/strata"
-            "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-iq3_s.shared-settings.json"
             # Maya's config/log/dashboard-settings bind (the entrypoint symlinks into it)
             "/run/current-system/sw/bin/mkdir -p /home/javi/.config/maya"
           ];
         };
       };
-
-      # llama.cpp server: on-demand only (no wantedBy) - llama-swap owns the
-      # container now. Manual fallback: starting it while llama-swap runs steals the
-      # container and both fight over :8080 and the cards (same :8080 as strata, so
-      # the two are mutually exclusive).
-      llamacpp = {
-        description = "llama.cpp server container";
-        serviceConfig = {
-          Type = "simple";
-          Restart = "on-failure";
-          RestartSec = "5s";
-          User = "javi";
-          Group = "users";
-          Environment = [
-            "PATH=/run/current-system/sw/bin"
-            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
-          ];
-        };
-
-        # script = ''
-        #   podman run \
-        #     --replace \
-        #     --name llama-swap-llamacpp \
-        #     --pull newer \
-        #     --network host \
-        #     --device nvidia.com/gpu=all \
-        #     -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
-        #     -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-        #     ghcr.io/ggml-org/llama.cpp:server-cuda \
-        #     --models-preset /app/llama-preset.ini \
-        #     --models-max 1 \
-        #     -lv 5 \
-        #     -t 8 \
-        #     -tb 8
-        # '';
-        script = ''
-          # Local build: branch local/mtp-qwen4exp = master @ 6e316de29
-          # + patches/mtmd-dflash-mrope-fix.patch (fixes #27408: dflash + mtmd image
-          # decoding 500s) + merge of ggml-org/llama.cpp#28243 (qwen4exp MTP draft
-          # load + tensor borrow, needed for Qwen3.8-Flash-Next MTP heads).
-          # Rebuild via ~/dev/personal/llama.cpp/build-patched.sh <tag>.
-          podman run \
-            --replace \
-            --name llama-swap-llamacpp \
-            -p 8080:8080 \
-            --device nvidia.com/gpu=all \
-            -e GGML_CUDA_ALLREDUCE=internal \
-            -e CUDA_VISIBLE_DEVICES=1,0 \
-            -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
-            -v /home/javi/.config/llamacpp/llama-preset.ini:/app/llama-preset.ini:ro \
-            localhost/llama-cuda:mtmd-fix \
-            --models-preset /app/llama-preset.ini \
-            --models-max 1 \
-            -lv 4 \
-            -t 8 \
-            -tb 8
-        '';
-      };
-
-      # Strata: Qwen3.8-Flash-Next (125B) on the NVIDIA cards. On-demand only (no
-      # wantedBy) - llama-swap preloads it and owns the container; kept as a manual
-      # fallback, see the llamacpp unit above. Image from ~/dev/personal/Strata
-      # (`docker build -t strata .`); model reused from ~/.cache/huggingface, pack
-      # and MTP layer live in the strata-data volume.
-      # --network host on purpose: pasta snapshots the namespace subnet from the
-      # host routes at container start, so with wlan0 not yet routed it mirrors
-      # libvirt's virbr0 192.168.122.0/24 with no default route - the container
-      # cannot reply to LAN clients and requests hang until passt resets them
-      # (~10 s). Host networking avoids the race; the firewall gates access.
-      # The model config lives on the host (~/.config/strata/strata-iq3_s.json)
-      # bind-mounted over the volume's /data/config: docker-entrypoint.sh builds
-      # $STRATA_DATA/config/strata-<model>.json, so shadowing that one directory
-      # keeps the config host-editable and image-independent while strata-data
-      # still holds the pack, MTP layer and GGUF links. Mount the directory, not
-      # the file: setup.py saves via <name>.tmp + os.replace, and renaming over a
-      # bind-mounted file fails with EBUSY (checked with mount --bind).
-      # The second mount is the web app's Chat settings: serve/server.py writes
-      # them beside the --config path, which is the /opt/strata link rather than
-      # the config, so they would land in the container's layer and die on replace.
-      # That one is a plain write_text (no rename), but it must exist on the host
-      # first or podman creates a directory at the mount point.
-      strata = {
-        description = "Strata (Qwen3.8-Flash-Next) container";
-        unitConfig = {
-          # The engine dies on its own sometimes (e.g. a mid-request CUDA OOM kills
-          # serve, so `podman run` exits non-zero). Lift the default 5 starts/10 s
-          # rate limit so a crash-loop keeps retrying instead of failing the unit.
-          StartLimitIntervalSec = 0;
-        };
-        serviceConfig = {
-          Type = "simple";
-          # always, not on-failure: the engine also exits 0 after its own
-          # watchdog gives up ("the engine stopped unexpectedly (exit code 0)"),
-          # which on-failure would leave the service inactive.
-          Restart = "always";
-          RestartSec = "5s";
-          User = "javi";
-          Group = "users";
-          # Both mounts need their host side to exist as the right kind: an absent
-          # directory becomes an empty one (an empty /data/config sends the
-          # entrypoint through a full setup pass), an absent file becomes a directory.
-          ExecStartPre = [
-            "/run/current-system/sw/bin/mkdir -p /home/javi/.config/strata"
-            "/run/current-system/sw/bin/touch /home/javi/.config/strata/strata-iq3_s.shared-settings.json"
-          ];
-          Environment = [
-            "PATH=/run/current-system/sw/bin"
-            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
-          ];
-        };
-
-        script = ''
-          podman run \
-            --replace \
-            --name qwen3.8-flash-next-iq3_s \
-            --network host \
-            --device nvidia.com/gpu=all \
-            --ulimit memlock=-1 \
-            -v strata-data:/data \
-            -v /home/javi/.config/strata:/data/config \
-            -v /home/javi/.config/strata/strata-iq3_s.shared-settings.json:/opt/strata/strata-iq3_s.shared-settings.json \
-            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro \
-            -e HF_CACHE=/hf-cache \
-            -e MODEL=IQ3_S \
-            -e VISION=yes \
-            localhost/strata:latest
-        '';
-      };
-
-      # Project Maya: GLM-5.3-Flash (321 B) on the NVIDIA cards. On-demand only (no wantedBy) -
-      # llama-swap preloads Strata and owns the containers; this is the manual fallback, same
-      # role as the strata/llamacpp units above. It shares the container name with the
-      # llama-swap backend entry, so the two cannot both be up.
-      # PORT=5800 here instead of Maya's own 8080: llama-swap itself holds :8080 (it runs with
-      # --network host too), so a fallback on 8080 would steal the front door's port; 5800 is
-      # llama-swap's startPort and reaches this container directly while the router is up.
-      # First run only (the setup asks nothing, --yes; the model comes from the HF cache, so no
-      # download - the pack plus the links land in the volume):
-      #   podman run --rm -e SETUP=1 -v maya-data:/data \
-      #     -v "$HOME/.cache/huggingface/hub:/hf-cache:ro" -v "$HOME/.config/maya:/data/config" \
-      #     -e HF_CACHE=/hf-cache localhost/maya:latest
-      # Then start this unit, or let llama-swap swap to "glm-5.3-flash-maya-s24".
-      maya = {
-        description = "Project Maya (GLM-5.3-Flash) container";
-        unitConfig = {
-          # like the strata unit: no start-rate limit, so a crash-loop keeps retrying
-          StartLimitIntervalSec = 0;
-        };
-        serviceConfig = {
-          Type = "simple";
-          Restart = "always";
-          RestartSec = "5s";
-          User = "javi";
-          Group = "users";
-          # the host side of /data/config must exist as a directory, or podman makes one at the
-          # mount point of a missing path (and the entrypoint would then look for a config in it)
-          ExecStartPre = [
-            "/run/current-system/sw/bin/mkdir -p /home/javi/.config/maya"
-          ];
-          Environment = [
-            "PATH=/run/current-system/sw/bin"
-            "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
-          ];
-        };
-
-        script = ''
-          podman run \
-            --replace \
-            --name glm-5.3-flash-maya-s24 \
-            --network host \
-            --device nvidia.com/gpu=all \
-            --ulimit memlock=-1 \
-            -v maya-data:/data \
-            -v /home/javi/.config/maya:/data/config \
-            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro \
-            -e HF_CACHE=/hf-cache \
-            -e MODEL=Maya-S24 \
-            -e HOST=0.0.0.0 \
-            -e PORT=5800 \
-            localhost/maya:latest
-        '';
-      };
-
-      # llamacpp-npu = {
-      #   description = "llama.cpp server container on Intel NPU (OpenVINO backend)";
-      #   wantedBy = [ "multi-user.target" ];
-      #   serviceConfig = {
-      #     Type = "simple";
-      #     Restart = "on-failure";
-      #     RestartSec = "5s";
-      #     User = "javi";
-      #     Group = "users";
-      #     Environment = [
-      #       "PATH=/run/current-system/sw/bin"
-      #       "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
-      #     ];
-      #   };
-      #
-      #   script = ''
-      #     # llama.cpp with OpenVINO backend (official image), NPU via /dev/accel
-      #     # (render group = 303). OpenAI API on :8090 -> container :8080.
-      #     podman run \
-      #       --replace \
-      #       --name llamacpp-npu \
-      #       -p 8090:8080 \
-      #       --device /dev/accel \
-      #       -e GGML_OPENVINO_DEVICE=NPU \
-      #       --group-add 303 \
-      #       -v /home/javi/.cache/huggingface:/root/.cache/huggingface \
-      #       -v /home/javi/.config/llamacpp-npu/llama-preset.ini:/app/llama-preset.ini:ro \
-      #       ghcr.io/ggml-org/llama.cpp:server-openvino \
-      #       --no-warmup \
-      #       --models-preset /app/llama-preset.ini \
-      #       --models-max 1 \
-      #       -lv 5 \
-      #       -t 8 \
-      #       -tb 8
-      #   '';
-      # };
 
       # Stops llama-swap (and whichever backend container it holds) before suspend
       # and restarts it after resume. llama-swap stops its upstream process on
@@ -971,29 +772,6 @@ in
         };
         wantedBy = [ "sleep.target" ];
       };
-
-      # hermes = {
-      #   description = "Hermes Agent container";
-      #   wantedBy = [ "default.target" ];
-      #   serviceConfig = {
-      #     Type = "simple";
-      #     Restart = "on-failure";
-      #     RestartSec = "5s";
-      #     User = "javi";
-      #     Group = "users";
-      #     Environment = "PATH=/run/current-system/sw/bin";
-      #     ExecStartPost = "/bin/sh -c 'sleep 5 && ${config.virtualisation.podman.package}/bin/podman cp /home/javi/.config/hermes/config.yaml hermes:/opt/data/config.yaml && ${config.virtualisation.podman.package}/bin/podman exec hermes chown -R hermes:hermes /opt/data || true'";
-      #   };
-
-      #   script = ''
-      #     podman run \
-      #       --replace \
-      #       --name hermes \
-      #       -v /home/javi/.local/hermes:/opt/data \
-      #       nousresearch/hermes-agent:latest \
-      #       gateway run
-      #   '';
-      # };
     };
   };
 
