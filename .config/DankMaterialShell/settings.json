@@ -23,6 +23,7 @@
   "blurEnabled": true,
   "controlCenterShowMicPercent": true,
   "appIdSubstitutions": [],
+  "useAutoLocation": true,
   "dashTabs": [
     {
       "id": "overview",
