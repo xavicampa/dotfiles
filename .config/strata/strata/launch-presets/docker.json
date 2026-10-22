@@ -9,7 +9,7 @@
   "gpu_roles": null,
   "gpus": null,
   "kv": null,
-  "last_used": "2026-10-22 17:28:12.067550",
+  "last_used": "2026-10-22 21:44:29.689813",
   "model": "IQ3_S",
   "model_path": "/data/gguf/IQ3_S",
   "mtp": null,

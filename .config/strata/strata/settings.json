@@ -5,14 +5,13 @@
   "/opt/strata"
  ],
  "calibration": {
-  "NVIDIA GeForce RTX 5070 Ti + NVIDIA GeForce RTX 3090 Ti|40GB|Intel(R) Core(TM) Ultra 7 270K Plus|62GB|qwen3.8-flash-next-iq3_s|262144|images": {
+  "? + ?|0GB|Intel(R) Core(TM) Ultra 7 270K Plus|62GB|qwen3.8-flash-next-iq3_s|262144|images": {
    "settings": {
-    "--pcie-frac": "0.20",
+    "--pcie-frac": "0.00",
     "--spec-min-p": "0.70"
    },
-   "env": {},
-   "tok_s": 140.3,
-   "date": "2026-10-18"
+   "tok_s": 144.7,
+   "date": "2026-10-22"
   }
  },
  "data_dir_at": 1792610775.2596912

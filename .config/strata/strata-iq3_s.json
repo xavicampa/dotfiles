@@ -22,8 +22,10 @@
   "--kv",
   "int8",
   "--vision",
-  "--pool-workers",
-  "15"
+  "--pcie-frac",
+  "0.00",
+  "--spec-min-p",
+  "0.70"
  ],
  "cwd": "/opt/strata/terminal",
  "tokenizer": "/data/Strata-data/packs/iq3_s/tokenizer",
@@ -46,8 +48,6 @@
   "cuda_device": 1
  },
  "user_args": [
-  "--spec-min-p",
-  "0.70",
   "--vram-reserve-mib",
   "1024",
   "--vram-reserve-later-mib",
@@ -61,8 +61,6 @@
   "0.97",
   "--adapt-async",
   "1",
-  "--pcie-frac",
-  "0.20",
   "--pipeline-windows",
   "2"
  ],

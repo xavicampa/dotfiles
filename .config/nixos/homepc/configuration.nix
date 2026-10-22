@@ -526,6 +526,7 @@ in
             --ulimit memlock=-1
             --shm-size 2g
             --stop-timeout 120
+            --pull newer
             -v strata-data:/data
             -v /home/javi/.config/strata:/data/install
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
@@ -535,7 +536,7 @@ in
             -e VISION=on
             -e CONTEXT=256k
             -e PORT=''${PORT}
-            ghcr.io/niko1221/strata:0.2.2-cuda13
+            ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
           checkEndpoint = "/health";
