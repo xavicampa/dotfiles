@@ -23,3 +23,15 @@ strata/profiles/.*
 # line setup.py records from the container's entrypoint.
 0.1x/
 run-iq3_s.sh
+
+# profiles/<name>.json is what `strata_control.runtime --host <name>` reads: it binds
+# that runtime to its launch config (launch-docker.json -> /data/state/strata/launch/
+# docker.json). The live container boots on --host launch-docker, so that one is tracked;
+# test.json is a dead record from a manual launch nothing references any more.
+strata/profiles/test.json
+
+# launch-presets/<name>.json is the preset the entrypoint boots on (PRESET=${PRESET:-docker},
+# entrypoint.sh:33) and the only durable copy - the copy the engine actually reads lives in
+# the strata-data volume. Tracked, but note api_key is a field here: while no_key is true
+# Strata mints its own key at /data/state/api-key (umask 077); setting a key would put a
+# secret in a tracked file. Its last_used timestamp also changes on every launch.
