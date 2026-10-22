@@ -1,6 +1,7 @@
 {
- "data_dir": "/opt/Strata-data",
+ "data_dir": "/data/Strata-data",
  "installs": [
+  "/data/install",
   "/opt/strata"
  ],
  "calibration": {
@@ -13,5 +14,6 @@
    "tok_s": 140.3,
    "date": "2026-10-18"
   }
- }
+ },
+ "data_dir_at": 1792610775.2596912
 }

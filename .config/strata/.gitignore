@@ -1,5 +1,19 @@
 # setup.py keeps a copy of the model config beside it every time it changes one
 # (setup.py:3968 writes strata-<model>.json.bak): artifacts of a setup run, not
-# settings anyone chose. strata-<model>.shared-settings.json IS tracked - the
-# container bind-mounts it as a single file, so it has to exist as a file.
+# settings anyone chose. strata-<model>.shared-settings.json is still tracked, but
+# only out of habit: since the 0.2.x image the container binds this whole directory
+# as /data/install instead of that one file, so podman no longer needs it to exist.
 strata-*.json.bak*
+
+# The engine's log: strata-<model>.json carries "log": /data/install/strata-<model>.log,
+# and /data/install is this directory - same reason as the .config/maya/*.log rule
+# in .dotfiles/info/exclude.
+strata-*.log
+
+# Written by the image's setup pass: a symlink into the image's own seed tree
+# (/opt/strata/seed/...), so it points at nothing on the host outside a container.
+third_party/
+
+# The web app's per-profile bookkeeping: flock files, .history/ of every edit and
+# .ops/<name>/.runs/<id>.json records. The <name>.json profiles themselves stay in.
+strata/profiles/.*
