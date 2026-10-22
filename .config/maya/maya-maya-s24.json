@@ -30,7 +30,7 @@
  "env": {
    "MAYA_GLM_CPU_LANE": "7",
    "MAYA_GLM_PCIE_SHARE": "0.00",
-   "RAM_HEADROOM_GB": "4"
+   "MAYA_GLM_READ_CHUNKS": "2"
  },
  "reasoning_effort": "high",
  "lib_dirs": [
