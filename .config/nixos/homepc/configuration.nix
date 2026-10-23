@@ -508,16 +508,36 @@ in
         # [a-zA-Z0-9][a-zA-Z0-9_.-]* (a llama.cpp-style `org/name:quant` key would not).
         # The 0.2.x image reads MODEL_PATH, not HF_CACHE (the latter is unknown to it: no
         # warning, just a fresh ~62 GB download into the volume). The mounts:
-        # strata-data:/data holds the pack, the MTP draft and /data/gguf/IQ3_S (whose
-        # shards are links into the read-only /hf-cache hub mount - keep both mounted or
-        # they dangle), and ~/.config/strata:/data/install (XDG_CONFIG_HOME) keeps the run
-        # settings and the web app's chat settings host-editable. Mount the directory, not
-        # the file: setup.py saves via <name>.tmp + os.replace, and renaming over a
-        # bind-mounted file fails with EBUSY.
-        # The cards and the layer split are deliberately NOT env here: passing GPUS makes setup
-        # re-derive the split, which writes layer_split back to "auto". They live in the run
-        # settings (/home/javi/.config/strata/strata-iq3_s.json: gpu [0,1], layer_split "32"),
-        # which also carries the hand-picked engine options in "user_args".
+        # strata-data:/data holds the pack, the MTP draft and /data/gguf/IQ3_S, and
+        # ~/.config/strata:/data/install (XDG_CONFIG_HOME) keeps the run settings and the web
+        # app's chat settings host-editable. Mount the directory, not the file: setup.py saves
+        # via <name>.tmp + os.replace, and renaming over a bind-mounted file fails with EBUSY.
+        # The three model files are bound onto their names as FILES (from the HF cache blobs).
+        # They used to be symlinks inside the volume pointing at /hf-cache/... - a target that
+        # only exists inside a container - and that silently cost the tuned setup on every
+        # start: `strata launch` decides whether to reuse the installed run settings with
+        # installed_serves_request (strata_cli/launch/runner.py), which resolves every .gguf in
+        # the config and requires it inside MODEL_PATH. Resolving a link lands in /hf-cache, so
+        # the answer was no: setup.py ran each start, failed to see the cards (the image has no
+        # runnable nvidia-smi: the CDI one from this host is a Nix binary whose PT_INTERP is a
+        # /nix/store path that is not in the image), and its adopt fallback rewrote
+        # strata-iq3_s.json from defaults - dropping the layer split, the tuned options, the
+        # vision section and any "user_args". Bind-mounting the blobs makes those paths real
+        # files, the reuse check passes, setup never runs, and the settings are ours to keep.
+        # If the model is ever re-downloaded the blob names change: relink these three lines
+        # (a missing file makes podman create an empty mount point, and the entrypoint then
+        # stops with "MODEL_PATH holds no .gguf files" - it refuses to download a second copy).
+        # The whole hub is NOT mounted any more (nothing in the image reads /hf-cache, and an
+        # HF cache path is not a variable this image knows): with no /hf-cache in the container,
+        # links that point there dangle and the start fails loudly instead of quietly sending
+        # the launcher back through setup, which is how the tuned settings were lost.
+        # The cards and the layer split are deliberately NOT env here: GPUS/LAYER_SPLIT env is
+        # ignored by this image or makes setup re-derive the split as "auto". They live in the
+        # launch preset (/home/javi/.config/strata/strata/launch-presets/docker.json: "gpus":
+        # [0, 1] plus "extra" carrying --layer-split 32, --trim-stage-weights, --vram-reserve-*
+        # 1024, --pipeline-windows 2, --spec-min-p 0.70, --pcie-frac 0.00, --kv int8, which
+        # derive_config re-applies to every launch), and the picture reader lives in
+        # strata-iq3_s.json's "vision" section (see ~/.config/strata/strata-vision).
         "qwen3.8-flash-next-iq3_s" = {
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
@@ -529,13 +549,16 @@ in
             --pull newer
             -v strata-data:/data
             -v /home/javi/.config/strata:/data/install
-            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0:/data/gguf/IQ3_S/mmproj-Qwen3.8-Flash-Next-BF16.gguf:ro
             -e XDG_CONFIG_HOME=/data/install
             -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
-            -e VISION=on
-            -e CONTEXT=256k
             -e PORT=''${PORT}
+            -e STRATA_PF_FUSED=1
+            -e STRATA_ADAPT_LAG=2
+            -e STRATA_EXCHANGE_ROTATE=1
             ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';

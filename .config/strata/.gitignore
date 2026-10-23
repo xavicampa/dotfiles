@@ -35,3 +35,24 @@ strata/profiles/test.json
 # the strata-data volume. Tracked, but note api_key is a field here: while no_key is true
 # Strata mints its own key at /data/state/api-key (umask 077); setting a key would put a
 # secret in a tracked file. Its last_used timestamp also changes on every launch.
+
+# Measurements, not choices: .strata-calibration-backups/ is what a calibration apply keeps
+# before it touches the settings and the run config, and strata/presets/ holds `strata tune`
+# results (presets/<hash>.json + active.json). Both are keyed to the engine build they were
+# measured against (the report's identity.engine_sha256, the preset's "engine"/"model" shas),
+# so the next engine image retires them and `strata engine calibrate` / `strata tune auto`
+# make new ones. Keeping them in is a promise the next update breaks.
+.strata-calibration-backups/
+strata/presets/
+
+# Host Strata and the container write this same file through /data/install, each one rewriting
+# data_dir and installs to its own paths (the container's copy also loses the trailing
+# newline), so it is dirty on principle. The settings that matter are the run config, the
+# preset and strata-vision below.
+strata/settings.json
+
+# The picture reader the run config names (/data/install/strata-vision). Nothing but this
+# repository has a copy: it is hand-written, it is what keeps strata-iq3_s.json free of any
+# /opt/strata/components/engine/<version> path, and it resolves the reader from whichever
+# engine package the image ships. Losing it means images silently off after an update.
+# (Tracked, not ignored - this line is documentation; no pattern above matches the name.)

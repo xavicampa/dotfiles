@@ -15,17 +15,14 @@
   "auto",
   "--spec",
   "4",
+  "--spec-min-p",
+  "0.5",
   "--mtp",
   "/data/Strata-data/mtp/rt",
   "--max-context",
   "262144",
   "--kv",
-  "int8",
-  "--vision",
-  "--pcie-frac",
-  "0.00",
-  "--spec-min-p",
-  "0.70"
+  "int8"
  ],
  "cwd": "/opt/strata/terminal",
  "tokenizer": "/data/Strata-data/packs/iq3_s/tokenizer",
@@ -33,42 +30,28 @@
  "log": "/data/install/strata-iq3_s.log",
  "lib_dirs": [],
  "port": 8080,
- "gpu": [
-  0,
-  1
- ],
- "gpus_asked": true,
- "layer_split": "32",
+ "backend": "cuda",
  "vision": {
-  "exe": "/opt/strata/components/engine/0.1.47-linux-x86_64-cuda-cuda13/strata-vision",
+  "exe": "/data/install/strata-vision",
   "mmproj": "/data/gguf/IQ3_S/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
   "model": "/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
   "gpu": true,
-  "max_tokens": 300,
-  "cuda_device": 1
+  "cuda_device": 1,
+  "max_tokens": 512
  },
  "user_args": [
+  "--layer-split",
+  "32",
+  "--trim-stage-weights",
   "--vram-reserve-mib",
   "1024",
   "--vram-reserve-later-mib",
   "1024",
-  "--trim-stage-weights",
-  "--adapt-every",
-  "1",
-  "--adapt-swaps",
-  "160",
-  "--adapt-decay",
-  "0.97",
-  "--adapt-async",
-  "1",
   "--pipeline-windows",
-  "2"
- ],
- "parallel": 1,
- "fit_max_tokens": true,
- "env": {
-  "STRATA_PF_FUSED": "1",
-  "STRATA_ADAPT_LAG": "2",
-  "STRATA_EXCHANGE_ROTATE": "1"
- }
+  "2",
+  "--spec-min-p",
+  "0.70",
+  "--pcie-frac",
+  "0.00"
+ ]
 }

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Version-independent launcher for the engine package's picture reader (strata-vision).
+#
+# A run config normally pins the reader as an absolute path inside the engine package folder,
+# /opt/strata/components/engine/<version>/strata-vision. In this container that is a trap: the
+# image's entrypoint drops any /data/install/strata-*.json that names a /opt/strata/components/
+# path the image does not have, and the launcher then re-runs setup - which cannot see the cards
+# (no usable nvidia-smi in the image) and falls back to writing default run settings, losing the
+# layer split, user_args and the vision block.
+#
+# This file lives in the volume (/data/install/strata-vision), so the config holds no
+# /opt/strata/components/ string at all, and it follows whichever engine package the image ships.
+set -u
+
+base=""
+for d in /opt/strata/components/engine/*; do
+    [ -x "$d/strata-vision" ] && base="$d"        # the glob is sorted: the last match wins
+done
+if [ -z "$base" ]; then
+    echo "strata-vision shim: no strata-vision under /opt/strata/components/engine/" >&2
+    exit 127
+fi
+
+LD_LIBRARY_PATH="$base${LD_LIBRARY_PATH:+:}${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH
+exec "$base/strata-vision" "$@"
