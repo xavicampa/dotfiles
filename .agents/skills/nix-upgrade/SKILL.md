@@ -107,8 +107,9 @@ env HOME="$SCRATCH/home" XDG_STATE_HOME="$SCRATCH/state" \
 
 - The heredoc **must match `/root/.nix-channels` exactly** (one `<url> <name>` per line). The current contents are recorded in **Background → NixOS host** — keep that record in sync when the branch changes (re-verify with `pkexec cat /root/.nix-channels` if the A2 sanity check fails unexpectedly).
 - If `rm -rf` fails on a leftover root-owned scratch (aborted pkexec attempt), `pkexec rm -rf "$SCRATCH"` first.
-- Result: scratch profile `$SCRATCH/state/nix/profiles/channels/` with one symlink per channel. The profile is just symlinks; the store paths live in `/nix/store`.
-- Fast (network fetch, no build). If it fails (e.g. network), nothing real was touched — fix and retry.
+- Result: scratch profile `$SCRATCH/state/nix/profiles/channels` → `channels-1-link` → a **`user-environment` store dir** that contains `manifest.nix`, `nixos`, `nixpkgs-unstable` as symlinks into `/nix/store` (verified 2026-10-23, nix 2.34). So `ls -l "$SCRATCH/state/nix/profiles/channels/"` lists the *contents of that store dir*: entries appear `root root`, epoch-dated, with link count 2, and the dir is **not writable** (this host mounts `/nix/store` read-only as a bind of `/[/nix/store]`) — that's normal, not a leftover root-owned scratch. The A2 `readlink -f "$SCRATCH/state/nix/profiles/channels/<name>"` resolves through the env dir fine.
+- The scratch `HOME` also gets `.nix-defexpr/channels` → the scratch profile and `.nix-defexpr/channels_root` → `/nix/var/nix/profiles/per-user/root/channels` (a read-only pointer; the fetch never writes root's profile).
+- Fast (network fetch, no build; prints only `unpacking 2 channels...`). If it fails (e.g. network), nothing real was touched — fix and retry.
 
 ### A2 — build with diff (plain user, long step)
 
@@ -129,6 +130,7 @@ NIX_PATH="nixpkgs-unstable=$NEW_UNSTABLE" nix-instantiate --eval --strict --raw 
 (Expect a `26.05.x` release and an unstable version respectively.) Then build (background + poll, minutes):
 
 ```bash
+cd /var/tmp   # so the build's `result` symlink lands somewhere disposable, not in ~
 NIX_PATH="nixpkgs=$NEW_NIXOS:nixpkgs-unstable=$NEW_UNSTABLE:nixos-config=/etc/nixos/configuration.nix" \
   nixos-rebuild build --diff --show-trace > /tmp/nixos-upgrade-build.log 2>&1
 ```
@@ -138,11 +140,18 @@ Notes:
 - Before kicking off the long build, optionally **probe for pre-built packages** (section below) for the kernel-dependent ones (kernel itself, GPU drivers) — it's fast and sets expectations (fetch vs local compile, and compile time) before committing to a 10+ minute build.
 - **No `--upgrade-all`**: the channels were already fetched in A1, and `--upgrade-all` would try to re-fetch the *root* channels (root-only; it hard-errors as a plain user). The explicit `NIX_PATH` maps exactly what `--upgrade-all` would have expanded: `nixpkgs` ← the `nixos` channel, `nixpkgs-unstable` ← itself.
 - The `--diff` output (`nix store diff-closures /run/current-system <new>`) goes to **stderr** with ANSI colors — strip them with `sed 's/\x1b\[[0-9;]*m//g'`.
-- The new toplevel path appears in the log twice: the `>>> /nix/store/...` diff header line and the final `Done. The new configuration is /nix/store/...` line. Grep for it:
+- **The combined log is binary to grep** (progress-bar carriage returns + control chars): plain `grep -o` on it prints `binary file matches` and returns nothing useful. Normalize once, then work on the text copy (verified 2026-10-23):
   ```bash
-  grep -oE '/nix/store/[a-z0-9]+-nixos-system-[a-z0-9.-]+' /tmp/nixos-upgrade-build.log | tail -1
+  sed 's/\x1b\[[0-9;]*m//g' /tmp/nixos-upgrade-build.log | tr '\r' '\n' > /tmp/nixos-upgrade-build.txt
+  grep -aE 'Done\. The new configuration|>>> ' /tmp/nixos-upgrade-build.txt | tail -6
   ```
-  (The class after `-nixos-system-` must include `.` — the version `26.05.…` contains dots; a tail like `-[a-f0-9]+` truncates the path at the first dot, yielding a non-existent store path.)
+- The new toplevel path appears in the log twice: the `>>> /nix/store/...` diff header line and the final `Done. The new configuration is /nix/store/...` line. Grep for it (in the normalized copy, with `-a`):
+  ```bash
+  grep -aoE '/nix/store/[a-z0-9]+-nixos-system-homepc-26\.05\.[0-9]+\.[a-f0-9]+' /tmp/nixos-upgrade-build.txt | grep -v '\.drv$' | tail -1
+  ```
+  (Two traps: the class after `-nixos-system-` must include `.` — the version `26.05.…` contains dots, and a tail like `-[a-f0-9]+` truncates at the first dot, yielding a non-existent store path; and the same pattern also matches the **`.drv`** path printed for the toplevel, so exclude `\.drv$` or anchor on the `Done.` line. Then `ls -d` the result to be sure it exists.)
+- For a clean diff table, **re-run `nix store diff-closures <old-toplevel> <new-toplevel>` standalone** instead of mining the log — cheap once both closures are built/local, and it also shows the `±size`-only lines the log truncation can hide.
+- A successful `nixos-rebuild build` leaves a `result` symlink **in the CWD the build ran from** (not always `/tmp/result`) — it is a GC root holding the new toplevel. On a declined upgrade, `rm -f` it along with the scratch (plain user if it's user-owned), otherwise the toplevel stays reachable until the next generation-pruning/GC.
 - If the build fails on creating the result link over a stale root-owned `/tmp/result` (left by an older pkexec build), `pkexec rm -f /tmp/result` and retry.
 - **If the build fails (otherwise):** show the user the tail of the log and stop. Nothing real was mutated — no rollback needed. Retry against the same scratch channels, or re-run A1 to pick up newer revisions; clean up per the A4-decline branch when done.
 
@@ -159,7 +168,7 @@ done
 
 The `-modules` paths are kernel modules of the same version. Compare the two lists, and add a line like `Kernel: linux 7.1.8 (unchanged)` or `7.1.8 → 7.2.1 (reboot required)`.
 
-Mention that `--diff` compares against `/run/current-system` (last activated), which can differ from `/run/booted-system` if a switch happened after the last boot.
+Mention that `--diff` compares against `/run/current-system` (last activated), which can differ from `/run/booted-system` if a switch happened after the last boot. The two can share an identical **version string** while being different store paths (seen 2026-10-23: `…homepc-26.05.11985.26f4107e47e3` for both, different hashes — a config-only rebuild, no kernel change), so compare the full paths, never the version suffix, when deciding what the old side of the diff is.
 
 Also state explicitly: the real root channel profile is still at the A0 revisions; on confirmation it will move to exactly the store paths this build used.
 
@@ -173,9 +182,10 @@ Also state explicitly: the real root channel profile is still at the A0 revision
 
 ```bash
 rm -rf "$SCRATCH"
+rm -f "$PWD/result"      # build symlink from A2 — a GC root holding the declined toplevel
 ```
 
-Verify the root channels still match the A0 paths (they will — they were never modified); state is identical to before the attempt. (A stale root-owned `/tmp/result` from an older pkexec run, if any, can be removed with `pkexec rm -f /tmp/result`; GC collects the declined toplevel once unreferenced.)
+Verify the root channels still match the A0 paths (they will — they were never modified) and that `/run/current-system` still matches the A0 toplevel; state is identical to before the attempt. (A stale root-owned `/tmp/result` from an older pkexec run, if any, can be removed with `pkexec rm -f /tmp/result`; GC collects the declined toplevel once unreferenced — i.e. only after the `result` link is gone.)
 
 **Confirmed:** first commit the channels to exactly the store paths the build used (pkexec, approval per the `elevated-permissions` skill):
 
@@ -229,7 +239,7 @@ Output interpretation:
 
 | Line | Meaning |
 |---|---|
-| `these N paths will be fetched (…)`, no `will be built` | pre-built on the cache — fast |
+| `these N paths will be fetched (…)` / `this path will be fetched (…)`, no `will be built` | pre-built on the cache — fast (singular wording when one path; probed kernel + nvidia-open both fetched, 2026-10-23) |
 | `these N derivations will be built` | not on the cache — local compile (budget time; a driver module build is ~5–15 min on this host) |
 | both lines present | target (or a dep) compiles locally — that's the signal; the fetched list is mostly *build inputs* (compilers, sources), its size is build-time, not runtime cost |
 | no such lines at all | the path is **already in the local store** (a previous build fetched or built it) — disambiguate with `nix path-info --store`, below |
@@ -389,10 +399,11 @@ journalctl -u fstrim.service --since "2 min ago" --no-pager | grep -i trimmed
 
 - Classic (non-flake) NixOS. `/etc/nixos` is a **directory symlink** to `~/.config/nixos/homepc` (the config is one real file, `~/.config/nixos/homepc/configuration.nix`, reached as `/etc/nixos/configuration.nix`); shared bits in `~/.config/nixos/common.nix`, imported as `../common.nix` (the relative import resolves against the symlink target's directory).
 - `nixos-rebuild` on this system is **nixos-rebuild-ng** (supports `--diff`, `--upgrade`, `--upgrade-all`, `--store-path`).
-- `pkgs` = root's **`nixos` channel** (`nixos-26.05` branch). `unstable` (used in `common.nix` for e.g. `kiro-cli`, `btop-cuda`, `_1password-cli`) = root's **`nixpkgs-unstable` channel**.
-- Kernel: `pkgs.linuxPackages_latest` (from the `nixos` channel). Kernel/initrd changes only take effect after a reboot.
+- `pkgs` = root's **`nixos` channel** (`nixos-26.05` branch). `unstable` (a `_module.args` special arg — `import <nixpkgs-unstable>` defined in `common.nix:9` and inherited into every module) = root's **`nixpkgs-unstable` channel**; used in `common.nix` for e.g. `kiro-cli`, `btop-cuda`, `_1password-cli`/`_1password-gui`, `telegram-desktop`, `rpi-imager`, and in `configuration.nix` for the kernel+nvidia pair, `hyprland`(+portal), `dms-shell`/`dms-greeter`/`quickshell`, `llama-swap`, `lact` — so a large part of the desktop stack tracks the **unstable** channel and moves with the `nixpkgs-unstable` pin in Flow A.
+- Kernel: `unstable.linuxPackages_6_18` (6.18 **LTS** from the root `nixpkgs-unstable` channel — `boot.kernelPackages`, configuration.nix:128) and `hardware.nvidia.package = unstable.linuxPackages_6_18.nvidiaPackages.latest` — deliberately the *same* `linuxPackages_6_18` set, and deliberately from **unstable** (not `pkgs`/`linuxPackages_latest` as recorded here until 2026-10-23): the release channel pre-builds nvidia-open only at an older CUDA-12 driver for 6.12/6.18, which would break the CUDA-13 llama-cuda container. Kernel/initrd changes only take effect after a reboot. Both kernel and nvidia-open for 6.18.x **are** pre-built on cache.nixos.org (verified 2026-10-23: 6.18.57 + nvidia-open 615.78.08-6.18.57 fetched, zero local compile; a fully cached Flow A build took ~90 s).
+- `/nix/store` is a **read-only bind mount** of the root ext4 fs (`/dev/nvme0n1p2[/nix/store]`, `ro,nosuid,nodev`) — anything that lands inside it (nix-created profile env dirs, `result` targets) is unwritable and appears `root root`, epoch-dated. Don't mistake that for a root-owned scratch dir. `/` itself is `rw,noatime`, so scratch dirs outside the store are plain-user writable.
 - Root channels live in `/nix/var/nix/profiles/per-user/root/channels/` (root-owned).
-- **Root channel list** (`/root/.nix-channels`, recorded 2026-09-17 — used verbatim for the A1 heredoc, no pkexec read needed):
+- **Root channel list** (`/root/.nix-channels`, recorded 2026-09-17, fetch-verified 2026-10-23 — used verbatim for the A1 heredoc, no pkexec read needed):
   ```
   https://channels.nixos.org/nixos-26.05 nixos
   https://channels.nixos.org/nixos-unstable nixpkgs-unstable
