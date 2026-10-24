@@ -1,0 +1,15 @@
+--- a/quickshell/Modules/Settings/ThemeBrowser.qml
++++ b/quickshell/Modules/Settings/ThemeBrowser.qml
+@@ -103,6 +103,12 @@ DankFloatingWindow {
+     }
+ 
+     function themePreviewUrl(theme) {
++        // Third-party registries are cloned locally and the daemon hands us the resolved art path
++        // (core/internal/themes/registry.go sets PreviewPath from themes/<id>/preview.svg), so
++        // prefer it over the official registry's raw URL, which cannot exist for their ids.
++        if (theme.previewPath)
++            return "file://" + theme.previewPath;
++
+         const base = "https://raw.githubusercontent.com/AvengeMedia/dms-plugin-registry/main/themes/" + (theme.sourceDir || theme.id) + "/";
+         const variants = theme.variants || null;
+         if (!variants)

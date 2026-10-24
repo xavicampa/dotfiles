@@ -229,7 +229,25 @@ in
       # <nixpkgs-unstable> together so the QML API (1.6.2) and the `qs` binary
       # (0.3.1) agree - mixing 1.6.2 with the channel's quickshell 0.3.0 risks
       # QML calling into qs APIs that do not exist yet.
-      package = unstable.dms-shell;
+      #
+      # Local patch (added 2026-10-24): Settings -> Browse Themes builds every card's preview URL as
+      # https://raw.githubusercontent.com/AvengeMedia/dms-plugin-registry/main/themes/<id>/preview.svg
+      # and ignores the `previewPath` the daemon already resolves for third-party registries
+      # (core/internal/themes/registry.go stats themes/<id>/preview.svg in the local clone), so all
+      # omarchy-* cards render blank. ./patches/dms-preview-path.patch is that two-line fix. Drop the
+      # override once upstream ships it - check for `theme.previewPath` in
+      # quickshell/Modules/Settings/ThemeBrowser.qml of the new version. Upstream master still has the
+      # hardcoded line as of writing.
+      package = unstable.dms-shell.overrideAttrs (final: prev: {
+        postPatch = (prev.postPatch or "") + ''
+          # nixpkgs sets sourceRoot = "source/core"; the QML tree is one level up, and the
+          # fetched tree is read-only, so chmod before patching.
+          root=..
+          [ -f ../quickshell/Modules/Settings/ThemeBrowser.qml ] || root=.
+          chmod -R u+w "$root"
+          patch -p1 -d "$root" -N --batch < ${./patches/dms-preview-path.patch}
+        '';
+      });
       quickshell.package = unstable.quickshell;
 
       # dms.service ships in the package (lib/systemd/user/dms.service) and the
