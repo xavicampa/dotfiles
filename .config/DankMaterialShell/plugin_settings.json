@@ -1,0 +1,9 @@
+{
+  "omarchyWallpapers": {
+    "enabled": true,
+    "pickMode": "cycle"
+  },
+  "themeSwitchTest": {
+    "enabled": false
+  }
+}
