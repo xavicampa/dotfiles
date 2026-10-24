@@ -25,3 +25,10 @@
 .config/hypr/hyprland.lua.bak
 .config/hypr/hyprland.lua.backup*
 .config/hypr/.dms-backups/
+
+# Installed registry themes (Settings -> Browse Themes / `dms theme install`) are reproducible from the
+# registries in .config/DankMaterialShell/registries.json, and each card preview now embeds the theme's
+# screenshot (~20 KB per theme), so this is generated state, not configuration. Untracked 2026-10-24;
+# the files stay on disk. Recreate: dms registry add omarchy ~/dev/personal/dms-omarchy-themes and
+# install from Browse Themes, or python3 ~/dev/personal/dms-omarchy-themes/tool/install_local.py <slug>.
+.config/DankMaterialShell/themes/
