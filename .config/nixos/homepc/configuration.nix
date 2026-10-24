@@ -306,19 +306,34 @@ in
         compositor.name = "hyprland";
         # The greeter runs hyprland as the dms-greeter user, which has no config of
         # its own, so Hyprland would default to a US layout at the login screen.
+        #
+        # This has to be LUA (hl.*), not hyprlang. dms-greeter sniffs the -C file
+        # (launcher.isHyprlandLuaConfig: ".lua" suffix or a `(^|[^[:alnum:]_])hl\.`
+        # match) and writes the config it hands Hyprland as either
+        # $TMPDIR/dms-greeter-*.lua or, in the hyprlang branch,
+        # $TMPDIR/dms-greeter-1234567890 with no extension at all. Hyprland picks
+        # the config manager by that extension (src/config/ConfigManager.cpp:
+        # anything not ".lua" -> Legacy/hyprlang mgr), and the legacy manager paints
+        # the on-screen "You are using the .conf config format, support for which
+        # will be removed in Hyprland 0.57." notification - which is why the nag
+        # only ever showed on the login screen, the session itself being driven by
+        # ~/.config/hypr/hyprland.lua. Hyprland 0.57 drops hyprlang outright, so a
+        # .conf greeter config would stop being read at all, warning or not.
         compositor.customConfig = ''
-          # Cursor theme must come from env here: the greeter's Hyprland loads no
-          # DMS fragment (dms/cursor.lua belongs to the session), and Hyprland 0.55
-          # has no cursor:theme option at all -- HYPRCURSOR_*/XCURSOR_* are the only
-          # mechanism. XCursor only: apple-cursor ships XCursor, not hyprcursor.
-          # Theme itself comes from environment.systemPackages (pkgs.apple-cursor),
-          # since this serviceAccount has no per-user profile.
-          env = XCURSOR_THEME,macOS
-          env = XCURSOR_SIZE,24
-          input {
-              kb_layout = no
-              kb_options = altwin:swap_lalt_lwin
-          }
+          -- Cursor theme must come from env here: the greeter's Hyprland loads no
+          -- DMS fragment (dms/cursor.lua belongs to the session), and Hyprland 0.55
+          -- has no cursor:theme option at all -- HYPRCURSOR_*/XCURSOR_* are the only
+          -- mechanism. XCursor only: apple-cursor ships XCursor, not hyprcursor.
+          -- Theme itself comes from environment.systemPackages (pkgs.apple-cursor),
+          -- since this serviceAccount has no per-user profile.
+          hl.env("XCURSOR_THEME", "macOS")
+          hl.env("XCURSOR_SIZE", "24")
+          hl.config({
+              input = {
+                  kb_layout  = "no",
+                  kb_options = "altwin:swap_lalt_lwin",
+              },
+          })
         '';
         # Copies ~/.config/DankMaterialShell/settings.json,
         # ~/.local/state/DankMaterialShell/session.json and
@@ -353,7 +368,7 @@ in
           ${lib.getExe unstable.dms-greeter} --cache-dir /var/lib/dms-greeter --command hyprland${
             lib.optionalString (
               config.services.displayManager.dms-greeter.compositor.customConfig != ""
-            ) " -C ${pkgs.writeText "dmsgreeter-compositor-config" config.services.displayManager.dms-greeter.compositor.customConfig}"
+            ) " -C ${pkgs.writeText "dmsgreeter-compositor-config.lua" config.services.displayManager.dms-greeter.compositor.customConfig}"
           }
         ''
       )
