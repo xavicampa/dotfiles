@@ -11,6 +11,8 @@
     "--conversation-cache-mib": "1024",
     "--conversation-cache-min-tokens": "256",
     "--conversation-cache-park-gain": "512",
+    "--expert-profile": "/data/state/strata/profile-learned.bin",
+    "--expert-profile-save": "/data/state/strata/profile-learned.bin",
     "--layer-split": "32",
     "--pcie-frac": "0.00",
     "--pipeline-windows": "2",
@@ -18,8 +20,7 @@
     "--spec-min-p": "0.70",
     "--trim-stage-weights": "on",
     "--vram-reserve-later-mib": "1024",
-    "--vram-reserve-mib": "1024",
-    "--expert-profile": "/data/state/strata/profile-learned.bin"
+    "--vram-reserve-mib": "1024"
   },
   "family": "qwen",
   "gpu_roles": null,
@@ -28,7 +29,7 @@
     1
   ],
   "kv": "int8",
-  "last_used": "2026-10-25 11:47:37.202540",
+  "last_used": "2026-10-25 16:04:11.332785",
   "model": "IQ3_S",
   "model_path": "/data/gguf/IQ3_S",
   "mtp": null,
