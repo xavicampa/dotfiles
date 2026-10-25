@@ -36,6 +36,10 @@ strata/profiles/test.json
 # Strata mints its own key at /data/state/api-key (umask 077); setting a key would put a
 # secret in a tracked file. Its last_used timestamp also changes on every launch.
 
+# Safety copies taken by hand before a preset edit (docker.json.bak-p3cache, docker-p3.json.bak-pristine, ...).
+# The strata-*.json.bak* rule above only catches run-config backups, so these would otherwise show up as new files.
+launch-presets/*.bak*
+
 # Measurements, not choices: .strata-calibration-backups/ is what a calibration apply keeps
 # before it touches the settings and the run config, and strata/presets/ holds `strata tune`
 # results (presets/<hash>.json + active.json). Both are keyed to the engine build they were

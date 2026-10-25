@@ -1,0 +1,10 @@
+{
+  "id": "launch-docker-p3",
+  "overrides": {
+    "host": "0.0.0.0",
+    "parallel": 3,
+    "port": 5802
+  },
+  "schema_version": 1,
+  "source_config": "/data/state/strata/launch/docker-p3.json"
+}
