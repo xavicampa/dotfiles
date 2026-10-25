@@ -38,7 +38,7 @@ strata/profiles/test.json
 
 # Safety copies taken by hand before a preset edit (docker.json.bak-p3cache, docker-p3.json.bak-pristine, ...).
 # The strata-*.json.bak* rule above only catches run-config backups, so these would otherwise show up as new files.
-launch-presets/*.bak*
+strata/launch-presets/*.bak*
 
 # Measurements, not choices: .strata-calibration-backups/ is what a calibration apply keeps
 # before it touches the settings and the run config, and strata/presets/ holds `strata tune`

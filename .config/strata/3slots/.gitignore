@@ -1,0 +1,40 @@
+# Same rules as ../1slot/.gitignore, restated here because a .gitignore only
+# covers its own directory: 3slots is the parallel (3-slot) Strata install bound
+# as /data/install by qwen3.8-flash-next-iq3_s-parallel, so the engine writes
+# into it the same way. Only the choices are tracked — run config, launch
+# preset, profile, strata-vision — not what a run leaves behind.
+
+# setup.py's safety copies of the run config (setup.py:3968) — artifacts of a
+# setup run, not settings anyone chose.
+strata-*.json.bak*
+
+# The engine's log: the run config carries "log": /data/install/strata-<model>.log
+# and /data/install is this directory.
+strata-*.log
+
+# Written by the image's setup pass: a symlink into the image's own seed tree
+# (/opt/strata/seed/...), so it points at nothing on the host outside a container.
+third_party/
+
+# The web app's per-profile bookkeeping: flock files (.launch-docker.lock,
+# .rt*.lock), .history/ of every edit and .ops/<name>/.runs/<id>.json records.
+# The <name>.json profiles themselves stay in.
+strata/profiles/.*
+
+# Safety copies taken by hand before a preset edit (docker.json.bak-int8-262k,
+# docker.json.bak-cache-1024, ...). Anchored under strata/ — the presets live at
+# strata/launch-presets/, so a bare launch-presets/ rule would match nothing.
+strata/launch-presets/*.bak*
+
+# Measurements, not choices: .strata-calibration-backups/ is what a calibration
+# apply keeps before it touches the settings, and strata/presets/ holds
+# `strata tune` results — both keyed to the engine build they were measured
+# against, so the next engine image retires them.
+.strata-calibration-backups/
+strata/presets/
+
+# Host Strata and the container write this same file through /data/install, each
+# one rewriting data_dir and installs to its own paths, so it is dirty on
+# principle. The settings that matter are the run config, the preset and
+# strata-vision.
+strata/settings.json

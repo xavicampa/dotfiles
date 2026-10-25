@@ -1,0 +1,14 @@
+#!/bin/sh
+# Strata picture reader for the 3slots install: the CUDA engine component carries only the CPU reader
+# (`strata-vision`; there is no strata-vision-hip/-sycl for CUDA), so run the newest one installed.
+# The run config names this file as /data/install/strata-vision; the engine component folder carries the
+# version, so a wrapper keeps the config stable across `strata update`.
+found=""
+for cand in /opt/strata/components/engine/*/strata-vision; do
+    [ -x "$cand" ] && found="$cand"
+done
+if [ -z "$found" ]; then
+    echo "strata-vision wrapper: no installed engine component carries strata-vision (run: strata update)" >&2
+    exit 127
+fi
+exec "$found" "$@"
