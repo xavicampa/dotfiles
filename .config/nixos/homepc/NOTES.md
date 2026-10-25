@@ -344,8 +344,11 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
 - **The 0.2.x image reads `MODEL_PATH`, not `HF_CACHE`** (the latter is unknown to it:
   no warning, just a fresh ~62 GB download into the volume).
 - Mounts: `strata-data:/data` holds the pack, the MTP draft and `/data/gguf/IQ3_S`;
-  `~/.config/strata:/data/install` (`XDG_CONFIG_HOME`) keeps the run settings and the
-  web app's chat settings host-editable. **Mount the directory, not the file**:
+  `~/.config/strata/1slot:/data/install` (`XDG_CONFIG_HOME`) keeps the run settings and the
+  web app's chat settings host-editable. **One install tree per entry since 2026-10-25**: this
+  entry gets `1slot/`, the batch entry gets `3slots/` (§ llama-swap/strata-parallel) — the run
+  config, the launch preset and the profile all live under `/data/install`, so the split is what
+  keeps one entry's start from rewriting the other's. **Mount the directory, not the file**:
   `setup.py` saves via `<name>.tmp` + `os.replace`, and renaming over a bind-mounted
   file fails with `EBUSY`.
 - **The three model files are bind-mounted as FILES** (from the HF cache blobs). They
@@ -362,7 +365,8 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   makes those paths real files and that reuse check passes, so the settings stay ours —
   but it is only half of the reuse test, and a preset whose context/KV differ from the
   installed file sends the start through setup anyway (§ llama-swap/strata-p3, parked
-  2026-10-25 — with one preset left for this model they no longer disagree).
+  2026-10-25). Within this tree there is one preset again, so nothing disagrees with it here;
+  the batch entry disagrees, but it boots on its own install tree (§ llama-swap/strata-parallel).
   **If the model is ever re-downloaded the blob names change:
   relink those three lines** (a missing file makes podman create an empty mount point,
   and the entrypoint then stops with "MODEL_PATH holds no .gguf files" — it refuses to
@@ -373,18 +377,18 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   how the tuned settings were lost.
 - **The cards and the layer split are deliberately NOT env here**: `GPUS`/`LAYER_SPLIT`
   env is ignored by this image or makes setup re-derive the split as "auto". They live
-  in the launch preset `~/.config/strata/strata/launch-presets/docker.json`
+  in the launch preset `~/.config/strata/1slot/strata/launch-presets/docker.json`
   (`"gpus": [0, 1]` plus `extra` carrying `--layer-split 32`, `--trim-stage-weights`,
   `--vram-reserve-* 1024`, `--pipeline-windows 2`, `--spec-min-p 0.70`,
   `--pcie-frac 0.00`, which `derive_config` re-applies to every launch; `"context": 262144`
   and `"kv": "int8"` are top-level preset fields, not `extra`, and they are what the reuse
   test compares); the picture reader lives in `strata-iq3_s.json`'s `"vision"` section
-  (see `~/.config/strata/strata-vision`) and **had** to be re-pasted there by hand after
-  every p1↔p3 switch — that switch is gone (§ llama-swap/strata-p3, parked 2026-10-25),
-  so the section now survives on its own.
+  (see `~/.config/strata/1slot/strata-vision`) and **had** to be re-pasted there by hand after
+  every p1↔p3 switch — the p3 pair is gone and its successor boots on its own tree, so this file
+  is written only by this entry and the section survives on its own.
 - **`--cgroup-conf memory.swap.max=0` (inside `cmd`).** The expert arena here is
   anonymous memory: the engine's `MAP_HUGETLB` ask fails
-  ("needed 23983 2 MiB pages, vm.nr_hugepages=0", see `~/.config/strata/strata-iq3_s.log`)
+  ("needed 23983 2 MiB pages, vm.nr_hugepages=0", see `~/.config/strata/1slot/strata-iq3_s.log`)
   and the `MADV_HUGEPAGE` fallback does not land either (`AnonHugePages` stays 0), so
   the 51 GiB arena sits on ordinary 4 KiB anon pages, and anon is reclaimable only
   through swap. `cudaHostRegister PORTABLE` and `mlock` are already in play and still
@@ -405,18 +409,20 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
 
 ### llama-swap/strata-p3 — `qwen3.8-flash-next-iq3_s-p3` (PARKED 2026-10-25)
 
-**Dropped 2026-10-25:** the backend and the launch preset are both out (`swift-1.5-iq3_s`
-replaced it in the `gpu` group). The preset is in git at `8e620d7`, the nix entry at
-`42d8314`; reviving it is those two back plus `-e PRESET=docker-p3 -e PARALLEL=3`.
-Everything below stays because re-measuring it costs a full engine restart per arm.
+**Dropped 2026-10-25:** the backend and its launch preset are both out (it lost its `gpu` group
+seat to `swift-1.5-iq3_s`, which has since lost its own seat to this idea's second attempt —
+§ llama-swap/strata-parallel). The preset is in git at `8e620d7`, the nix entry at `42d8314`;
+reviving *this* shape is those two back plus `-e PRESET=docker-p3 -e PARALLEL=3`. Batch 3 itself
+is running again, as its own install tree rather than a second preset in this one. Everything
+below stays because re-measuring it costs a full engine restart per arm.
 
 What dropping it fixes for free: the two presets disagreed on `context`/`kv` **by design**
 (262144/int8 vs 131072/q4_0), which is what made `desc_matches` fail and sent every switch
 through `setup.py` — the rewrite that emptied `user_args` and dropped the `"vision"`
 section twice (2026-10-25 13:11 and 16:04). With one preset left for this model, the
 installed file always already holds p1's own numbers, so the reuse test passes and setup
-stops running. The `swift` entry does not reintroduce it: it is a different tag, so it
-owns a different run config file.
+stops running. The batch entry is that pair again (131072/q4_0 against 262144/int8), but it
+cannot reach this file any more — it boots on its own `/data/install` (§ llama-swap/strata-parallel).
 
 The original reasoning, kept for the next time batch is worth trying:
 
@@ -556,40 +562,86 @@ slots** instead of one — a second llama-swap model so clients pick the mode by
 - Not in `hooks.on_startup.preload`: the boot backend stays the single-stream one, and
   this entry swaps in on first request like Maya.
 
-### llama-swap/swift — `swift-1.5-iq3_s` (wired 2026-10-25, **not started yet**)
+### llama-swap/swift — `swift-1.5-iq3_s` (DROPPED 2026-10-25)
 
-The second qwen3.8 in the HF cache: `ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF`, IQ3_S, fetched
-2026-10-23 — shard 1 blob `46cb3996cd1a…` (44.9 GB), shard 2 `70ce6fb48a94…` (38.8 GB), and its own
-`mmproj-Swift-Qwen3.8-Flash-Next-BF16.gguf` `cd1140f4abba…` (907,543,520 B — **not** the original's
-907,543,008 B file, so don't reuse that mount line). Same 83.6 GB class as IQ3_S (`MODELS`: `ram_gb` 62).
+Wired the day it was fetched, **never started once**. `qwen3.8-flash-next-iq3_s-parallel` took
+its seat in the `gpu` group (§ llama-swap/strata-parallel). The weights are still in the HF
+cache: `ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF` IQ3_S — shard 1 `46cb3996cd1a…`
+(44.9 GB), shard 2 `70ce6fb48a94…` (38.8 GB), and its own
+`mmproj-Swift-Qwen3.8-Flash-Next-BF16.gguf` `cd1140f4abba…` (907,543,520 B — **not** the
+original's 907,543,008 B, so the mount lines differ; same 83.6 GB class, `MODELS`: `ram_gb` 62).
+Revival: the preset is in git at `42d8314`, the nix entry at `ade7e50`, plus `-e FAMILY=swift`
+`-e PRESET=docker-swift` — and after 2026-10-25 its own `/data/install` tree, which is now the
+house style rather than a second preset in someone else's.
 
-- **Why a second model is cleaner than a second preset:** the run config is `strata-<family tag + MODEL>.json`
-  (`setup.py:7392` + `:7507`, read back by `catalog.tag_of`/`installed_config`, `catalog.py:355,463`) and the
-  `swift` family's tag is `swift-` (`setup.py:571-578`). So this install is `strata-swift-iq3_s.json`,
-  `packs/swift-iq3_s`, `models/swift-IQ3_S`, `model_name swift-1.5-iq3_s` — a separate identity, so nothing
-  rewrites the IQ3_S file. p1 and p3 collide only because they share family **and** MODEL.
-- **Shared with the original, on purpose:** the MTP draft `mtp/rt` (setup builds it from the original Qwen
-  checkpoint for every family — `setup.py:8737-8745`) and the shipped expert profile (only `coder` overrides
-  it, `"profile": "expert-profile-coder.bin"`, `setup.py:585`), so setup hands swift
-  `--expert-profile …/data/expert-profile.bin`. `docker-swift.json` therefore wires **only**
-  `--expert-profile-save /data/state/strata/swift-profile-learned.bin`: it starts from the shipped ranking and
-  learns into its own file — a learned profile is only taken over "when it is a profile of the same model"
-  (`docs/DETAILS.md:744-752`).
-- **Two things to expect on the first start.** It prepares the pack (`packs/swift-iq3_s` = `dense.bin` ~1.5 GB
-  + `index.txt` + `native_experts.txt` + `tokenizer/`, extracted from the 45 GB shard) — do that one by hand,
-  `healthCheckTimeout = 900` may not cover it and llama-swap would `--replace` the container mid-work. And it
-  comes up **text-only**: same card-blind setup as the entries above, so its `"vision"` section is missing
-  until pasted in (see § llama-swap/strata-p3). Nothing in the volume yet: `packs/` holds only `iq3_s`.
-- Not in `hooks.on_startup.preload` (the boot backend stays the single-stream IQ3_S one); it **is** in the
-  `gpu` exclusive group, so it swaps against the other three.
-- **Found while wiring it: `--expert-profile-save` had quietly left `docker.json` and `docker-p3.json`.** It
-  lived in `user_args`, which every setup run empties, and the launcher re-saves the preset on each start; so
-  `profile-learned.bin` stopped changing at 2026-10-24 22:53 while both entries kept reading it ("without the
-  key nothing is counted or written", `docs/DETAILS.md:752`). Both presets carry it again. Side note: the
-  engine's own write of the learned file happens on a clean exit — `cmdStop = podman stop -t 120` is what
-  gives it the chance.
-- Stale in the volume: `/data/Strata-data/models/IQ3_S/…-00001-of-00002.gguf.part` (4.6 GB, 2026-10-21) is a
-  half-download nothing reads — the model files are bind mounts now.
+What that wiring learned, kept because the facts are the engine's, not swift's:
+
+- **Install identity is `<family tag><MODEL>`.** The run config is `strata-<family tag + MODEL>.json`
+  (`setup.py:7392` + `:7507`, read back by `catalog.tag_of`/`installed_config`, `catalog.py:355,463`)
+  and the `swift` family's tag is `swift-` (`setup.py:571-578`) — so swift owned
+  `strata-swift-iq3_s.json`, `packs/swift-iq3_s`, `models/swift-IQ3_S`, and nothing it did could
+  touch the IQ3_S file. p1 and p3 collided only because they shared family **and** MODEL; the
+  parallel entry keeps that collision and separates the *directory* instead.
+- **A fine-tune of the same weights shares the MTP draft and the shipped expert profile**: setup
+  builds `mtp/rt` from the original Qwen checkpoint for every family (`setup.py:8737-8745`) and
+  only `coder` overrides the profile (`"profile": "expert-profile-coder.bin"`, `setup.py:585`).
+- **`--expert-profile-save` had quietly left `docker.json` and `docker-p3.json`** — it lived in
+  `user_args`, which every setup run empties, while the launcher re-saves the preset on each
+  start; `profile-learned.bin` stopped changing at 2026-10-24 22:53 while both entries kept
+  reading it ("without the key nothing is counted or written", `docs/DETAILS.md:752`). The engine
+  writes the learned file only on a clean exit — `cmdStop = podman stop -t 120` gives it the
+  chance. `1slot` carries that wiring again; the parallel entry runs the shipped ranking.
+- Stale in the volume: `/data/Strata-data/models/IQ3_S/…-00001-of-00002.gguf.part` (4.6 GB,
+  2026-10-21) is a half-download nothing reads — the model files are bind mounts now.
+
+### llama-swap/strata-parallel — `qwen3.8-flash-next-iq3_s-parallel` (wired 2026-10-25)
+
+Batch 3 is back — the p3 numbers, in a different shape. Instead of a second preset inside the p1
+install tree (§ llama-swap/strata-p3, parked), this entry boots on `~/.config/strata/3slots` as
+its own `/data/install`, so its run config `strata-iq3_s.json`, its launch preset
+`strata/launch-presets/docker.json`, its `launch-docker` profile and its `strata-vision` shim are
+separate files. That is what the split buys: `desc_matches` failing can no longer rewrite the
+single-stream entry's file — the setup pass that emptied `user_args` and dropped the `"vision"`
+section twice now only ever touches its own tree.
+
+- **Numbers** (`3slots/strata/launch-presets/docker.json`): `parallel: 3`, port `5802`,
+  `context 131072`, `kv q4_0`, `--conversation-cache-mib 7168` (three parked 128k conversations
+  at q4_0, ~1.27 GiB each) and `--resident-experts on` — **not** p3's `--mmap-experts`, so this
+  one wants the pinned 51 GiB arena, which is what `--cgroup-conf memory.swap.max=0` guards. The
+  rest of the tuned `extra` is p1's (`--layer-split 32`, `--pipeline-windows 2`, `--spec-min-p
+  0.70`, `--pcie-frac 0.00`, `--trim-stage-weights`, `--vram-reserve-* 1024`), minus the
+  `--expert-profile*` pair: it runs the shipped ranking.
+- **No `-e PRESET` / `-e PARALLEL` / `-e CONTEXT` in nix.** The preset is named `docker` here as
+  well, and the batch comes from the preset's own `"parallel": "3"`; the p3-era collision was the
+  *shared* preset, and there isn't one any more. Worth checking once: without `-e CONTEXT` the
+  entrypoint's default context is what `desc_matches` compares against the preset's 131072, and a
+  mismatch means every start runs setup on *this* tree (§ llama-swap/strata-p3 for what that
+  costs) — `POST /v1/status` → `context` and the file's mtime say which way it went.
+- **Vision is wired from the start**: the run config carries the `"vision"` section
+  (`exe`/`cpu_exe: /data/install/strata-vision`, the BF16 mmproj, `gpu: true`, `cuda_device: 1`,
+  `max_tokens: 512`) and `args` carry `--vision`, so the paste-it-back-after-every-switch step
+  (§ llama-swap/strata-p3) does not apply to this tree.
+- **Still shared, so keep the group**: `strata-data:/data` is one volume for both entries, and
+  **both profiles' `source_config` is `/data/state/strata/launch/docker.json`** — the launcher's
+  derived run-config copy is keyed by *preset name*, not per entry, and both presets are called
+  `docker`. That file on disk is the batch entry's today: `--max-context 131072 --kv q4_0
+  --resident-experts`, port 5802, written 2026-10-25 18:07. Same for `profile-learned.bin`, the
+  API key, the pack and `mtp/rt`. The install split did not separate any of that; the `gpu`
+  exclusive group is what keeps the two from meeting, and they still can never run together (two
+  expert arenas, ~2 × 51 GiB against 62 GB of RAM).
+- **`capabilities.context = 131072`** — the engine's own cap, not p1's 256k. `--max-context
+  131072` sits in this tree's run-config `args` and the launcher's derived copy agrees with it.
+  It shipped as 262144, inherited from the swift entry this one replaced, and llama-swap publishes
+  the *static* `capabilities` — so a wrong number here is what `/v1/models` reports whatever the
+  engine actually loaded; p3 set 131072 on its entry for exactly this reason. Cross-check with
+  `/v1/status` → `context`.
+- Reported `model` stays `qwen3.8-flash-next-iq3_s` for both entries (`model_name` in each tree's
+  run config, same string; nothing overrides it) — only the request name separates them.
+  `--pipeline-windows 2` is off in batch mode (the engine logs `… is off: not with --batch slots`),
+  so this entry loses p1's CUDA1 interleaving; count it as batch cost. The measured better arm at
+  2–4 streams was `--batch-groups 1` (+ optionally `STRATA_BATCH_MTP=1`) — try it in **this**
+  preset's `extra`, one change per restart. Not in `hooks.on_startup.preload`: the boot backend
+  stays the single-stream one.
 
 ### llama-swap/maya — `glm-5.3-flash-maya-s24`
 
@@ -656,11 +708,11 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
 ### routing / activity / preload
 
 - `routing.router.use = "group"`, one `gpu` group: `swap = true` (one at a time),
-  `exclusive = true` (it evicts every other group), members = Strata + Swift + Maya
+  `exclusive = true` (it evicts every other group), members = Strata + Strata-parallel + Maya
   (+ the parked llama.cpp entry). Strata wants both cards: `gpus [0,1]` with
-  `layer_split 32` — which is why the two Strata entries (iq3_s and swift-1.5) live in
-  this group and can never run together: two expert arenas (~2 × 51 GiB) against 62 GB of
-  RAM.
+  `layer_split 32` — which is why the two Strata entries (the single-stream `iq3_s` and the
+  batch `…-parallel`) live in this group and can never run together: two expert arenas
+  (~2 × 51 GiB) against 62 GB of RAM.
 - `store.path = /var/lib/llama-swap/activity.sqlite` — the Activity page and
   `/api/metrics/activity` record to sqlite instead of the in-memory ring
   (`metricsMaxInMemory` then has no effect); text logs (`/logs`, `/logs/stream/*`) stay
