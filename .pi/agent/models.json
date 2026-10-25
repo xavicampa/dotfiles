@@ -38,6 +38,29 @@
               "preserve_thinking": true
             }
           }
+        },
+        "qwen3.8-flash-next-iq3_s-parallel": {
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": null,
+            "xhigh": "xhigh",
+            "max": null
+          },
+          "compat": {
+            "thinkingFormat": "chat-template",
+            "chatTemplateKwargs": {
+              "enable_thinking": {
+                "$var": "thinking.enabled"
+              },
+              "reasoning_effort": {
+                "$var": "thinking.effort",
+                "omitWhenOff": true
+              },
+              "preserve_thinking": true
+            }
+          }
         }
       }
     }

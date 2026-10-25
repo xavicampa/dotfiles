@@ -8,9 +8,11 @@
   "extra": {
     "--adapt-decay": "0.97",
     "--adapt-swaps": "160",
-    "--conversation-cache-mib": "7168",
+    "--batch-mtp": "on",
+    "--conversation-cache-mib": "5120",
     "--conversation-cache-min-tokens": "256",
-    "--conversation-cache-park-gain": "512",
+    "--conversation-cache-park-gain": "2048",
+    "--conversation-cache-slots": "3",
     "--layer-split": "32",
     "--pcie-frac": "0.00",
     "--pipeline-windows": "2",
@@ -28,7 +30,7 @@
     1
   ],
   "kv": "q4_0",
-  "last_used": "2026-10-25 17:07:36.729003",
+  "last_used": "2026-10-25 19:22:25.708129",
   "model": "IQ3_S",
   "model_path": "/data/gguf/IQ3_S",
   "mtp": null,
