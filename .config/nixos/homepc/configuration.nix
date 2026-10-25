@@ -369,6 +369,92 @@ in
           };
         };
 
+        # Strata again, batch mode: same image/mounts/weights, its own launch preset PRESET=docker-p3 — NOTES.md § llama-swap/strata-p3
+        "qwen3.8-flash-next-iq3_s-p3" = {
+          # PARALLEL=3 + PRESET=docker-p3 only: the preset is what carries parallel (-> engine --batch 3); a shared
+          # PRESET would collide with the entry above and rewrite its settings — NOTES.md § llama-swap/strata-p3
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            --network host
+            --device nvidia.com/gpu=all
+            --ulimit memlock=-1
+            --cgroup-conf memory.swap.max=0
+            --shm-size 2g
+            --stop-timeout 120
+            --pull newer
+            -v strata-data:/data
+            -v /home/javi/.config/strata:/data/install
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0:/data/gguf/IQ3_S/mmproj-Qwen3.8-Flash-Next-BF16.gguf:ro
+            -e XDG_CONFIG_HOME=/data/install
+            -e MODEL_PATH=/data/gguf/IQ3_S
+            -e MODEL=IQ3_S
+            -e PRESET=docker-p3
+            -e PARALLEL=3
+            -e CONTEXT=128k
+            -e PORT=''${PORT}
+            -e STRATA_PF_FUSED=1
+            -e STRATA_ADAPT_LAG=2
+            -e STRATA_EXCHANGE_ROTATE=1
+            ghcr.io/niko1221/strata:latest-cuda13
+          '';
+          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
+          checkEndpoint = "/health";
+          ttl = 0;
+          # same card budget as the entry above: only one of the two is ever up
+          # context follows docker-p3.json's --max-context (128k), not the 256k of the p1 entry
+          capabilities = {
+            context = 131072;
+            "in" = [ "text" "image" ];
+            out = [ "text" ];
+            tools = true;
+          };
+        };
+
+        # Strata again, a different model: UkisAI's Swift 1.5 fine-tune of the same weights (family swift -> its own
+        # tag, so its own run config strata-swift-iq3_s.json and pack packs/swift-iq3_s) — NOTES.md § llama-swap/swift
+        "swift-1.5-iq3_s" = {
+          # the first start prepares the pack (dense.bin from the 45 GB shard) inside the container: run that one by
+          # hand, healthCheckTimeout = 900 may not cover it — NOTES.md § llama-swap/swift
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            --network host
+            --device nvidia.com/gpu=all
+            --ulimit memlock=-1
+            --cgroup-conf memory.swap.max=0
+            --shm-size 2g
+            --stop-timeout 120
+            --pull newer
+            -v strata-data:/data
+            -v /home/javi/.config/strata:/data/install
+            -v /home/javi/.cache/huggingface/hub/models--ukisai--Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/46cb3996cd1a17fe8bc5ae1f9bb16869480de5a03f17f868d6047a20a46edd3b:/data/gguf-swift/IQ3_S/Swift-Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ukisai--Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/70ce6fb48a94fe34bd7e9a53a526be68066c64b5a5077cdc82fb31350b66b608:/data/gguf-swift/IQ3_S/Swift-Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ukisai--Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/cd1140f4abba943ce8d9fa92fed8407e389954d26907efde7b72153c75bd8a60:/data/gguf-swift/IQ3_S/mmproj-Swift-Qwen3.8-Flash-Next-BF16.gguf:ro
+            -e XDG_CONFIG_HOME=/data/install
+            -e MODEL_PATH=/data/gguf-swift/IQ3_S
+            -e MODEL=IQ3_S
+            -e FAMILY=swift
+            -e PRESET=docker-swift
+            -e PORT=''${PORT}
+            -e STRATA_PF_FUSED=1
+            -e STRATA_ADAPT_LAG=2
+            -e STRATA_EXCHANGE_ROTATE=1
+            ghcr.io/niko1221/strata:latest-cuda13
+          '';
+          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
+          checkEndpoint = "/health";
+          ttl = 0;
+          # same card budget: still one Strata up at a time; the MTP draft (mtp/rt) and the shipped expert profile
+          # are the original checkpoint's for every family but coder, so they are shared
+          capabilities = {
+            context = 262144;
+            "in" = [ "text" "image" ];
+            out = [ "text" ];
+            tools = true;
+          };
+        };
+
         # Maya: GLM-5.3-Flash MoE, images built locally; model bytes stay in /hf-cache — NOTES.md § llama-swap/maya
         "glm-5.3-flash-maya-s24" = {
           cmd = ''
@@ -437,6 +523,8 @@ in
             exclusive = true; # evicts every other group
             members = [
               "qwen3.8-flash-next-iq3_s"
+              "qwen3.8-flash-next-iq3_s-p3"
+              "swift-1.5-iq3_s"
               "glm-5.3-flash-maya-s24"
               # "bartowski/Qwen3.8-27B-GGUF:Q8_0" # parked
             ];
