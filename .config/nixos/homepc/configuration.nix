@@ -572,11 +572,28 @@ in
         # derive_config re-applies to every launch), and the picture reader lives in
         # strata-iq3_s.json's "vision" section (see ~/.config/strata/strata-vision).
         "qwen3.8-flash-next-iq3_s" = {
+          # Why the container gets memory.swap.max=0 (below, inside cmd):
+          #   The expert arena here is anonymous memory - the engine's MAP_HUGETLB ask fails
+          #   ("needed 23983 2 MiB pages, vm.nr_hugepages=0", see ~/.config/strata/strata-iq3_s.log)
+          #   and the MADV_HUGEPAGE fallback does not land either (AnonHugePages stays 0), so the
+          #   51 GiB arena sits on ordinary 4 KiB anon pages, and anon is reclaimable only through
+          #   swap. cudaHostRegister PORTABLE and mlock are already in play and still left ~1.4 GiB
+          #   of strata-host in swap, so neither is the guarantee; memory.swap.max=0 is: the kernel
+          #   then refuses to page any of it out, so neither the desktop nor buff/cache growth can
+          #   take it. Nothing sets memory.min anywhere, and a min would need every level from
+          #   user.slice down (effective min is capped by ancestors' memory.min).
+          #   Cost: a strata that over-budgets is OOM-killed instead of thrashing, and pages already
+          #   swapped when the limit is set are not pulled back eagerly - they fault in as the arena
+          #   touches them and can then never leave again.
+          #   Keep comments OUT of the cmd string: llama-swap renders it as one YAML scalar whose
+          #   newlines fold to spaces, so a '#' there comments out the rest of the podman run line
+          #   (mounts, env, image) and the container never starts.
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
             --device nvidia.com/gpu=all
             --ulimit memlock=-1
+            --cgroup-conf memory.swap.max=0
             --shm-size 2g
             --stop-timeout 120
             --pull newer
