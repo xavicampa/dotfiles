@@ -29,7 +29,7 @@
   "--kv",
   "int8",
   "--kv-resident",
-  "32768",
+  "20480",
   "--conversation-cache-mib",
   "8192",
   "--conversation-cache-slots",

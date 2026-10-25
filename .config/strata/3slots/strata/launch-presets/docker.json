@@ -15,7 +15,7 @@
     "--conversation-cache-min-tokens": "256",
     "--conversation-cache-park-gain": "2048",
     "--conversation-cache-slots": "6",
-    "--kv-resident": "32768",
+    "--kv-resident": "20480",
     "--layer-split": "32",
     "--pcie-frac": "0.00",
     "--pipeline-windows": "2",
@@ -23,8 +23,8 @@
     "--spec": "4",
     "--spec-min-p": "0.70",
     "--trim-stage-weights": "on",
-    "--vram-reserve-later-mib": "1024",
-    "--vram-reserve-mib": "1024"
+    "--vram-reserve-later-mib": "896",
+    "--vram-reserve-mib": "896"
   },
   "family": "qwen",
   "gpu_roles": null,
@@ -33,7 +33,7 @@
     1
   ],
   "kv": "int8",
-  "last_used": "2026-10-25 22:20:28.873015",
+  "last_used": "2026-10-25 22:43:54.298252",
   "model": "IQ3_S",
   "model_path": "/data/gguf/IQ3_S",
   "mtp": null,
