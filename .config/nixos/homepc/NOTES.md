@@ -539,6 +539,41 @@ slots** instead of one — a second llama-swap model so clients pick the mode by
 - Not in `hooks.on_startup.preload`: the boot backend stays the single-stream one, and
   this entry swaps in on first request like Maya.
 
+### llama-swap/swift — `swift-1.5-iq3_s` (wired 2026-10-25, **not started yet**)
+
+The second qwen3.8 in the HF cache: `ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF`, IQ3_S, fetched
+2026-10-23 — shard 1 blob `46cb3996cd1a…` (44.9 GB), shard 2 `70ce6fb48a94…` (38.8 GB), and its own
+`mmproj-Swift-Qwen3.8-Flash-Next-BF16.gguf` `cd1140f4abba…` (907,543,520 B — **not** the original's
+907,543,008 B file, so don't reuse that mount line). Same 83.6 GB class as IQ3_S (`MODELS`: `ram_gb` 62).
+
+- **Why a second model is cleaner than a second preset:** the run config is `strata-<family tag + MODEL>.json`
+  (`setup.py:7392` + `:7507`, read back by `catalog.tag_of`/`installed_config`, `catalog.py:355,463`) and the
+  `swift` family's tag is `swift-` (`setup.py:571-578`). So this install is `strata-swift-iq3_s.json`,
+  `packs/swift-iq3_s`, `models/swift-IQ3_S`, `model_name swift-1.5-iq3_s` — a separate identity, so nothing
+  rewrites the IQ3_S file. p1 and p3 collide only because they share family **and** MODEL.
+- **Shared with the original, on purpose:** the MTP draft `mtp/rt` (setup builds it from the original Qwen
+  checkpoint for every family — `setup.py:8737-8745`) and the shipped expert profile (only `coder` overrides
+  it, `"profile": "expert-profile-coder.bin"`, `setup.py:585`), so setup hands swift
+  `--expert-profile …/data/expert-profile.bin`. `docker-swift.json` therefore wires **only**
+  `--expert-profile-save /data/state/strata/swift-profile-learned.bin`: it starts from the shipped ranking and
+  learns into its own file — a learned profile is only taken over "when it is a profile of the same model"
+  (`docs/DETAILS.md:744-752`).
+- **Two things to expect on the first start.** It prepares the pack (`packs/swift-iq3_s` = `dense.bin` ~1.5 GB
+  + `index.txt` + `native_experts.txt` + `tokenizer/`, extracted from the 45 GB shard) — do that one by hand,
+  `healthCheckTimeout = 900` may not cover it and llama-swap would `--replace` the container mid-work. And it
+  comes up **text-only**: same card-blind setup as the entries above, so its `"vision"` section is missing
+  until pasted in (see § llama-swap/strata-p3). Nothing in the volume yet: `packs/` holds only `iq3_s`.
+- Not in `hooks.on_startup.preload` (the boot backend stays the single-stream IQ3_S one); it **is** in the
+  `gpu` exclusive group, so it swaps against the other three.
+- **Found while wiring it: `--expert-profile-save` had quietly left `docker.json` and `docker-p3.json`.** It
+  lived in `user_args`, which every setup run empties, and the launcher re-saves the preset on each start; so
+  `profile-learned.bin` stopped changing at 2026-10-24 22:53 while both entries kept reading it ("without the
+  key nothing is counted or written", `docs/DETAILS.md:752`). Both presets carry it again. Side note: the
+  engine's own write of the learned file happens on a clean exit — `cmdStop = podman stop -t 120` is what
+  gives it the chance.
+- Stale in the volume: `/data/Strata-data/models/IQ3_S/…-00001-of-00002.gguf.part` (4.6 GB, 2026-10-21) is a
+  half-download nothing reads — the model files are bind mounts now.
+
 ### llama-swap/maya — `glm-5.3-flash-maya-s24`
 
 Project Maya: GLM-5.3-Flash (321 B MoE; the hottest experts in VRAM, the rest read
