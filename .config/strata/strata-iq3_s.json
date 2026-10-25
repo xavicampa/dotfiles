@@ -20,9 +20,9 @@
   "--mtp",
   "/data/Strata-data/mtp/rt",
   "--max-context",
-  "131072",
+  "262144",
   "--kv",
-  "q4_0"
+  "int8"
  ],
  "cwd": "/opt/strata/terminal",
  "tokenizer": "/data/Strata-data/packs/iq3_s/tokenizer",
