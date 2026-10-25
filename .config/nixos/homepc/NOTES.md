@@ -359,8 +359,10 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   binary whose `PT_INTERP` is a `/nix/store` path that is not in the image), and its
   adopt fallback rewrote `strata-iq3_s.json` from defaults — dropping the layer split,
   the tuned options, the vision section and any `user_args`. Bind-mounting the blobs
-  makes those paths real files, the reuse check passes, setup never runs, and the
-  settings stay ours. **If the model is ever re-downloaded the blob names change:
+  makes those paths real files and that reuse check passes, so the settings stay ours —
+  but it is only half of the reuse test, and a preset whose context/KV differ from the
+  installed file sends the start through setup anyway (see § llama-swap/strata-p3).
+  **If the model is ever re-downloaded the blob names change:
   relink those three lines** (a missing file makes podman create an empty mount point,
   and the entrypoint then stops with "MODEL_PATH holds no .gguf files" — it refuses to
   download a second copy). The whole hub is **not** mounted any more (nothing in the
@@ -373,9 +375,11 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   in the launch preset `~/.config/strata/strata/launch-presets/docker.json`
   (`"gpus": [0, 1]` plus `extra` carrying `--layer-split 32`, `--trim-stage-weights`,
   `--vram-reserve-* 1024`, `--pipeline-windows 2`, `--spec-min-p 0.70`,
-  `--pcie-frac 0.00`, `--kv int8`, which `derive_config` re-applies to every launch);
-  the picture reader lives in `strata-iq3_s.json`'s `"vision"` section
-  (see `~/.config/strata/strata-vision`).
+  `--pcie-frac 0.00`, which `derive_config` re-applies to every launch; `"context": 262144`
+  and `"kv": "int8"` are top-level preset fields, not `extra`, and they are what the reuse
+  test compares); the picture reader lives in `strata-iq3_s.json`'s `"vision"` section
+  (see `~/.config/strata/strata-vision`) and has to be re-pasted there by hand after every
+  p1↔p3 switch — see § llama-swap/strata-p3.
 - **`--cgroup-conf memory.swap.max=0` (inside `cmd`).** The expert arena here is
   anonymous memory: the engine's `MAP_HUGETLB` ask fails
   ("needed 23983 2 MiB pages, vm.nr_hugepages=0", see `~/.config/strata/strata-iq3_s.log`)
@@ -396,6 +400,144 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   `context = 262144`, in `text`+`image`, out `text`, `tools = true`.
 - No aliases: the key is the public name, and every alias is listed too
   (`includeAliasesInList`) — so the old engine name "strata" is dropped.
+
+### llama-swap/strata-p3 — `qwen3.8-flash-next-iq3_s-p3`
+
+The same model, image, mounts and weights as the entry above, started with **three batch
+slots** instead of one — a second llama-swap model so clients pick the mode by name.
+
+- **`parallel` is an engine-start setting, not a request parameter.** It reaches the engine
+  as `--batch N`, and **`-e PARALLEL=3` on this backend is what carries it** — the
+  entrypoint passes `--parallel 3`, which both overrides the preset at start and writes the
+  number back into `docker-p3.json`'s `"parallel"` field. Editing that field is futile: a
+  `2` there was back to `3` after the next start (2026-10-25 13:11), and the live engine had
+  never seen `--batch 2`. So the only way to have both is two backends, and every switch
+  between them is a full engine restart (the load lines differ per mode, see mmap below).
+- **`-e PARALLEL=3` alone would have broken the entry above.** The image's entrypoint
+  defaults `PRESET` to `docker` and re-saves it whenever settings are given
+  (`--save-preset`), so the p3 container would (a) collide with the running
+  `launch-docker` profile — `check_serving` refuses with "A model is already running …
+  These choices are different" (exit 6), and (b) write `parallel: 3` into the shared
+  preset, making the single-stream backend batched on its next start. Hence the second
+  launch preset **`~/.config/strata/strata/launch-presets/docker-p3.json`** and
+  `-e PRESET=docker-p3`.
+- **The preset was copied from `docker.json`, not created by the entrypoint** — a fresh
+  preset carries none of the tuned `extra` (`--layer-split 32`, `--pipeline-windows 2`,
+  `--spec-min-p 0.70`, `--pcie-frac 0.00`, `--vram-reserve-* 1024`, conversation cache)
+  or `gpus: [0, 1]`; only `name`, `parallel`, the context and the KV format differ.
+- **Batch mode runs at 128k, not 256k.** Conversation memory is what a slot costs: `int8`
+  KV is 1056 B/token over 13 layers (`catalog.kv_gb` / `setup.UD_FIT_KV_BYTES`) = 3.6 GiB
+  per conversation at 262144 and 1.8 GiB at 131072, so three slots go from ~10.7 GiB to
+  ~5.4 GiB of the KV pool the expert cache also lives in.
+  **Two lines do it**: the `extra` line `"--max-context": "131072"`, and `-e CONTEXT=128k`.
+  The cap the server obeys is the engine arg (`serve/server.py` reads `--max-context` out
+  of them), and `tune_knobs.apply_to_argv` deletes the base config's `--max-context 262144`
+  before appending the new one: `derive_config` (strata_cli/launch/runner.py) never puts a
+  preset's `context` field into `args`, only its `extra` gets there. What `-e CONTEXT=128k`
+  and the preset's `"context": 131072` settle is the **reuse test** (two bullets down) —
+  they are what makes setup run, and setup writes 131072 into the shared
+  `strata-iq3_s.json`, so that file holds p3's numbers today and p1's next start writes back
+  256k. 128k needs no rope scaling and no repack (the trained limit is 256k, `check_context`
+  warns only above it).
+  `capabilities.context = 131072` on this entry keeps `/v1/models` from promising 256k;
+  check with `/v1/status` → `context`.
+- Everything else is shared and that is fine because the group keeps one up at a time: the
+  `strata-data` volume (API key, `profile-learned.bin`, `/data/state/strata/launch/`), and
+  the run settings file `strata-iq3_s.json` — `strata launch` builds its own copy per preset
+  at `/data/state/strata/launch/<preset>.json`, and that copy is where the p3-only choices
+  land (`--batch-mtp`, `--mmap-experts`, `--conversation-cache-slots 3`, `host`, `port`,
+  `api_key: none`, `gpu: [0, 1]` — from the preset, and never in the shared file).
+- **Every switch between the two entries runs `setup.py` inside the container**, and that is
+  what rewrites the shared `strata-iq3_s.json`. Reusing the installed config needs **both**
+  halves of the test: `installed_serves_request` (same `MODEL_PATH`, same pack folder — that
+  part does hold, thanks to the file bind mounts) **and** `desc_matches` (runner.py:217,
+  reached from `ensure_model`, runner.py:913-920) finding the installed
+  `context`/`kv`/`images` equal to this launch's. Those come from the preset plus
+  `-e CONTEXT=128k` (entrypoint.sh:180), and the two presets deliberately disagree: 262144
+  against 131072, int8 against q4_0. So p3's start sees 256k/int8 and p1's sees 128k/q4_0 —
+  the answer is always "no", and setup runs. Restarting the **same** entry is harmless: by
+  then the shared file already holds that entry's own numbers, the test passes, and nothing
+  is rewritten.
+- **What that setup run costs: `args`, the profile and `user_args`.** It rewrites `args` to
+  its own choices (`--max-context 131072 --kv q4_0` on p3, and p1's next start flips them
+  back), puts `--expert-profile` back on the shipped `expert-profile.bin`, and empties
+  `user_args` outright (2026-10-25 13:11) — which would have silently stripped p1's hand
+  tuning on its next start. With `MODEL=IQ3_S` shared by both entries, neither entry's
+  `user_args` is safe from the other, so **every hand setting lives in the preset's `extra`
+  instead** (it is per-preset and beats what the launch builds, the same way
+  `--vram-reserve-mib` does); `user_args` is now empty on purpose. The expert profile is
+  wired there for both entries: `"--expert-profile": "/data/state/strata/profile-learned.bin"`
+  — without it a preset gets the shipped profile, which is why p3 ran the unlearned ranking
+  until 2026-10-25.
+- **And it takes the `"vision"` section with it, which has no preset home.** `SETUP_KEYS`
+  (setup.py:6005) counts `vision` among the keys setup writes itself, and a setup that cannot
+  see the cards (no runnable `nvidia-smi` in the image) resolves pictures off; with no vision
+  dict in the new config, `carry_over` (setup.py:6016) has nothing to merge the old keys into,
+  so the section is gone — `"cuda_device"`/`"max_tokens"` sit outside `SETUP_VISION` and
+  survive only when setup writes a vision dict of its own. Setup is the only writer at all
+  (`vision_reader.vision_section` is called from setup.py:7533/7803/9085), and a preset's
+  `"vision": "on"` merely feeds setup's command line, so **the reader has to be pasted back
+  into `strata-iq3_s.json` after any p1↔p3 switch**: `exe: /data/install/strata-vision` (the
+  shim, never the version-pinned path), the BF16 mmproj, `gpu: true`, `cuda_device: 1`,
+  `max_tokens: 512`. `serve/server.py:2974` derives the bare `--vision` from the section, so
+  nothing else is needed. Until it is back, both entries still advertise
+  `"in": ["text", "image"]` from the static llama-swap `capabilities` while the engine has no
+  reader; the engine's `strata-vision: warmed up at N image tokens` line is the proof it is
+  on. Making both presets agree on context and KV would stop the setup runs — at the price of
+  p1's 256k.
+- **The reported `model` field stays `qwen3.8-flash-next-iq3_s` for both**: llama-swap
+  passes the upstream body through (verified) and the name comes from the shared run
+  config's `model_name`, which no env overrides. Only the *request* name and
+  `/v1/models` distinguish them.
+- What batch costs here (Strata `docs/BATCHING.md`): one request alone keeps the solo MTP
+  path (unchanged speed); overlapping requests share verify windows. Each slot takes VRAM
+  out of the expert cache (0.56 GiB at 32K with int8 KV, more at 256K), and this 83 GB MoE
+  on 40 GB of VRAM is exactly the "experts do not all fit" case where a shared window can
+  cost 10–25 % per request. `fit_parallel(24 GB) = 3`, so 3 is the top that launch would
+  recommend for the 3090 Ti and it is honoured as asked; the engine may still run fewer —
+  it logs `INFO batch_slots=N` and `/v1/status` → `concurrency.serving` says the truth.
+- **Measured 2026-10-25 (batch 3, `--kv q4_0`, `--mmap-experts`) against the p1 entry the
+  same day** — `serving-smoke --repeat 5`, `/data/bench/p3-smoke-a` vs `smoke-pg512-e/f`:
+  serial **123 tok/s (101.6–133.7) against p1's 171**, i.e. −28 %, so "a solo request keeps
+  the solo MTP path, unchanged speed" does not hold here; mixed (4 clients) ~101 against
+  ~135, but *better* tail latency: p95 TTFT 1.16–1.22 s against 1.41–1.69. Hit rate 81.3 %
+  (4626 CUDA0 slots) against 84.6 % (4841). A direct probe (250-token completions, p3 solo
+  vs N concurrent): **solo 67 tok/s aggregate → 3 concurrent 104 → 5 concurrent 102** —
+  ~1.55× and flat, per-request decode 105 → 36–51 tok/s. One decode stream already
+  saturates the CPU expert pool, so **slots buy concurrent long contexts, not throughput**;
+  a second slot is nearly free after the first, a third is not the win it looks like.
+- **`--pipeline-windows 2` is silently off in batch mode** — the log prints
+  `--pipeline-windows 2 is off: not with --batch slots` — so p3 does not get the 0.1.48
+  CUDA1 interleaving that p1 has. Count it as part of the batch cost, not as a bad config.
+- **`--mmap-experts` is what makes 3 × 128k fit in RAM.** No pinned arena: the engine's own
+  guard reads `current 5.3 GiB … available 56.9 GiB` where the arena mode reads
+  `current 51.6 GiB, available 5.4 GiB` (host: 11 GiB used, 50 GiB available). The experts
+  live in the page cache instead — `experts via mmap (--mmap-experts; the GGUF shards in
+  place, no experts.bin)` — and once warm the I/O line reports `page cache held 234783.3 MB
+  at the read, not 0.0 MB` with ~0 major faults. Parking then works, which p1 cannot do at
+  all: `parked 462 tokens … parked=3 bytes=1577661064 evictions=0`,
+  `restored 42529 tokens (live) in 55.8 ms`. The catch is the engine's own A/B warning for
+  this mode, `71.97 vs 34.78 ms/token cold vs warm`: keep host RAM (page cache) free, and
+  do not let anything else on this machine eat 46 GiB.
+- **KV sizing for the cache numbers** (`vram_fit.KV_BYTES`, 13 layers): q4_0 576 B/token =
+  0.80 GiB per 131072 slot — matches `--batch: 3 slot sessions on CUDA0 (0.80 GiB each)`
+  and `the slot sessions take 2.41 GiB of VRAM on CUDA0 that the expert cache would
+  otherwise hold`; CUDA1 keeps `8192 slots, 8192 of its 8192 profiled pairs`. At int8 those
+  three slots would take ~3.9 GiB (projected) and CUDA1's full coverage would not survive.
+  Hence `"kv": "q4_0"` on this entry only. `--conversation-cache-mib 7168` with
+  `--conversation-cache-slots 3` covers three parked 128k conversations (~1.27 GiB each at
+  q4_0) with ~1.9× headroom. Bench p3 without owning its lifecycle: `strata bench run
+  --suite serving-smoke --url http://127.0.0.1:5802 --repeat 5 --condition X
+  --out /data/bench/X` (`--out` is required for the serving suites; `compare` refuses runs
+  whose source config digests differ, so diff `results.json` `phases[].summary` by hand).
+- **Untuned on purpose**: the 0.1.4x default `--batch-groups` is `auto`, i.e. one
+  pipelined group per stage, and the pipelined path turns off `--batch-mtp` *and* the
+  adaptive expert tier between windows (`--adapt-*`, `STRATA_ADAPT_LAG=2` are live here).
+  The measured better arm at 2–4 streams on a two-stage split was `--batch-groups 1` (+
+  optionally `STRATA_BATCH_MTP=1`); try it in `docker-p3.json`'s `extra`, one change per
+  restart. Check `/metrics` → `live.slots` and `/v1/status` while measuring.
+- Not in `hooks.on_startup.preload`: the boot backend stays the single-stream one, and
+  this entry swaps in on first request like Maya.
 
 ### llama-swap/maya — `glm-5.3-flash-maya-s24`
 
@@ -462,8 +604,10 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
 ### routing / activity / preload
 
 - `routing.router.use = "group"`, one `gpu` group: `swap = true` (one at a time),
-  `exclusive = true` (it evicts every other group), members = Strata + Maya (+ the
-  parked llama.cpp entry). Strata wants both cards: `gpus [0,1]` with `layer_split 32`.
+  `exclusive = true` (it evicts every other group), members = Strata + Strata-p3 + Maya
+  (+ the parked llama.cpp entry). Strata wants both cards: `gpus [0,1]` with
+  `layer_split 32` — which is why the two Strata entries live in this group and can never
+  run together: two expert arenas (~2 × 51 GiB) against 62 GB of RAM.
 - `store.path = /var/lib/llama-swap/activity.sqlite` — the Activity page and
   `/api/metrics/activity` record to sqlite instead of the in-memory ring
   (`metricsMaxInMemory` then has no effect); text logs (`/logs`, `/logs/stream/*`) stay
