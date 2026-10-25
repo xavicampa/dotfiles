@@ -361,7 +361,8 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   the tuned options, the vision section and any `user_args`. Bind-mounting the blobs
   makes those paths real files and that reuse check passes, so the settings stay ours —
   but it is only half of the reuse test, and a preset whose context/KV differ from the
-  installed file sends the start through setup anyway (see § llama-swap/strata-p3).
+  installed file sends the start through setup anyway (§ llama-swap/strata-p3, parked
+  2026-10-25 — with one preset left for this model they no longer disagree).
   **If the model is ever re-downloaded the blob names change:
   relink those three lines** (a missing file makes podman create an empty mount point,
   and the entrypoint then stops with "MODEL_PATH holds no .gguf files" — it refuses to
@@ -378,8 +379,9 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   `--pcie-frac 0.00`, which `derive_config` re-applies to every launch; `"context": 262144`
   and `"kv": "int8"` are top-level preset fields, not `extra`, and they are what the reuse
   test compares); the picture reader lives in `strata-iq3_s.json`'s `"vision"` section
-  (see `~/.config/strata/strata-vision`) and has to be re-pasted there by hand after every
-  p1↔p3 switch — see § llama-swap/strata-p3.
+  (see `~/.config/strata/strata-vision`) and **had** to be re-pasted there by hand after
+  every p1↔p3 switch — that switch is gone (§ llama-swap/strata-p3, parked 2026-10-25),
+  so the section now survives on its own.
 - **`--cgroup-conf memory.swap.max=0` (inside `cmd`).** The expert arena here is
   anonymous memory: the engine's `MAP_HUGETLB` ask fails
   ("needed 23983 2 MiB pages, vm.nr_hugepages=0", see `~/.config/strata/strata-iq3_s.log`)
@@ -401,7 +403,22 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
 - No aliases: the key is the public name, and every alias is listed too
   (`includeAliasesInList`) — so the old engine name "strata" is dropped.
 
-### llama-swap/strata-p3 — `qwen3.8-flash-next-iq3_s-p3`
+### llama-swap/strata-p3 — `qwen3.8-flash-next-iq3_s-p3` (PARKED 2026-10-25)
+
+**Dropped 2026-10-25:** the backend and the launch preset are both out (`swift-1.5-iq3_s`
+replaced it in the `gpu` group). The preset is in git at `8e620d7`, the nix entry at
+`42d8314`; reviving it is those two back plus `-e PRESET=docker-p3 -e PARALLEL=3`.
+Everything below stays because re-measuring it costs a full engine restart per arm.
+
+What dropping it fixes for free: the two presets disagreed on `context`/`kv` **by design**
+(262144/int8 vs 131072/q4_0), which is what made `desc_matches` fail and sent every switch
+through `setup.py` — the rewrite that emptied `user_args` and dropped the `"vision"`
+section twice (2026-10-25 13:11 and 16:04). With one preset left for this model, the
+installed file always already holds p1's own numbers, so the reuse test passes and setup
+stops running. The `swift` entry does not reintroduce it: it is a different tag, so it
+owns a different run config file.
+
+The original reasoning, kept for the next time batch is worth trying:
 
 The same model, image, mounts and weights as the entry above, started with **three batch
 slots** instead of one — a second llama-swap model so clients pick the mode by name.
@@ -639,10 +656,11 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
 ### routing / activity / preload
 
 - `routing.router.use = "group"`, one `gpu` group: `swap = true` (one at a time),
-  `exclusive = true` (it evicts every other group), members = Strata + Strata-p3 + Maya
+  `exclusive = true` (it evicts every other group), members = Strata + Swift + Maya
   (+ the parked llama.cpp entry). Strata wants both cards: `gpus [0,1]` with
-  `layer_split 32` — which is why the two Strata entries live in this group and can never
-  run together: two expert arenas (~2 × 51 GiB) against 62 GB of RAM.
+  `layer_split 32` — which is why the two Strata entries (iq3_s and swift-1.5) live in
+  this group and can never run together: two expert arenas (~2 × 51 GiB) against 62 GB of
+  RAM.
 - `store.path = /var/lib/llama-swap/activity.sqlite` — the Activity page and
   `/api/metrics/activity` record to sqlite instead of the in-memory ring
   (`metricsMaxInMemory` then has no effect); text logs (`/logs`, `/logs/stream/*`) stay
