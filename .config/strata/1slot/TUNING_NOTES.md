@@ -12,14 +12,18 @@ preset `extra`:
 
 ```
 --resident-experts on     --adapt-async 1   --adapt-every 1   --adapt-swaps 160   --adapt-decay 0.97
---layer-split 32          --pcie-frac 0.00  --pipeline-windows 2
+--layer-split 31          --kv-resident 32768
+--pcie-frac 0.00          --pipeline-windows 2
 --spec 4                  --spec-min-p 0.70 --trim-stage-weights
 --vram-reserve-mib 1024   --vram-reserve-later-mib 1024
 --conversation-cache-mib 1024 --conversation-cache-min-tokens 256 --conversation-cache-park-gain 512
 --expert-profile /data/state/strata/profile-learned.bin (+ --expert-profile-save)
 ```
 
-No `--kv-resident` (measured free at 32768, cost ~10 tok/s decode at 170K — see arms 2/3).
+`--kv-resident 32768` is on because it is what pays for split 31 (see "Split 31" below); `20480` was measured
+as no gain (CUDA0 +45 slots, CUDA1 +62 MiB margin, decode slightly lower). Setup's own value for ctx >= 64K is
+32768; `tune_knobs.py` treats values below that at 128K+ as never-pick ("22 % to 34 % slower … only 49152 and
+65536 flat or better").
 `strata-iq3_s.json` mirrors the args and carries `"env": {"STRATA_SPLIT_RING": "384"}`.
 
 **Where `STRATA_SPLIT_RING=384` lives:** it is **not** a preset `extra` any more — the intended home is the
@@ -32,11 +36,12 @@ ring 96 (−16 % cold reads).
 
 Start-up state to expect:
 
-- `resident RAM mode: ~28 GiB of experts in RAM (page-locked), ~4,890 in the GPU cache … (no file reads)`
-- `layer split: 53% of the experts resident, the prompt path's streamed ring 384 slots`
-- `lend sizing: the prompt path borrows ~3,512 slots (ring 384 at chunk 8192), 3512 of them keep their experts in RAM too`
-- CUDA0 expert cache ~4,890 slots (8.98 GiB), CUDA1 8,192/8,192 (16.52 GiB, profile-capped)
-- free VRAM with everything loaded: CUDA0 ~757 MiB, CUDA1 ~840 MiB
+- `resident RAM mode: ~25.7 GiB of experts in RAM (page-locked), ~5,950 in the GPU cache … (no file reads)`
+- `layer split: 60% of the experts resident, the prompt path's streamed ring 384 slots`
+- `lend sizing: the prompt path borrows ~3,788 slots (ring 384 at chunk 8192), 3788 of them keep their experts in RAM too`
+- `KV streaming: 32768 of 262144 cells per QSA layer in VRAM, the K/V in 1.80 GiB of pinned RAM`
+- CUDA0 expert cache ~5,947 slots (10.91 GiB), **CUDA1 8,704 slots of 8,704 profiled pairs (17.55 GiB)**
+- free VRAM with everything loaded: CUDA0 ~759 MiB, CUDA1 ~822 MiB
 - `MemAvailable` ~19-20 GiB, swap flat, page cache ~23 GiB (the PLE table stays warm: ~0.0 GB read from the drive per prompt)
 
 ## Measured (bench-1slot.py, greedy, identical prompts every arm; full table in BENCH-1slot.md)
@@ -54,6 +59,27 @@ Start-up state to expect:
 
 Decode is flat across all arms (spread ±7 % swamps the differences); the real wins are **RAM** and the
 **prompt path**, and the prompt path is decided by the ring.
+
+## Split 31 + KV streaming (arms 6/7, 2026-10-26) — the current keeper
+
+Your 3slots note rejected split 31 because CUDA1 stopped being fully resident (needed 17.55 GiB, room ~17.4 GiB,
+residency 8,633/8,704, CUDA1 `wait + pool` 7-9.5 ms/window). On 1slot **KV streaming buys exactly the GiB the
+17th layer costs**: 512 pairs x 2.11 MiB = 1.08 GiB, and CUDA1's free VRAM goes 808 -> 2,026 MiB once only 32768
+cells per QSA layer stay in VRAM. So at split 31 + `--kv-resident 32768`:
+
+- `CUDA1 … expert cache 8704 slots (17.55 GiB), 8704 of its 8704 profiled pairs` — full, from 17.70 GiB of room
+- CUDA0 cache 4,888 -> **5,947 slots**, residency 53 % -> **60 %**, hit rate 88-93.5 %
+- decode at deep context: **145-156 tok/s at 182-190K** (real session) vs **124-140 tok/s at 148-175K** with
+  split 32/KV in VRAM — about **+15 %**
+- cost: cold 84.7K prompt read 4,727 -> **4,476 tok/s (-5.3 %)**, in-session reads -3…-6 %
+- `--kv-resident 20480` at split 31: reads unchanged, CUDA0 +45 slots, CUDA1 +62 MiB margin, decode a bit lower ->
+  keep 32768
+
+**Margin is thin and worth watching**: CUDA1's expert room at split 31 is 17.70-17.76 GiB and the 17 layers need
+17.55 GiB, i.e. ~150-200 MiB of play. Vision runs on CUDA1 (`cuda_device: 1`). After any change that touches
+CUDA1 (vision, a second install on the card, bigger `--vram-reserve-later-mib`), check that the start still says
+`8704 of its 8704 profiled pairs` and that CUDA1 free VRAM stays >= 512 MiB; if the pair count drops, go back to
+`--layer-split 32` (the 3slots failure mode, not a warning).
 
 ## What each knob did here
 
@@ -102,6 +128,7 @@ or delete it from the installed config. Env vars go in `extra` under their bare 
 | file | restores |
 |---|---|
 | `strata-iq3_s.json.bak-pre-resident-kv`, `strata/launch-presets/docker.json.bak-pre-resident-kv` | the old arena config (no resident, no kv-resident) |
+| `docker.json.bak-arm5-split32` | arm 5 (split 32, KV in VRAM, resident + adapt-async + ring 384) |
 | `docker.json.bak-arm2-kvres32768` | arm 2 (resident + adapt-async + `--kv-resident 32768`) |
 | `docker.json.bak-arm3` | arm 3 (resident + adapt-async, no kv-resident, ring default) |
 | `docker.json.bak-arm4-ring0` | arm 4 (`STRATA_SPLIT_RING=0`) |

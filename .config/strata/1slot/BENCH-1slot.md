@@ -178,3 +178,28 @@ preset `extra`: `--resident-experts on`, `--adapt-async 1`, `--adapt-every 1`, `
 (262144 ctx, `--kv int8`, `--layer-split 32`, `--pcie-frac 0.00`, `--pipeline-windows 2`, `--spec 4 --spec-min-p 0.70`,
 `--conversation-cache-mib 1024`, `--vram-reserve-mib 1024 --vram-reserve-later-mib 1024`, `--trim-stage-weights`, `--vision`).
 Installed config `strata-iq3_s.json` mirrors the args and carries `env: {"STRATA_SPLIT_RING": "384"}`.
+
+# Arm 6 — split 31 + --kv-resident 32768  (and arm 7 = same with 20480)
+
+Split 31 is viable here, and only because KV streaming funds CUDA1's 17th layer:
+`CUDA1: 18.95 GiB free, room for experts 17.70 GiB -> expert cache 8704 slots (17.55 GiB), 8704 of its 8704 profiled pairs`
+(512 pairs x 2.11 MiB = 1.08 GiB; at split 32 with KV in VRAM CUDA1 had only 808 MiB free -> would have missed).
+CUDA0 cache 4,888 -> **5,947 slots**; overall residency 53 % -> **60 %**; free VRAM 759 / 822 MiB; no warnings.
+
+```
+arm 6 (kv 32768)                                  arm 7 (kv 20480)
+ctx 1673/2039  read @971-1078   gen 692 @176.9    ctx 1673/2039  gen 691 @145.6/146.7
+ctx 81301  read 79633 @4385.1   gen 690 @133.5    ctx 81301  gen 691 @130.2
+ctx 83201  read 81167 @4478.6   gen 691 @156.4    ctx 83201  gen 691 @124.6
+ctx 171103 read 87907 @4099.7   gen 691 @139.6    ctx 171103 gen 696 @139.1
+ctx 174808 read 93512 @4085.7   gen 693 @159.2    ctx 174808 gen 1200 @128.6
+cold 84678 @4475.6 / 4477.2                       cold 84678 @4477.1 / 4527.2
+hit rate 88.3-93.5 %                              hit rate 92.1-93.9 %
+```
+Also in arm 6, a real long session ran through the engine: 182,501-token cold read @4,337.9 then decode
+146.1 / 146.1 / 145.3 / 147.8 / 155.5 tok/s at 182-190K context. Arm 5 (split 32, KV in VRAM) had
+124.4 / 134.7 / 128.4 / 139.6 tok/s at 148-175K. **Split 31 is ~+15 % decode at deep context**, paid for with
+4,727 -> 4,476 tok/s on cold prompt reads (-5.3 %).
+
+kv-resident 20480 vs 32768 at split 31: reads identical, CUDA0 +45 slots, CUDA1 +62 MiB margin,
+decode a little lower -> keep **32768** (setup's own value for ctx >= 64K).
