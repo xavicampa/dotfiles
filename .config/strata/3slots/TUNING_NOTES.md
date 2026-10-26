@@ -114,8 +114,20 @@ Readings:
 - CUDA1's cache is **profile-capped** at split 32: it already holds all 8,192 profiled pairs, so its ~1.4 GiB of
   free VRAM cannot be spent on experts. Raising `--kv-resident` back toward 32768 spends CUDA1 VRAM but *removes*
   CUDA0 expert slots — the opposite of what leg C measured.
-- Vision runs on CUDA1 (`--vision`, `strata-vision --gpu --max-tokens 512`, `CUDA_VISIBLE_DEVICES=1`); it has not
-  regressed CUDA1 headroom.
+- **Vision: `vision.max_tokens` 1024** (2026-10-26; was 512). It is the stock GPU default — `setup.VISION =
+  {"gpu": {"max_tokens": 1024, "reserve_mib": 700}, "cpu": {...300}}` and `serve/server.py Vision.DEFAULT_MAX_TOKENS` —
+  and nothing caps it above that: `Vision.token_limit()` passes the key straight to `strata-vision --max-tokens N`
+  (`0` = unlimited); setup only notes "more than the encoder's default needs more VRAM and context per picture".
+  The knob lives **only** in `strata-iq3_s.json` (the preset carries just `"vision": "on"`); the launcher copies the
+  whole section into `state/strata/launch/docker.json`, which is where the reader's args come from.
+  Measured here (3840×2160 screenshot, one request): image tokens **482 → 1,010** (`usage.prompt_tokens` 498 → 1,026,
+  text-only baseline 16), CUDA1 **free VRAM 1,372 → 1,288 MiB** at start (−84 MiB), CUDA1 still `8192 of its 8192
+  profiled pairs`, CUDA0 unchanged (669 MiB free, cache 5,488 slots), no VRAM warning, decode unaffected. The reader is
+  a separate process on CUDA1 (`vision.cuda_device: 1`); the room the engine reports for CUDA1 experts read 17.31 →
+  17.22 GiB, still above the 16.52 GiB its 8,192 resident pairs need, so residency is untouched.
+  Above 1024 the same math applies (2,048 ≈ 2× linear resolution over 512), but check the `CUDA1: N MiB free with
+  everything loaded` line again; the floor is 512 MiB at request start. Raising the cap does not upscale anything —
+  it only lifts the ceiling on how big a picture may become, so it does nothing for a client that downsamples first.
 - Watch `MemAvailable` (≈12–13 GiB under load): pinned footprint is ~27.3 GiB experts (including the 3,655 lend
   slots kept by `STRATA_SPLIT_RING`) + ~1.0 GiB K/V. Levers if it tightens: `--conversation-cache-mib`,
   `STRATA_RESIDENT_HEADROOM_GIB`, `STRATA_SPLIT_RING`, context, batch slots.
@@ -124,6 +136,7 @@ Readings:
 
 | file | restores |
 |---|---|
+| `strata-iq3_s.json.bak-pre-vision1024` | vision `max_tokens` 512 (everything else current) |
 | `strata-iq3_s.json.bak-pre-reserve960` + `strata/launch-presets/docker.json.bak-pre-reserve960` | the reserve-896 and reserve-960 legs (kv-resident 20480, split 32) |
 | `strata-iq3_s.json.bak-pre-legC` + `strata/launch-presets/docker.json.bak-pre-legC` | baseline leg (split 32 / kv-res 32768 / reserve 1024) |
 | `*.bak-pre-split31` | pre-split-experiment (same as baseline leg) |
