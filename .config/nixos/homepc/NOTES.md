@@ -598,7 +598,8 @@ What that wiring learned, kept because the facts are the engine's, not swift's:
 ### llama-swap/strata-parallel — `qwen3.8-flash-next-iq3_s-parallel` (wired 2026-10-25, **REMOVED 2026-10-26**)
 
 **Dropped 2026-10-26** once the pi-subagents budget moved to 4 concurrent children. It was replaced by
-`qwen3.8-flash-next-iq3_s-parallel5` — 5 batch slots, port `5803`, booting off `~/.config/strata/5slot` — which is
+`qwen3.8-flash-next-iq3_s-parallel5` — 5 batch slots, port `5802` (the port this entry had; 5801 is the
+single-stream 1slot tree), booting off `~/.config/strata/5slot` — which is
 the preloaded batch engine now. What went with it: this nix entry, its `gpu` group member, the
 `~/.config/strata/3slots` tree, the Pi `modelOverrides`/`modelThinkingLevels` entries for the name, and the exited
 container. The 5-slot preset ties this one's best aggregate (166.7 vs 167.1 tok/s measured on the same box);

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Fixed A/B benchmark for --batch-mtp on the 3slots install.
+"""Fixed A/B benchmark for --batch-mtp on the 5slot install.
 
 Run it once with --batch-mtp in the engine argv, once without (restart between).
-It drives 3 conversations concurrently, 3 rounds, and prints per-stream and
-aggregate medians plus the engine's own batch-window accounting.
+It drives one solo request then 2, 3, 4 and 5 conversations concurrently, 3 rounds,
+and prints per-stream and aggregate medians plus the engine's own batch-window
+accounting.
 """
 import json, re, statistics, subprocess, sys, threading, time, urllib.request
 
-URL = "http://127.0.0.1:5803/v1/chat/completions"
+URL = "http://127.0.0.1:5802/v1/chat/completions"
 LOG = ("/home/javi/.local/share/containers/storage/volumes/strata-data/_data/"
        "state/strata/launch/docker.engine.log")
 ROUNDS = 3

@@ -7,10 +7,13 @@
 
 ## Deltas vs 3slots
 
-- Preset `docker`: `"parallel": "5"` (was "3") and `"port": 5803` (5801=1slot, 5802=3slots; the exclusive
-  GPU group means only one of them runs at a time).
+- Preset `docker`: `"parallel": "5"` (was "3"); **port stays 5802** — the port the retired 3-slot entry held
+  (5801 = 1slot), reused because the exclusive GPU group means only one of them runs at a time. Verified live:
+  `ss -ltn` shows 5802 answering `/health` from the `…-parallel5` container, nothing on 5803. The profile edit to
+  5803 exists in `strata/profiles/.history/launch-docker/` (19:48:05) but the live profile reverted to 5802; any
+  5803 mention below that predates that revert describes 5802.
 - Install JSON args are unchanged — `--batch` comes only from the preset's `parallel` field.
-- `bench-batch-mtp.py` drives solo/2/3/4/5 streams against **127.0.0.1:5803** and parses `rows` for tok/s/slot.
+- `bench-batch-mtp.py` drives solo/2/3/4/5 streams against **127.0.0.1:5802** and parses `rows` for tok/s/slot.
 - Backup of the pre-fork preset: `strata/launch-presets/docker.json.bak-pre-batch5`.
 
 ## Why it fits (budget from the 3slots boot 2026-10-26 17:27)
@@ -103,7 +106,7 @@ Sizing constants measured here (engine log `conversation cache:` lines):
   ~145 tok/s ≈ 7 min for the first request. To restart: `sudo podman stop qwen3.8-flash-next-iq3_s-parallel5`
   — llama-swap re-runs the cmd (`--replace`) on the next request to that model name.
 - Measured cheaper than feared (2026-10-26 19:22:51, `nixos-rebuild switch` restarted llama-swap -> the preload
-  re-ran `--replace`): engine healthy on 5803 in **~40 s**, and the next pi request took **62 s**, not 7 min — the
+  re-ran `--replace`): engine healthy on 5802 in **~40 s**, and the next pi request took **62 s**, not 7 min — the
   parked 60k-token prefix survived the container replace. Read the 7-min figure as the *cold-cache* case; a warm
   park makes the restart roughly one reload + one short re-prefill.
 
@@ -115,7 +118,7 @@ Requesting that model name through the proxy swaps the group — the gpu group i
 else it has loaded (Maya, the 1-slot tree).
 
 Preload now names this tree: `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel5" ]`
-(`configuration.nix:496`, activated 2026-10-26 19:22; engine healthy on 5803 in ~40 s). Two gotchas:
+(`configuration.nix:496`, activated 2026-10-26 19:22; engine healthy on 5802 in ~40 s). Two gotchas:
 
 - Keep it a **single member**. `services.llama-swap.settings` is a submodule, so a module-level override
   **appends** instead of replacing — a draft overlay adding this preload rendered `[parallel5, parallel]`, i.e. two
@@ -204,8 +207,8 @@ Engine 0.1.48 linux-x86_64-cuda-cuda13. Container `qwen3.8-flash-next-iq3_s-para
 Model pack `IQ3_S`; 48 layers, **512 expert pairs per layer**, CUDA1 expert-cache cost ≈ **2.11 MiB/slot**, CUDA0 ≈ 1.94 MiB/slot.
 
 Measure with: `python3 ~/.config/strata/<tree>/bench-batch-mtp.py` (solo / 2-stream / 3-stream medians,
-plus the engine's own `strata batch:` window accounting). The 5slot copy of that script targets 5803 and takes
-"2 3 5" as its stream legs.
+plus the engine's own `strata batch:` window accounting). The 5slot copy of that script targets 5802 and runs
+solo + 2/3/4/5 streams every round (no stream-leg arguments; `--batch-mtp` / `--no-mtp` only set the warning line).
 
 ## Current best config (2026-10-25, "leg C")
 
