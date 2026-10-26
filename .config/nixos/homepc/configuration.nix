@@ -394,6 +394,7 @@ in
             -e STRATA_PF_FUSED=1
             -e STRATA_ADAPT_LAG=2
             -e STRATA_EXCHANGE_ROTATE=1
+            -e STRATA_SPLIT_RING=384
             ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';

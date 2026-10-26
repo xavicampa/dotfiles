@@ -21,7 +21,7 @@
   "--spec",
   "4",
   "--spec-min-p",
-  "0.5",
+  "0.70",
   "--mtp",
   "/data/Strata-data/mtp/rt",
   "--max-context",

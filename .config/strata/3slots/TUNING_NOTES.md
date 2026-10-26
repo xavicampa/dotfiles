@@ -16,14 +16,20 @@ Live and durable in both `strata-iq3_s.json` and `strata/launch-presets/docker.j
 --layer-split 32       --pcie-frac 0.00
 --resident-experts     --adapt-async 1 --adapt-every 1 --adapt-swaps 160 --adapt-decay 0.97
 --batch 3 (preset "parallel": 3)   --batch-mtp   --spec 4 --spec-min-p 0.70 --mtp rt
---vram-reserve-mib 896 --vram-reserve-later-mib 896 --trim-stage-weights
+--vram-reserve-mib 1024 --vram-reserve-later-mib 1024 --trim-stage-weights
 --conversation-cache-mib 8192 --conversation-cache-slots 6
 --conversation-cache-park-gain 2048 --conversation-cache-min-tokens 256
 ```
 
 Result: solo **137.4 / 136.6** · 2 streams **143.7 / 150.2** · 3 streams **163.2 / 167.1** tok/s.
 CUDA0 expert cache 5,558 slots (10.25 GiB), CUDA1 8,192/8,192 pairs (16.52 GiB, 100 % resident).
-Free VRAM: CUDA0 545 MiB, CUDA1 1,376 MiB. `MemAvailable` ≈ 13 GiB under load.
+Free VRAM: CUDA0 545 MiB at reserve 896, CUDA1 1,376 MiB. `MemAvailable` ≈ 13 GiB under load.
+
+**Reserve: 1024 is the keeper** (same value as the committed `2026-10-22-standard-rtx-5070-ti-plus-rtx-3090-ti`
+config for this GPU pair). Measured CUDA0 readings: 896 → 545 MiB idle but **475 at request start**; 960 → 605 idle
+but **505 at request start** — 7 MiB under the engine's 512 MiB floor (`#2065`). CUDA0 expert cache along that path:
+5,558 (896) → 5,525 (960) → ~5,490 (1024) — still **+212 over the 5,278 baseline**, because `--kv-resident 20480` is
+what frees the VRAM; the reserve only decides whether the warning fires.
 
 ## The layer-split experiment (2026-10-25)
 
@@ -77,6 +83,15 @@ Readings:
   If the engine declines it, it prints `adapt-async 1 is off (<reason>): the blocking adaptive tier`.
 - **`--kv int8` over `q4_0`** once `--kv-resident` pays for the VRAM (committed `2026-09-27-kv-q4`: q4_0 keeps only
   91.3 % of fp16's top-1 on a 1,024-token doc vs int8's 95.6 %, and +0.078 ± 0.011 nats/token perplexity).
+- **`--spec-min-p` must match in both files.** The install config carried `0.5` while the preset carried `0.70`; the
+  preset's args come later in the command line so it wins, but launch straight from the install config and you get
+  the looser gate silently. Both are `0.70` now.
+- **`STRATA_SPLIT_RING=384` (container env, set in `homepc/configuration.nix` for the 3-slot entry).** On a split the
+  prompt path lends tail slots of each card's cache; the default rule gives 96 ring slots once ≥75 % of pairs are
+  cache-resident, i.e. `borrows 2918 slots`. The override sets ring 384 → `borrows 3655 slots (ring 384 slots at chunk
+  8192), 3655 of them keep their experts in RAM too` — K == N, so the `lend sizing` WARNING does not fire and long
+  prompts read no experts from the model file. Cost: the RAM copy grows to ~27.3 GiB from ~26.2. Check this line after
+  any split/cache change: if K < N, every prompt chunk re-reads N−K experts from disk.
 - **`--pcie-frac 0.00` is correct while `--resident-experts` is on** — expert blobs come from pinned RAM
   (`file_blobs: 0`), so there is no file tier to prefetch into. Revisit (0.2–0.6) only if resident experts are removed.
 - **`--batch 3` is above the break-even for concurrency.** Committed `2026-10-06-community-rtx4090-opt-ins`:
@@ -93,21 +108,23 @@ Readings:
 ## Guardrails
 
 - Engine's own VRAM safety line is **512 MiB free at request start**; below it, `decode falls to a few tok/s and a
-  window may never finish (#2065)`. CUDA0 currently sits at ~545 MiB. If it warns, set
-  `--vram-reserve-mib 1024` and keep `--kv-resident 20480` (costs only ~66 expert slots).
+  window may never finish (#2065)`. Settled at `--vram-reserve-mib 1024`: 896 read 475 and 960 read 505 at request
+  start, both under the floor. If it ever warns at 1024, lower `--max-context` or `--batch` — not the reserve.
 - `--kv-resident` minimum is **20480**; a context ≤ N cells is not streamed.
 - CUDA1's cache is **profile-capped** at split 32: it already holds all 8,192 profiled pairs, so its ~1.4 GiB of
   free VRAM cannot be spent on experts. Raising `--kv-resident` back toward 32768 spends CUDA1 VRAM but *removes*
   CUDA0 expert slots — the opposite of what leg C measured.
 - Vision runs on CUDA1 (`--vision`, `strata-vision --gpu --max-tokens 512`, `CUDA_VISIBLE_DEVICES=1`); it has not
   regressed CUDA1 headroom.
-- Watch `MemAvailable` (≈13 GiB under load): pinned footprint is ~26.2 GiB experts + ~1.0 GiB K/V. Levers if it
-  tightens: `--conversation-cache-mib`, `STRATA_RESIDENT_HEADROOM_GIB`, context, batch slots.
+- Watch `MemAvailable` (≈12–13 GiB under load): pinned footprint is ~27.3 GiB experts (including the 3,655 lend
+  slots kept by `STRATA_SPLIT_RING`) + ~1.0 GiB K/V. Levers if it tightens: `--conversation-cache-mib`,
+  `STRATA_RESIDENT_HEADROOM_GIB`, `STRATA_SPLIT_RING`, context, batch slots.
 
 ## Revert points
 
 | file | restores |
 |---|---|
+| `strata-iq3_s.json.bak-pre-reserve960` + `strata/launch-presets/docker.json.bak-pre-reserve960` | the reserve-896 and reserve-960 legs (kv-resident 20480, split 32) |
 | `strata-iq3_s.json.bak-pre-legC` + `strata/launch-presets/docker.json.bak-pre-legC` | baseline leg (split 32 / kv-res 32768 / reserve 1024) |
 | `*.bak-pre-split31` | pre-split-experiment (same as baseline leg) |
 | `*.bak-pre-batch-mtp` | before `--batch-mtp` |
