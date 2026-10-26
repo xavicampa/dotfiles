@@ -1,8 +1,10 @@
 {
-  "maxActiveAsyncRunsPerSession": 4,
-  "globalConcurrencyLimit": 3,
+  "timeoutMs": 1800000,
+  "checkpointBeforeDeadlineMs": 180000,
+  "maxActiveAsyncRunsPerSession": 1,
+  "globalConcurrencyLimit": 4,
   "parallel": {
     "maxTasks": 12,
-    "concurrency": 3
+    "concurrency": 4
   }
 }
