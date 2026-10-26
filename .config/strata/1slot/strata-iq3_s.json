@@ -66,8 +66,5 @@
   "gpu": true,
   "cuda_device": 1,
   "max_tokens": 512
- },
- "env": {
-  "STRATA_SPLIT_RING": "384"
  }
 }

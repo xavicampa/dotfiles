@@ -24,15 +24,19 @@ preset `extra`:
 as no gain (CUDA0 +45 slots, CUDA1 +62 MiB margin, decode slightly lower). Setup's own value for ctx >= 64K is
 32768; `tune_knobs.py` treats values below that at 128K+ as never-pick ("22 % to 34 % slower … only 49152 and
 65536 flat or better").
-`strata-iq3_s.json` mirrors the args and carries `"env": {"STRATA_SPLIT_RING": "384"}`.
+`strata-iq3_s.json` mirrors the live args (no `env` block any more).
 
-**Where `STRATA_SPLIT_RING=384` lives:** it is **not** a preset `extra` any more — the intended home is the
-container cmd in `~/.config/nixos/homepc/configuration.nix` (`-e STRATA_SPLIT_RING=384`). That line is not live
-yet: the running container was created before it, so `docker inspect .Config.Env` has no `STRATA_SPLIT_RING`
-and the value reaches the engine only through the `env` block of `strata-iq3_s.json` (stopgap). After a
-home-manager switch recreates the container, delete it from `strata-iq3_s.json` too — otherwise nix and the
-installed config set it twice. Until then, taking it out of **both** files drops the prompt path back to
-ring 96 (−16 % cold reads).
+**Where `STRATA_SPLIT_RING=384` lives:** only in the container cmd of
+`~/.config/nixos/homepc/configuration.nix` (`-e STRATA_SPLIT_RING=384`). It went live with the
+2026-10-26 01:07 container (`docker inspect .Config.Env` lists it, and the engine prints the streamed-ring
+line); the copy in the preset `extra` and the stopgap `env` block in `strata-iq3_s.json` were both removed.
+If you ever put it back in the run config's `env`, note that it is applied **on top of** the container env —
+two copies then have to be kept in step.
+
+After a rebuild, a preset change or any restart, confirm the ring is still in play; it falls back to 96
+silently (−16 % cold prompt reads) and the only proof is in the engine log:
+`layer split: NN% of the experts resident, the prompt path's streamed ring 384 slots` and
+`lend sizing: the prompt path borrows ~3,790 slots (ring 384 at chunk 8192), … keep their experts in RAM too`.
 
 Start-up state to expect:
 
@@ -108,7 +112,11 @@ CUDA1 (vision, a second install on the card, bigger `--vram-reserve-later-mib`),
 - Per-request `resident RAM: … N blob reads from the file` should stay in the tens, not thousands — if it
   grows, the pinned complement stopped covering the working set (ring too big, RAM tight).
 - RAM levers if it tightens: `--conversation-cache-mib`, `STRATA_RESIDENT_HEADROOM_GIB` (4 GiB free by default),
-  `STRATA_SPLIT_RING`.
+  `STRATA_SPLIT_RING` (nix container cmd only).
+- `strata-iq3_s.json` still carries `--layer-split 32` and no `--kv-resident`; the preset `extra` overrides
+  both at launch (live argv: `--layer-split 31 --kv-resident 32768`), but `run-iq3_s.sh` reads the installed
+  config directly and would start split 32 with the KV in VRAM. Sync that file or retire the script before
+  trusting the manual path.
 - Image env already sets `STRATA_EXCHANGE_ROTATE=1` (`exchange buffer rotation enabled … 1.51 GiB page-locked`)
   and `STRATA_ADAPT_LAG=2`, `STRATA_PF_FUSED=1` — they apply to resident mode too.
 - The 3slots install shares this volume's `/data/state` and also uses preset name `docker`
