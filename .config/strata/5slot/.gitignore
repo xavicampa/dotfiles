@@ -1,12 +1,23 @@
 # Same rules as ../1slot/.gitignore, restated here because a .gitignore only
-# covers its own directory: 3slots is the parallel (3-slot) Strata install bound
-# as /data/install by qwen3.8-flash-next-iq3_s-parallel, so the engine writes
+# covers its own directory: 5slot is the parallel (5-slot) Strata install bound
+# as /data/install by qwen3.8-flash-next-iq3_s-parallel5, so the engine writes
 # into it the same way. Only the choices are tracked — run config, launch
-# preset, profile, strata-vision — not what a run leaves behind.
+# preset, profile, strata-vision — not what a run leaves behind. (The 3slots
+# tree and the un-suffixed `-parallel` entry were removed 2026-10-26.)
 
 # setup.py's safety copies of the run config (setup.py:3968) — artifacts of a
 # setup run, not settings anyone chose.
 strata-*.json.bak*
+
+# Hand backups taken at the tree root before a notes/gitignore edit
+# (TUNING_NOTES.md.bak-pre-pibudget, .gitignore.bak-pre-drop-3slots) — the rules
+# above anchor only the run config and the presets, so these were slipping
+# through. Anchored at the root so the preset rule above stays the specific one.
+/*.bak*
+
+# Bytecode from running bench-batch-mtp.py here (a 5slot-only script; 3slots
+# never tracked its copy).
+__pycache__/
 
 # The engine's log: the run config carries "log": /data/install/strata-<model>.log
 # and /data/install is this directory.
