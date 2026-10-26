@@ -346,7 +346,8 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
 - Mounts: `strata-data:/data` holds the pack, the MTP draft and `/data/gguf/IQ3_S`;
   `~/.config/strata/1slot:/data/install` (`XDG_CONFIG_HOME`) keeps the run settings and the
   web app's chat settings host-editable. **One install tree per entry since 2026-10-25**: this
-  entry gets `1slot/`, the batch entry gets `3slots/` (§ llama-swap/strata-parallel) — the run
+  entry gets `1slot/`, the batch entry gets `5slot/` (was `3slots/` until that tree and its entry were
+  removed 2026-10-26; § llama-swap/strata-parallel) — the run
   config, the launch preset and the profile all live under `/data/install`, so the split is what
   keeps one entry's start from rewriting the other's. **Mount the directory, not the file**:
   `setup.py` saves via `<name>.tmp` + `os.replace`, and renaming over a bind-mounted
@@ -594,7 +595,16 @@ What that wiring learned, kept because the facts are the engine's, not swift's:
 - Stale in the volume: `/data/Strata-data/models/IQ3_S/…-00001-of-00002.gguf.part` (4.6 GB,
   2026-10-21) is a half-download nothing reads — the model files are bind mounts now.
 
-### llama-swap/strata-parallel — `qwen3.8-flash-next-iq3_s-parallel` (wired 2026-10-25)
+### llama-swap/strata-parallel — `qwen3.8-flash-next-iq3_s-parallel` (wired 2026-10-25, **REMOVED 2026-10-26**)
+
+**Dropped 2026-10-26** once the pi-subagents budget moved to 4 concurrent children. It was replaced by
+`qwen3.8-flash-next-iq3_s-parallel5` — 5 batch slots, port `5803`, booting off `~/.config/strata/5slot` — which is
+the preloaded batch engine now. What went with it: this nix entry, its `gpu` group member, the
+`~/.config/strata/3slots` tree, the Pi `modelOverrides`/`modelThinkingLevels` entries for the name, and the exited
+container. The 5-slot preset ties this one's best aggregate (166.7 vs 167.1 tok/s measured on the same box);
+`~/.config/strata/5slot/TUNING_NOTES.md` § Removed: 3slots holds the restore recipe, and the old 3-slot preset still
+survives verbatim there as `strata/launch-presets/docker.json.bak-pre-batch5`. Everything below stays as history —
+its paths and port `5802` describe the removed layout, not what is on disk.
 
 Batch 3 is back — the p3 numbers, in a different shape. Instead of a second preset inside the p1
 install tree (§ llama-swap/strata-p3, parked), this entry boots on `~/.config/strata/3slots` as
@@ -641,7 +651,8 @@ section twice now only ever touches its own tree.
   so this entry loses p1's CUDA1 interleaving; count it as batch cost. The measured better arm at
   2–4 streams was `--batch-groups 1` (+ optionally `STRATA_BATCH_MTP=1`) — try it in **this**
   preset's `extra`, one change per restart. Not in `hooks.on_startup.preload`: the boot backend
-  stays the single-stream one.
+  stays the single-stream one. (Superseded: its `-parallel5` successor **is** preloaded since
+  2026-10-26 — see § routing / activity / preload.)
 
 ### llama-swap/maya — `glm-5.3-flash-maya-s24`
 
@@ -708,10 +719,11 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
 ### routing / activity / preload
 
 - `routing.router.use = "group"`, one `gpu` group: `swap = true` (one at a time),
-  `exclusive = true` (it evicts every other group), members = Strata + Strata-parallel + Maya
-  (+ the parked llama.cpp entry). Strata wants both cards: `gpus [0,1]` with
+  `exclusive = true` (it evicts every other group), members = Strata + Strata-parallel5 + Maya
+  (+ the parked llama.cpp entry) — the batch `…-parallel` member and its entry left the group
+  2026-10-26. Strata wants both cards: `gpus [0,1]` with
   `layer_split 32` — which is why the two Strata entries (the single-stream `iq3_s` and the
-  batch `…-parallel`) live in this group and can never run together: two expert arenas
+  batch `…-parallel5`) live in this group and can never run together: two expert arenas
   (~2 × 51 GiB) against 62 GB of RAM.
 - `store.path = /var/lib/llama-swap/activity.sqlite` — the Activity page and
   `/api/metrics/activity` record to sqlite instead of the in-memory ring
@@ -719,8 +731,10 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
   in-memory ring buffers either way. The directory comes from `StateDirectory` in the
   unit override below: `ProtectSystem=strict` leaves `/var` read-only apart from what
   systemd opens.
-- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ]` — keeps today's behaviour:
-  Strata is loaded at boot, not on first request. **Maya is deliberately not
+- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel5" ]` — changed 2026-10-26 from
+  `qwen3.8-flash-next-iq3_s`: the group is exclusive, so preloading the single-stream tree meant every
+  concurrent-client request paid a group swap (full reload + cold re-prefill) on its first hit. Strata
+  is still loaded at boot, not on first request. **Maya is deliberately not
   preloaded**: its cold load is minutes and it pins 44 GiB, so it swaps in on request
   (its first request pays for that, and `sendLoadingState` says so).
 
