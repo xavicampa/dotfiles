@@ -51,3 +51,129 @@
 # the files stay on disk. Recreate: dms registry add omarchy ~/dev/personal/dms-omarchy-themes and
 # install from Browse Themes, or python3 ~/dev/personal/dms-omarchy-themes/tool/install_local.py <slug>.
 .config/DankMaterialShell/themes/
+
+# ============================================================================
+# Secrets, app state and personal data — MIGRATED OUT OF .dotfiles/info/exclude
+# on 2026-10-27. That file is LOCAL ONLY: it never reaches a fresh clone (see
+# README.md steps 1-4), yet it held 97 of the 116 ignore rules this repo relies
+# on, including every secret-protection rule. With status.showUntrackedFiles=no
+# there is no warning in `git status` when one of these is addable, so the policy
+# has to live in this tracked file. Anything below may still be edited/added with
+# `git add -f`; already-tracked paths stay tracked regardless of these rules.
+# ============================================================================
+
+# --- CREDENTIALS: never publishable (this remote is public) ---
+# jellystack* compose files embed UN_RADARR_0_API_KEY in plaintext — verified in
+# jellystack.yml, jelly-stack.yml, jellystack.new{,2,3}.yml and .backup.yml.
+# The `.backup.yml` spelling is what slips past the *.bak-* / *.bak.* convention
+# above, so these are named explicitly rather than by a broad backup glob.
+jellystack.yml
+jelly-stack.yml
+jellystack.new*.yml
+jellystack.backup.yml
+jelly-stack.backup.yml
+webdav-stack.yml
+webdavstack.yml
+webdavstack.new.yml
+hermesstack.yml
+
+# Secret stores / agent state: ~/.hermes/.env and ~/.hermes/auth.json matched NO
+# rule anywhere (info/exclude:92 covers the unrelated .config/hermes/ssh-image/).
+.hermes/
+.1password/
+.ssh/
+.aws/
+.aws-sam/
+.appgate/
+.buddy/
+.claude/
+.claude.json
+.kiro/
+.semantic_search/
+.npmrc
+.config/1Password/
+.config/AppGate/
+.config/appgatesdp-service/
+.config/hermes/ssh-image/
+.config/pulse/
+.config/opencode/auth.json
+.config/transmission/
+
+# Belt-and-braces for secret-shaped names at any depth under the home work-tree.
+# No tracked path matches any of these today (checked with `git ls-files -i -c
+# --exclude-standard`); use `git add -f` if you ever track a cert deliberately.
+*.env
+auth.json
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+
+# --- command history / personal data (privacy, not credentials) ---
+.bash_history
+.zsh_history
+.calc_history
+.wget-hsts
+/logs/
+/logs.txt
+Documents/
+Music/
+Public/
+Templates/
+Videos/
+Downloads/
+Pictures/
+Desktop/
+images/
+sd_models/
+dev/
+javier-campa-dotfiles/
+
+# --- machine-generated state (reproducible from nix / the app itself) ---
+.gitconfig
+.zshrc
+.zshenv
+.zcompdump*
+.nix-profile
+.nix-channels
+.nix-defexpr/
+.npm/
+.npm-global/
+.nv/
+.cache/
+.local/
+.cargo/
+.mozilla/
+.openjfx/
+.pki/
+.pi/agent/logs/
+.pi/agent/models-store.json
+.pi/agent/pi-crash.log
+.pi/agent/**/*.bak
+.pi/agent/**/*.disabled
+.config/maya/*.log
+.config/llamacpp/*.bak*
+.config/opencode/node_modules/
+.config/opencode/package-lock.json
+.config/opencode/bun.lock
+.config/direnv/lib/
+.config/dunst/
+.config/environment.d/
+.config/systemd/user/
+.config/BraveSoftware/
+.config/Slack/
+.config/mozilla/
+.config/chromium/
+.config/quark/
+.config/vivaldi/
+.config/vivaldi-snapshot/
+.config/microsoft-edge-dev/
+.config/google-chrome/
+.config/google-chrome-beta/
+.config/google-chrome-unstable/
+.config/dconf/
+.config/fontconfig/
+.config/retroarch/
+.dotfiles/

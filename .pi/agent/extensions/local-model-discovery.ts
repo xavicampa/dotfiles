@@ -64,7 +64,23 @@ interface ProviderConfig {
   id: string;
   label: string;
   baseUrl: string;
-  apiKey: string;
+  /** Literal key only for public/no-auth endpoints ("not-needed"). */
+  apiKey?: string;
+  /**
+   * Name of the env var holding the key. Resolved lazily by apiKeyFor(), never
+   * written into this file: this tree is a PUBLIC repo (github.com/xavicampa/
+   * dotfiles), so any literal here is published to git history for good.
+   * Loaded from 1Password by .pi/agent/extensions/load-secrets.ts, which runs
+   * AFTER extension import — hence the lazy lookup instead of reading
+   * process.env in PROVIDERS.
+   */
+  apiKeyEnv?: string;
+}
+
+/** Resolve a provider's key at call time, so load-secrets' env is picked up. */
+function apiKeyFor(provider: ProviderConfig): string {
+  const fromEnv = provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined;
+  return fromEnv || provider.apiKey || "not-needed";
 }
 
 // pi's provider composer merges a provider-level `compat` into every model
@@ -91,7 +107,9 @@ const PROVIDERS: ProviderConfig[] = [
     id: "rpi",
     label: "RPI",
     baseUrl: "http://rpi:20128/v1",
-    apiKey: "sk-c9886c14389ac861-b2bf08-374cb9fb",
+    // Was a hardcoded literal until 2026-10-27 — that value is already in
+    // public history, so it must be revoked/rotated on the rpi gateway.
+    apiKeyEnv: "OMNIROUTE_API_KEY",
   },
 ];
 
@@ -319,9 +337,10 @@ async function fetchModelsImpl(
   const tag = `[${provider.id}-model-discovery]`;
   const response = await fetch(`${provider.baseUrl}/models`, {
     signal,
-    headers: provider.apiKey !== "not-needed"
-      ? { Authorization: `Bearer ${provider.apiKey}` }
-      : {},
+    headers: (() => {
+      const key = apiKeyFor(provider);
+      return key !== "not-needed" ? { Authorization: `Bearer ${key}` } : {};
+    })(),
   });
 
   if (!response.ok) {
@@ -504,7 +523,7 @@ export default async function (pi: ExtensionAPI) {
     const config: RegisteredProviderConfig = {
       name: provider.label,
       baseUrl: provider.baseUrl,
-      apiKey: provider.apiKey,
+      apiKey: apiKeyFor(provider),
       api: "openai-completions",
       models: discovered[index],
       compat: { supportsDeveloperRole: true, supportsReasoningEffort: false },
