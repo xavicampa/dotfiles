@@ -10,9 +10,9 @@ export default function (pi: ExtensionAPI) {
     { opPath: "op://dev/HF_TOKEN/credential", envVar: "HF_TOKEN", label: "HF token" },
     { opPath: "op://Private/portainer-rpi-ai-user/notesPlain", envVar: "PORTAINER_API_KEY", label: "Portainer API key" },
     // rpi/omniroute gateway key for .pi/agent/extensions/local-model-discovery.ts.
-    // UNCOMMENT after rotating, and set opPath to the real 1Password item — the
-    // previous key was hardcoded in that extension and is now burned.
-    // { opPath: "op://dev/OMNIROUTE_API_KEY/credential", envVar: "OMNIROUTE_API_KEY", label: "omniroute API key" },
+    // The previous key was hardcoded in that extension and is public in git
+    // history — treat it as burned and rotate it on the gateway when convenient.
+    { opPath: "op://dev/OMNIROUTE_API_KEY/credential", envVar: "OMNIROUTE_API_KEY", label: "omniroute API key" },
   ];
 
   type State = "pending" | "loaded" | "failed";

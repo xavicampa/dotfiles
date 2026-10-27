@@ -83,6 +83,20 @@ function apiKeyFor(provider: ProviderConfig): string {
   return fromEnv || provider.apiKey || "not-needed";
 }
 
+/**
+ * The form handed to pi.registerProvider(). pi resolves `apiKey` itself — a
+ * literal, `$ENV_VAR`/`${ENV_VAR}`, or a leading `!command` (see
+ * dist/core/resolve-config-value.js, used by model-registry/auth-storage) — so
+ * passing the `$VAR` REFERENCE defers resolution to request time. Passing
+ * apiKeyFor() here instead would capture whatever env existed at activation,
+ * which is empty: load-secrets.ts sets process.env after extension import.
+ * Unset at request time => pi reports a missing key rather than a 401, which is
+ * the honest signal that the secret never loaded.
+ */
+function registeredApiKeyFor(provider: ProviderConfig): string {
+  return provider.apiKeyEnv ? `$${provider.apiKeyEnv}` : (provider.apiKey ?? "not-needed");
+}
+
 // pi's provider composer merges a provider-level `compat` into every model
 // (mergeCompat(providerConfig.compat, model.compat)), but the extension-facing
 // ProviderConfig type omits the field — hence this local widening type instead
@@ -523,7 +537,7 @@ export default async function (pi: ExtensionAPI) {
     const config: RegisteredProviderConfig = {
       name: provider.label,
       baseUrl: provider.baseUrl,
-      apiKey: apiKeyFor(provider),
+      apiKey: registeredApiKeyFor(provider),
       api: "openai-completions",
       models: discovered[index],
       compat: { supportsDeveloperRole: true, supportsReasoningEffort: false },
