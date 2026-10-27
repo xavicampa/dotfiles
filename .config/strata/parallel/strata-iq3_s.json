@@ -46,6 +46,8 @@
  "log": "/data/install/strata-iq3_s.log",
  "lib_dirs": [],
  "port": 8080,
+ "max_queue": 3,
+ "queue_timeout": 90,
  "backend": "cuda",
  "vision": {
   "exe": "/data/install/strata-vision",

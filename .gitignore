@@ -26,6 +26,25 @@
 .config/hypr/hyprland.lua.backup*
 .config/hypr/.dms-backups/
 
+# --- Hand snapshots: `<file>.bak-<what>` / `<file>.bak.<what>` ---
+# The repo's convention for "copy the file before I change it" (strata run-config
+# edits, nixos edits). The repo already keeps that history better than a file copy
+# does, and a `git add <dir>` sweeps the copies in: `git add .config/nixos` nearly
+# took NOTES.md.bak-pre-drop-3slots plus three configuration.nix.bak-pre-* files
+# (~2.6k lines) into the 2026-10-27 rename commit. Ignored globally 2026-10-27; the
+# files stay on disk — `rm .config/nixos/homepc/*.bak-pre-*` if you want them gone.
+# The tag is spelled three ways here — `-pre-<change>` (configuration.nix.bak-pre-
+# 5slot-entry), `.pre-<change>` (config.json.bak.pre-cc4) and a date stamp
+# (jellystack.yml.bak-20261004) — so both separators are anchored, which also
+# subsumes the strata copies (`strata-iq3_s.json.bak-int8-262k`) that each tree's
+# own .gitignore already covers. Deliberately NOT a bare `*.bak*`: four plain `.bak`
+# files are tracked (.config/home-manager/home.nix.bak,
+# .config/hypr/legacy/hyprland.lua.bak,
+# .config/nvim/lua/plugins/{java,mason-dap}/init.lua.bak) and a copy that is the
+# only one should still show up. Force-add an exception with `git add -f`.
+*.bak-*
+*.bak.*
+
 # Installed registry themes (Settings -> Browse Themes / `dms theme install`) are reproducible from the
 # registries in .config/DankMaterialShell/registries.json, and each card preview now embeds the theme's
 # screenshot (~20 KB per theme), so this is generated state, not configuration. Untracked 2026-10-24;

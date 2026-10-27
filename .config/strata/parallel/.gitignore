@@ -1,9 +1,10 @@
 # Same rules as ../1slot/.gitignore, restated here because a .gitignore only
-# covers its own directory: 5slot is the parallel (5-slot) Strata install bound
-# as /data/install by qwen3.8-flash-next-iq3_s-parallel5, so the engine writes
+# covers its own directory: parallel is the batch (4-slot) Strata install bound
+# as /data/install by qwen3.8-flash-next-iq3_s-parallel, so the engine writes
 # into it the same way. Only the choices are tracked — run config, launch
-# preset, profile, strata-vision — not what a run leaves behind. (The 3slots
-# tree and the un-suffixed `-parallel` entry were removed 2026-10-26.)
+# preset, profile, strata-vision — not what a run leaves behind. (This tree was
+# `5slot/`, and the entry `-parallel5`, until 2026-10-27; the 3slots tree and the
+# original un-suffixed `-parallel` entry were removed 2026-10-26.)
 
 # setup.py's safety copies of the run config (setup.py:3968) — artifacts of a
 # setup run, not settings anyone chose.
@@ -15,7 +16,7 @@ strata-*.json.bak*
 # through. Anchored at the root so the preset rule above stays the specific one.
 /*.bak*
 
-# Bytecode from running bench-batch-mtp.py here (a 5slot-only script; 3slots
+# Bytecode from running bench-batch-mtp.py here (a batch-tree-only script; 3slots
 # never tracked its copy).
 __pycache__/
 
@@ -32,10 +33,14 @@ third_party/
 # The <name>.json profiles themselves stay in.
 strata/profiles/.*
 
-# Safety copies taken by hand before a preset edit (docker.json.bak-int8-262k,
-# docker.json.bak-cache-1024, ...). Anchored under strata/ — the presets live at
-# strata/launch-presets/, so a bare launch-presets/ rule would match nothing.
+# Safety copies taken by hand before a preset or profile edit
+# (docker.json.bak-int8-262k, docker.json.bak-cache-1024,
+# launch-docker.json.bak-pre-cc4, ...). Anchored under strata/ — the presets live
+# at strata/launch-presets/ and the profiles at strata/profiles/, so a bare
+# launch-presets/ rule would match nothing (launch-docker.json.bak-pre-cc4 slipped
+# through until the rename).
 strata/launch-presets/*.bak*
+strata/profiles/*.bak*
 
 # Measurements, not choices: .strata-calibration-backups/ is what a calibration
 # apply keeps before it touches the settings, and strata/presets/ holds

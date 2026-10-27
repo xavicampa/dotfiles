@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixed A/B benchmark for --batch-mtp on the 5slot install.
+"""Fixed A/B benchmark for --batch-mtp on the batch (parallel) install.
 
 Run it once with --batch-mtp in the engine argv, once without (restart between).
 It drives one solo request then 2, 3, 4 and 5 conversations concurrently, 3 rounds,

@@ -1,3 +1,10 @@
 sessions/
 auth.json
 trust.json
+
+# Mission / subagent-run state, same class as sessions/: index/<missionId>.json plus
+# projects/<projectRoot-hash>/<missionId>.json, keyed to this machine's paths and
+# rewritten by every run (status, lastRunId, run log). Nothing here is a setting I
+# chose — models.json, extensions/ and extensions/subagent/config.json are. Ignored
+# 2026-10-27 after `git add .pi` was about to take 22 of these records.
+missions/

@@ -346,7 +346,7 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
 - Mounts: `strata-data:/data` holds the pack, the MTP draft and `/data/gguf/IQ3_S`;
   `~/.config/strata/1slot:/data/install` (`XDG_CONFIG_HOME`) keeps the run settings and the
   web app's chat settings host-editable. **One install tree per entry since 2026-10-25**: this
-  entry gets `1slot/`, the batch entry gets `5slot/` (was `3slots/` until that tree and its entry were
+  entry gets `1slot/`, the batch entry gets `parallel/` (was `3slots/` until that tree and its entry were
   removed 2026-10-26; § llama-swap/strata-parallel) — the run
   config, the launch preset and the profile all live under `/data/install`, so the split is what
   keeps one entry's start from rewriting the other's. **Mount the directory, not the file**:
@@ -598,12 +598,13 @@ What that wiring learned, kept because the facts are the engine's, not swift's:
 ### llama-swap/strata-parallel — `qwen3.8-flash-next-iq3_s-parallel` (wired 2026-10-25, **REMOVED 2026-10-26**)
 
 **Dropped 2026-10-26** once the pi-subagents budget moved to 4 concurrent children. It was replaced by
-`qwen3.8-flash-next-iq3_s-parallel5` — 5 batch slots, port `5802` (the port this entry had; 5801 is the
-single-stream 1slot tree), booting off `~/.config/strata/5slot` — which is
+`qwen3.8-flash-next-iq3_s-parallel` — batch slots (5 when it was written, 4 since 2026-10-27; the key was
+`…-parallel5` and the tree `5slot/` until that rename), port `5802` (the port this entry had; 5801 is the
+single-stream 1slot tree), booting off `~/.config/strata/parallel` — which is
 the preloaded batch engine now. What went with it: this nix entry, its `gpu` group member, the
 `~/.config/strata/3slots` tree, the Pi `modelOverrides`/`modelThinkingLevels` entries for the name, and the exited
 container. The 5-slot preset ties this one's best aggregate (166.7 vs 167.1 tok/s measured on the same box);
-`~/.config/strata/5slot/TUNING_NOTES.md` § Removed: 3slots holds the restore recipe, and the old 3-slot preset still
+`~/.config/strata/parallel/TUNING_NOTES.md` § Removed: 3slots holds the restore recipe, and the old 3-slot preset still
 survives verbatim there as `strata/launch-presets/docker.json.bak-pre-batch5`. Everything below stays as history —
 its paths and port `5802` describe the removed layout, not what is on disk.
 
@@ -652,8 +653,70 @@ section twice now only ever touches its own tree.
   so this entry loses p1's CUDA1 interleaving; count it as batch cost. The measured better arm at
   2–4 streams was `--batch-groups 1` (+ optionally `STRATA_BATCH_MTP=1`) — try it in **this**
   preset's `extra`, one change per restart. Not in `hooks.on_startup.preload`: the boot backend
-  stays the single-stream one. (Superseded: its `-parallel5` successor **is** preloaded since
+  stays the single-stream one. (Superseded: its `-parallel5` successor — today's `-parallel` — **is** preloaded since
   2026-10-26 — see § routing / activity / preload.)
+
+### llama-swap/strata-parallel — where each serving setting lives (2026-10-27)
+
+- **Renamed 2026-10-27** (same day as the queue work): install tree `~/.config/strata/5slot/` →
+  `~/.config/strata/parallel/`, llama-swap key / podman name `qwen3.8-flash-next-iq3_s-parallel5` →
+  `qwen3.8-flash-next-iq3_s-parallel`, pi keys in `~/.pi/agent/settings.json` + `models.json` likewise. The `5`
+  left the name because the slot count is 4 and moves (`-e PARALLEL`), so a name that says 5 lies. Inside the tree
+  nothing changed — the preset is still `docker`, the profile still `launch-docker`, the port still `5802`, so the
+  tree's whole state moved with `mv`. Two traps the rename springs: **podman `--replace` only matches the same
+  name**, so the old container has to go by hand (`podman rm -f qwen3.8-flash-next-iq3_s-parallel5`) or both
+  backends load and the second one fails on VRAM; and `strata` running **on the host** (not in the container)
+  resolves its config dir from `XDG_CONFIG_HOME`, so a host-side `strata` invocation has to be pointed at the new
+  path. Worse than the VRAM race: the old container records `Source = /home/javi/.config/strata/5slot`, which is
+  gone, so `podman restart` on it recreates the bind as an **empty** directory — no preset, no profile, no run
+  config — and the start goes through setup's adopt fallback, which rewrites `strata-iq3_s.json` from defaults
+  (§ llama-swap/strata). Drop the old container; never revive it.
+  **Done and verified 2026-10-27:** old container removed before the switch, new one created 12:09 with
+  `-v /home/javi/.config/strata/parallel:/data/install`, `-e PARALLEL=4`; llama-swap `/v1/models` lists
+  `qwen3.8-flash-next-iq3_s-parallel`; boot checklist unchanged (`4 slot sessions`, expert cache 5270, CUDA1 8192
+  of 8192 profiled pairs, lend sizing 3657, 667/998 MiB free); queue bound live (`max_queue 3` in the derived
+  config, telemetry `admission_limit 7`, `parallel-overload-v1` at c=8 → `peak_active 7`, `occupied 4`, one 429,
+  `queue_timeouts 0` — `/data/bench/2026-10-27-rename-check`). The running engine follows the *inode*, so the `mv`
+  itself never disturbed a live session.
+
+Three knobs, three different layers, and only one of them is a launch flag. Read off the image's
+`strata_cli/launch/runner.py` and confirmed by watching container restarts do it to my edits.
+
+- **Slots → `-e PARALLEL=4` in the nix cmd** (`configuration.nix`, batch entry). The entrypoint passes
+  `--parallel 4`, which overrides the preset at start *and* writes it back (`--save-preset`) — the same
+  mechanism that made § llama-swap/strata-p3 conclude "editing that field is futile". The parallel preset's
+  `"parallel"` is kept at `"4"` anyway so `strata launch --list-presets` reads honestly (`4 requests`), but
+  the env line is the one that cannot drift. Changing it needs a system switch (llama-swap regenerates its
+  config and the container is recreated with a new cmd); the queue bound below does not.
+- **Queue bound → top-level keys in `~/.config/strata/parallel/strata-iq3_s.json`**: `"max_queue": 3`,
+  `"queue_timeout": 90`. There is **no launch flag and no env** for these — the entrypoint's settings list is
+  fixed (`MODEL FAMILY MODEL_PATH CONTEXT PARALLEL VISION KV GPU(S) GPU_ROLES TUNE PORT API_KEY PRESET
+  STRATA_SET`), and `STRATA_SET`/preset `extra` reach **engine** argv only (`as_argv_changes` →
+  `tune_knobs.apply_to_argv`; an unknown `--max-queue` would be handed to the engine). But they *are* run-config
+  keys: `serve/server.py` takes `max_queue = a.max_queue if a.max_queue is not None else cfg.get("max_queue")`,
+  same for `queue_timeout` (and errors if `queue_timeout` is set without `max_queue`), and
+  `derive_config` opens with `cfg = json.loads(json.dumps(base))` — a deep copy of the **installed** run config —
+  replacing only `host port api_key drafting exe open_browser log cards mtp args env`. So extra top-level keys
+  survive every start. Check without restarting:
+  `podman exec -e PYTHONPATH=/opt/strata/terminal <ctr> /opt/strata/terminal/python/bin/python3 -c "…derive_config…"`
+  printed `max_queue 3 / queue_timeout 90 / 29 tuned args intact`.
+  Effect: `admission_limit = slots + max_queue = 7` — 4 decoding, 3 waiting, 429 past that.
+- **The saved profile is not a config place.** `launch/runner.py:ensure_profile` replaces its whole override
+  set with exactly `host port parallel`, taken from the preset — "the overrides are replaced as a set". Two
+  `strata profile set launch-docker max_queue=…` edits were silently undone by the following container starts.
+  `strata profile set` + `strata runtime restart --profile launch-docker` (take the `--if-*` ids from `--plan
+  --output json`) *does* make them live inside a running container — measured once: `admission_limit 7`, one
+  429 at c=8, `queue_timeouts 0` — but that is a hotfix for a live box, not a setting; leave the profile at
+  whatever the launch writes (`47e97cdb5e924d68` = `host port parallel:4`) so there is one source of truth.
+- **Verify after any restart.** `--parallel 4` shows on the serve cmdline, but values that came from the run
+  config do **not** — read telemetry instead: bench report `environment` → `slots_effective 4`, `max_queue 3`,
+  `queue_timeout_s 90`, and `before/after` → `admission_limit 7`. A `parallel-mixed-v1`/`parallel-overload-v1`
+  run at c=8 must show exactly one 429. **If a setup pass ever rewrites `strata-iq3_s.json`** (§ llama-swap/strata:
+  `installed_serves_request` failing → setup's adopt fallback) the two keys vanish with it — `grep -n max_queue
+  ~/.config/strata/parallel/strata-iq3_s.json` is the one-line check.
+- Why 4 + 3: `~/.config/strata/parallel/TUNING_NOTES.md` § batch 4 + queue back-pressure — 179.3 agg / 45.0 per
+  stream at 4 streams (best measured point on this box), 150 at 5, and the bound keeps TTFT ≈0.01 s out to 7
+  concurrent instead of the unbounded p95 2.88 s at c=8.
 
 ### llama-swap/maya — `glm-5.3-flash-maya-s24`
 
@@ -720,11 +783,11 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
 ### routing / activity / preload
 
 - `routing.router.use = "group"`, one `gpu` group: `swap = true` (one at a time),
-  `exclusive = true` (it evicts every other group), members = Strata + Strata-parallel5 + Maya
+  `exclusive = true` (it evicts every other group), members = Strata + Strata-parallel + Maya
   (+ the parked llama.cpp entry) — the batch `…-parallel` member and its entry left the group
   2026-10-26. Strata wants both cards: `gpus [0,1]` with
   `layer_split 32` — which is why the two Strata entries (the single-stream `iq3_s` and the
-  batch `…-parallel5`) live in this group and can never run together: two expert arenas
+  batch `…-parallel`) live in this group and can never run together: two expert arenas
   (~2 × 51 GiB) against 62 GB of RAM.
 - `store.path = /var/lib/llama-swap/activity.sqlite` — the Activity page and
   `/api/metrics/activity` record to sqlite instead of the in-memory ring
@@ -732,7 +795,8 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
   in-memory ring buffers either way. The directory comes from `StateDirectory` in the
   unit override below: `ProtectSystem=strict` leaves `/var` read-only apart from what
   systemd opens.
-- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel5" ]` — changed 2026-10-26 from
+- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ]` — renamed 2026-10-27 from
+  `…-parallel5`; changed 2026-10-26 from
   `qwen3.8-flash-next-iq3_s`: the group is exclusive, so preloading the single-stream tree meant every
   concurrent-client request paid a group swap (full reload + cold re-prefill) on its first hit. Strata
   is still loaded at boot, not on first request. **Maya is deliberately not

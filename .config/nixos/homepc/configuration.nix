@@ -370,9 +370,15 @@ in
           };
         };
 
-        # Strata - 5 slots (only batched tree now; the 3slots fork was removed 2026-10-26 —
-        # restore recipe in 5slot/TUNING_NOTES.md § Removed: 3slots)
-        "qwen3.8-flash-next-iq3_s-parallel5" = {
+        # Strata - batch engine (only batched tree now; the 3slots fork was removed 2026-10-26 —
+        # restore recipe in parallel/TUNING_NOTES.md § Removed: 3slots). Renamed 2026-10-27: tree
+        # 5slot/ -> parallel/, key -parallel5 -> -parallel; the slot count is out of the name
+        # because -e PARALLEL below is what sets it.
+        # Serving knobs and where they live — NOTES.md § llama-swap/strata-parallel:
+        # slots = -e PARALLEL below (env beats the preset and is written back into it); the
+        # queue bound has no launch flag/env, so max_queue + queue_timeout sit as top-level
+        # keys in ~/.config/strata/parallel/strata-iq3_s.json, which derive_config copies.
+        "qwen3.8-flash-next-iq3_s-parallel" = {
           # swap.max=0 keeps the anon arena resident; no comments inside cmd — NOTES.md § llama-swap/strata
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
@@ -384,13 +390,14 @@ in
             --stop-timeout 120
             --pull newer
             -v strata-data:/data
-            -v /home/javi/.config/strata/5slot:/data/install
+            -v /home/javi/.config/strata/parallel:/data/install
             -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf:ro
             -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf:ro
             -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0:/data/gguf/IQ3_S/mmproj-Qwen3.8-Flash-Next-BF16.gguf:ro
             -e XDG_CONFIG_HOME=/data/install
             -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
+            -e PARALLEL=4
             -e PORT=''${PORT}
             -e STRATA_PF_FUSED=1
             -e STRATA_ADAPT_LAG=2
@@ -403,7 +410,7 @@ in
           ttl = 0;
           # without this Strata under-reports to capability discovery
           capabilities = {
-            context = 131072; # the cap here is --max-context 131072 in the 5slot tree, not 256k
+            context = 131072; # the cap here is --max-context 131072 in the parallel tree, not 256k
             "in" = [ "text" "image" ];
             out = [ "text" ];
             tools = true;
@@ -478,7 +485,7 @@ in
             exclusive = true; # evicts every other group
             members = [
               "qwen3.8-flash-next-iq3_s"
-              "qwen3.8-flash-next-iq3_s-parallel5"
+              "qwen3.8-flash-next-iq3_s-parallel"
               "glm-5.3-flash-maya-s24"
               # "bartowski/Qwen3.8-27B-GGUF:Q8_0" # parked
             ];
@@ -490,10 +497,11 @@ in
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
       # preload Strata at boot; Maya swaps in on request — NOTES.md § llama-swap
-      # 5slot is the keeper once 4-5 concurrent clients are real (5slot/TUNING_NOTES.md: 4 streams
-      # = 166.7 agg, 5 = 166.3); pi-subagents now caps children at 4, so it is. Only one entry:
-      # the exclusive gpu group evicts whatever else it preloads.
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel5" ];
+      # The batch entry is the keeper once concurrent clients are real (parallel/TUNING_NOTES.md:
+      # 4 streams = 179.3 agg / 45.0 per stream, 5 = 150.2); pi-subagents caps children at 3, so
+      # 3 children + this session = the 4 slots. Only one entry: the exclusive gpu group evicts
+      # whatever else it preloads.
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
     };
   };
 

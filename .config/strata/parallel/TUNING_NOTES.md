@@ -1,7 +1,15 @@
-# Strata 5slot — tuning notes (qwen3.8-flash-next-iq3_s)
+# Strata parallel — tuning notes (qwen3.8-flash-next-iq3_s)
+
+> **Renamed 2026-10-27:** this tree is `~/.config/strata/parallel/` — it used to be `5slot/`, and the llama-swap
+> backend `qwen3.8-flash-next-iq3_s-parallel5` is now `qwen3.8-flash-next-iq3_s-parallel`. The slot count left the
+> name because it is no longer 5: `-e PARALLEL=4` in `configuration.nix` sets it (§ Where each setting lives).
+> Everything written as `5slot/` before that date, here or in the dotfiles NOTES, means this same tree.
+
+> **Everything below was written before the rename.** Commands and paths quoted with the old names
+> (`5slot/`, `…-parallel5`) mean this tree and this backend; retype them with `parallel/` and `…-parallel`.
 
 > **This tree is a 2026-10-26 fork of `3slots/` for the `--batch 5` experiment.** Only the deltas below are
-> 5slot-specific; everything further down is inherited from the old `3slots/TUNING_NOTES.md` and still true unless
+> specific to it; everything further down is inherited from the old `3slots/TUNING_NOTES.md` and still true unless
 > noted. `3slots/` **was deleted later the same day** (§ Removed: 3slots) — the inherited section at the bottom of
 > this file is now the only copy of it, byte-identical to the file that was removed.
 
@@ -55,7 +63,7 @@ Boot verified against the checklist — **all six items pass, vision stays 1024*
 
 Bench (`bench-batch-mtp.py`, 5 legs, medians of 3) vs the 3slots keeper:
 
-| streams | 3slots (batch 3) | 5slot (batch 5) | per-stream @5slot |
+| streams | 3slots (batch 3) | parallel (batch 5) | per-stream @parallel |
 |---|---:|---:|---:|
 | solo | 137.4 / 136.6 | 135.2 | — |
 | 2 | 143.7 / 150.2 | 148.7 | — |
@@ -73,7 +81,7 @@ where the notes said it would bite (the feed path, not compute).
   (per-stream 42 → 33). Both hit the same ~166–167 tok/s ceiling as 3slots at 3 streams — the box saturates there.
 - **A 3-stream client is slightly slower on this tree** (161.3 vs 163–167): the smaller CUDA0 cache is paid
   whether or not five clients show up.
-- So 5slot is the right preset **when 4–5 concurrent clients are real**; at ≤3 concurrency 3slots remains the
+- So parallel is the right preset **when 4–5 concurrent clients are real**; at ≤3 concurrency 3slots remains the
   per-stream keeper — but that tree and its llama-swap entry are gone now, so the fallback costs a restore
   (§ Removed: 3slots). Cheaper first step if 3-stream per-stream speed bothers you: `parallel: "4"` on this tree.
 - Untested middle: `parallel: "4"` here (cache would land ~5,270, CUDA1 slack +0.27 GiB) — expected to match
@@ -103,8 +111,9 @@ Sizing constants measured here (engine log `conversation cache:` lines):
   lend 3662=3662, free 665/708 MiB); idle **MemAvailable 10 GiB** (better than the ~6 predicted — a fresh
   engine also shed ~3 GiB of old anon/page-cache pressure). Recheck evictions under real multi-session load.
 - Restart cost to warn about: reload ~90 s, then this session's 60k-token prefix re-prefills cold at
-  ~145 tok/s ≈ 7 min for the first request. To restart: `sudo podman stop qwen3.8-flash-next-iq3_s-parallel5`
-  — llama-swap re-runs the cmd (`--replace`) on the next request to that model name.
+  ~145 tok/s ≈ 7 min for the first request. To restart: `podman stop qwen3.8-flash-next-iq3_s-parallel`
+  (name before 2026-10-27: `…-parallel5`) — llama-swap re-runs the cmd (`--replace`) on the next request to that
+  model name.
 - Measured cheaper than feared (2026-10-26 19:22:51, `nixos-rebuild switch` restarted llama-swap -> the preload
   re-ran `--replace`): engine healthy on 5802 in **~40 s**, and the next pi request took **62 s**, not 7 min — the
   parked 60k-token prefix survived the container replace. Read the 7-min figure as the *cold-cache* case; a warm
@@ -113,7 +122,7 @@ Sizing constants measured here (engine log `conversation cache:` lines):
 ## To run it (llama-swap)
 
 Done: the `qwen3.8-flash-next-iq3_s-parallel5` entry lives in `homepc/configuration.nix:375` — the only batched
-entry since 2026-10-26 (`-v /home/javi/.config/strata/5slot:/data/install`, `capabilities.context = 131072`).
+entry since 2026-10-26 (`-v /home/javi/.config/strata/parallel:/data/install`, `capabilities.context = 131072`).
 Requesting that model name through the proxy swaps the group — the gpu group is exclusive, so it evicts whatever
 else it has loaded (Maya, the 1-slot tree).
 
@@ -132,7 +141,7 @@ Preload now names this tree: `hooks.on_startup.preload = [ "qwen3.8-flash-next-i
   model other than the loaded one — that is the missing warm request (fix = one small completion after /health,
   re-run whenever the group swaps).
 
-## pi-subagents budget on this tree (2026-10-26, live)
+## pi-subagents budget on this tree (2026-10-26, **superseded 2026-10-27** — see § batch 4 + queue back-pressure: the product rule is ≤ 3 now, not ≤ 4)
 
 The consumer that decides how many streams arrive is `~/.pi/agent/extensions/subagent/config.json`:
 
@@ -156,17 +165,104 @@ The consumer that decides how many streams arrive is `~/.pi/agent/extensions/sub
   `checkpointBeforeDeadlineMs` 180000 so the checkpoint steer can still write its report at 33-42 tok/s.
 - **Pi settings paired with it** (`~/.pi/agent/settings.json`): `httpIdleTimeoutMs: 900000` bounds one model
   response, which must cover a cold 60k re-prefill (~7 min at 145 tok/s); `modelThinkingLevels` and the
-  `models.json` `modelOverrides` entry both need the exact `-parallel5` name — the sibling overrides do **not**
-  carry over to a newly discovered model name, and the session silently runs at the `medium` default.
-- **Do not point agents at another group member.** Children inherit the parent model (`-parallel5`) by default;
-  setting `subagents.defaultModel` or an agent's `model` to `-parallel` / the 262k name evicts this engine through
-  the exclusive gpu group on that child's launch.
+  `models.json` `modelOverrides` entry both need the exact model name — `-parallel` since the 2026-10-27 rename,
+  `-parallel5` before it — and the sibling overrides do **not** carry over to a newly discovered model name, so the
+  session silently runs at the `medium` default. Both were renamed with the backend (`settings.json.bak-pre-rename`,
+  `models.json.bak-pre-rename`).
+- **Do not point agents at another group member.** Children inherit the parent model (`…-parallel`) by default;
+  setting `subagents.defaultModel` or an agent's `model` to the single-stream `qwen3.8-flash-next-iq3_s`, the 262k
+  name or Maya evicts this engine through the exclusive gpu group on that child's launch. (Until 2026-10-26
+  `-parallel` was a *different* entry, since removed; the name is the live batch one now — this warning used to say
+  the opposite.)
 - Workflow scripts may pass their own `globalConcurrencyLimit` per call (workflow-only, not forwarded to child
-  calls) — a script asking for 8 lanes oversubscribes the engine. Pass 4 explicitly.
+  calls) — a script asking for 8 lanes oversubscribes the engine. Pass ≤ 3 explicitly.
+
+## batch 4 + queue back-pressure (2026-10-27, **LIVE** — `--batch 4`, `max_queue 3`, `queue_timeout 90`)
+
+### Where each setting lives — declarative (2026-10-27; supersedes the CLI recipe I used first)
+
+Two container restarts silently reverted my `strata profile set` edits: `launch/runner.py:ensure_profile`
+replaces the saved profile's whole override set with exactly `host port parallel`, taken from the preset
+("the overrides are replaced as a set"). So the settings now sit where the box regenerates them — full write-up
+in the dotfiles NOTES § llama-swap/strata-parallel:
+
+| knob | file | mechanism |
+|---|---|---|
+| slots | `~/.config/nixos/homepc/configuration.nix` (batch entry, key `…-parallel`): **`-e PARALLEL=4`** | entrypoint → `--parallel 4`, which overrides the preset at start *and* writes it back (`--save-preset`). § pi-subagents-era notes already called editing the preset alone "futile" |
+| `parallel` in the tree | `strata/launch-presets/docker.json` → `"parallel": "4"` | kept in sync so `strata launch --list-presets` reads honestly (`4 requests`) |
+| `max_queue`, `queue_timeout` | `strata-iq3_s.json` (this tree) → top-level `"max_queue": 3`, `"queue_timeout": 90` | `serve/server.py` falls back to `cfg.get("max_queue")` / `cfg.get("queue_timeout")`; `derive_config` opens with `json.loads(json.dumps(base))` (deep copy of the **installed** run config) and replaces only `host port api_key drafting exe open_browser log cards mtp args env`, so extra top-level keys survive every start. There is no launch flag or env for these: `STRATA_SET`/preset `extra` reach engine argv only |
+
+Proved without touching the live engine — in-container `derive_config(install config, preset)` returned
+`max_queue 3 / queue_timeout 90` with all 29 tuned engine args intact.
+
+**`strata profile set` + `strata runtime restart --profile launch-docker` is a hotfix, not a setting.** It does
+go live inside a running container (guarded by the `--if-profile-revision/--if-owner-id/--if-instance-id` ids from
+`--plan --output json`; measured live: `admission_limit 7`, one 429 at c=8, `queue_timeouts 0`), but a profile
+holding values the tree does not is a second source of truth that the next container start erases. The profile is
+left at the launch-derived revision `47e97cdb5e924d68` (`host port parallel:4`); the queue lives in the tree file.
+
+**Status: both live since 2026-10-27 12:09** (system switch done, and the tree/entry were renamed
+`5slot` → `parallel` / `-parallel5` → `-parallel` in the same change — see the rename note at the top and the dotfiles
+NOTES § llama-swap/strata-parallel for the podman-name trap that had to be cleared first). Verified after the
+switch: container `-v /home/javi/.config/strata/parallel:/data/install`, `-e PARALLEL=4`, `admission_limit 7`,
+`parallel-overload-v1` at c=8 → one 429 and `queue_timeouts 0` (`/data/bench/2026-10-27-rename-check`). Nothing
+left to re-apply after a restart. Backups: `strata-iq3_s.json.bak-pre-cc4`, `launch-presets/docker.json.bak-pre-cc4`,
+`profiles/launch-docker.json.bak-pre-cc4`, `~/.pi/agent/extensions/subagent/config.json.bak.pre-cc4`.
+
+Live values (`strata runtime restart ... --output json` → instance `8e0c3703ed2749abb65178745c27460b`,
+profile revision `4a0d15207ec1e839`): serve `--parallel 4 --max-queue 3 --queue-timeout 90.0`, engine `--batch 4`,
+telemetry `slots_effective 4`, **`admission_limit 7`** (= slots + max_queue).
+
+### Boot checklist at batch 4 (verified 2026-10-27 11:4x, cheaper than 5 slots as predicted)
+
+`--batch: 4 slot sessions on CUDA0 (0.40 GiB each)` + CUDA1 twin; **expert cache 5270 slots** (5051 at 5 slots —
+the freed slot feeds the cache, matching the 5,270 prediction); CUDA1 still `8192 slots (16.52 GiB), 8192 of its
+8192 profiled pairs` (residency holds); `lend sizing: the prompt path borrows 3657 slots … 3657 of them keep
+their experts in RAM too` (N == N, no WARNING); **667 / 998 MiB free with everything loaded** (665 / 708 at 5
+slots). Also relevant: the old 5-slot boot logged repeated
+`WARNING: only 179/249/379/509 MiB of VRAM free at the start of this request (below 512 MiB)` (#2065) during
+traffic — 5 slots was running inside the paging guard, another reason 4 is the right setting here.
+
+### Steady-state curve at batch 4 (300 tok/stream, temp 0, medians of 3 rounds — `bench-cc-curve.py 1 2 3 4 5 6 7`)
+
+| streams | agg tok/s | med/stream | min/stream | med TTFT | max TTFT |
+|---|---|---|---|---|---|
+| 1 | 144.3 | 144.3 | 93.9 | 0.00 s | 0.01 s |
+| 2 | 154.9 | 77.9 | 70.6 | 0.00 | 0.01 |
+| 3 | 169.8 | 57.2 | 53.2 | 0.00 | 0.01 |
+| **4** | **179.3** | **45.0** | **41.5** | 0.00 | 0.01 |
+| 5 | 150.2 | 37.9 | 27.4 | 0.01 | 0.02 |
+| 6 | 143.5 | 33.2 | 23.8 | 0.00 | 0.01 |
+| 7 | 143.1 | 31.0 | 19.9 | 0.01 | 0.01 |
+
+**What the queue bound does and does not buy.** It fixes the tail-TTFT pathology: at 7 concurrent, TTFT stays
+≈0.01 s, where the unbounded batch-5 mixed suite measured p95 2.88 s at c=8 and 7.03 s at c=16. It does **not**
+protect aggregate: 5 streams still costs 179 → 150 tok/s and 6–7 settle ≈143, because a queued conversation is
+rotated into a slot as soon as one frees (the `slot takes N tokens (copied in ~116-120 ms)` / `gave back ~47 ms`
+churn plus MTP acceptance loss), so oversubscription past slots is still pure loss. The bound's real value is
+the hard ceiling: 8 clients got `peak_active 7 / occupied_slots 4` and **one HTTP 429**, `queue_timeouts: 0` —
+vs batch 5 unbounded where 16 clients all got absorbed (`active 16, queued 0`) and dragged everyone down.
+Keep the operating point at **≤ 4 streams**, i.e. **3 subagent children + 1 parent**.
+
+### Suites now unlocked (both passed 2026-10-27)
+
+- `parallel-overload-v1` c=8: **passed** — `peak_active 7`, `peak_admission_rejected 1` (429), `queue_timeouts 0`,
+  recovery phase back to 1 stream at 52 tok/s.
+- `parallel-cancel-v1` c=5: **passed** — `client_disconnect_cancels 2`, no queue timeouts, recovery 47.8 tok/s.
+- `parallel-prefill-cancel-v1` (ran earlier at batch 5): recovery TTFT 0.50 s.
+- `peak_queued` reads 0 even when the queue was used: samples are ~1 s apart and a queued request here waits far
+  less than that. Trust `admission_limit`, `admission_rejected` and `peak_active` instead.
+
+### pi-subagents budget at 4 slots
+
+`~/.pi/agent/extensions/subagent/config.json`: `globalConcurrencyLimit: 3`, `parallel.concurrency: 3`
+(backup `config.json.bak.pre-cc4`); `maxActiveAsyncRunsPerSession: 1` × 3 = 3 children + parent = 4 = slots.
+A workflow script passing its own `globalConcurrencyLimit` must pass ≤ 3. At 8+ children the old config measured
+152.0 agg / 19.4 each; the product ≤ 3 rule keeps every stream in the 45 tok/s band.
 
 ## Removed: 3slots (2026-10-26)
 
-Deleted once the pi-subagents budget moved to 4 children: the bench says 5slot ties 3slots' best aggregate
+Deleted once the pi-subagents budget moved to 4 children: the bench says parallel ties 3slots' best aggregate
 (166.7 vs 167.1) and a tree nobody routes to is just a third thing to keep in sync. What went:
 
 | Removed | Where |
@@ -182,12 +278,13 @@ historical rows for the model — harmless, it only tracks what has been served.
 
 **Restore recipe** — every piece below is still on disk today, so this is a re-wire, not a reconstruction:
 
-1. `cp -r ~/.config/strata/5slot ~/.config/strata/3slots`
+1. `cp -r ~/.config/strata/parallel ~/.config/strata/3slots`
 2. In `3slots/strata-iq3_s.json`, revert the two args the deleted install JSON differed by:
    `"--conversation-cache-mib", "10240"` → `"8192"` and `"--conversation-cache-slots", "10"` → `"6"`.
 3. `cp 3slots/strata/launch-presets/docker.json.bak-pre-batch5 3slots/strata/launch-presets/docker.json` — that
    backup **is** the old 3-slot preset verbatim (`"parallel": "3"`, `"port": 5802`; only `last_used` differs).
-4. Re-add the llama-swap entry (copy the `-parallel5` block at `configuration.nix:375`, change the `-v .../5slot`
+4. Re-add the llama-swap entry (copy the batch block — key `qwen3.8-flash-next-iq3_s-parallel` — at
+   `configuration.nix:375`, change the `-v .../parallel`
    mount to `.../3slots`) **and** the same name in `routing.router`'s gpu `members` — forgetting the member is the
    classic "model not found" after a restore. Set `hooks.on_startup.preload` to whichever tree should boot.
 5. Build, then `sudo nixos-rebuild switch --store-path <built path>` (edit literal lists; the submodule appends).
@@ -207,7 +304,7 @@ Engine 0.1.48 linux-x86_64-cuda-cuda13. Container `qwen3.8-flash-next-iq3_s-para
 Model pack `IQ3_S`; 48 layers, **512 expert pairs per layer**, CUDA1 expert-cache cost ≈ **2.11 MiB/slot**, CUDA0 ≈ 1.94 MiB/slot.
 
 Measure with: `python3 ~/.config/strata/<tree>/bench-batch-mtp.py` (solo / 2-stream / 3-stream medians,
-plus the engine's own `strata batch:` window accounting). The 5slot copy of that script targets 5802 and runs
+plus the engine's own `strata batch:` window accounting). The parallel copy of that script targets 5802 and runs
 solo + 2/3/4/5 streams every round (no stream-leg arguments; `--batch-mtp` / `--no-mtp` only set the warning line).
 
 ## Current best config (2026-10-25, "leg C")

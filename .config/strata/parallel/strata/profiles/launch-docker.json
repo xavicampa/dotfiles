@@ -2,7 +2,7 @@
   "id": "launch-docker",
   "overrides": {
     "host": "0.0.0.0",
-    "parallel": 5,
+    "parallel": 4,
     "port": 5802
   },
   "schema_version": 1,
