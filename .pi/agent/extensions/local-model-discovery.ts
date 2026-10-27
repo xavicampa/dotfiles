@@ -349,13 +349,13 @@ async function fetchModelsImpl(
   signal: AbortSignal,
 ): Promise<ProviderModelConfig[]> {
   const tag = `[${provider.id}-model-discovery]`;
-  const response = await fetch(`${provider.baseUrl}/models`, {
-    signal,
-    headers: (() => {
-      const key = apiKeyFor(provider);
-      return key !== "not-needed" ? { Authorization: `Bearer ${key}` } : {};
-    })(),
-  });
+  // Typed as Record<string,string> so the no-key branch stays assignable to
+  // HeadersInit — an IIFE returning `{ Authorization } | {}` infers the
+  // property as `string | undefined`, which is not.
+  const headers: Record<string, string> = {};
+  const key = apiKeyFor(provider);
+  if (key !== "not-needed") headers.Authorization = `Bearer ${key}`;
+  const response = await fetch(`${provider.baseUrl}/models`, { signal, headers });
 
   if (!response.ok) {
     throw new Error(`${provider.baseUrl}: ${response.status} ${response.statusText}`);

@@ -156,9 +156,19 @@ export default function (pi: ExtensionAPI) {
     await loadSecrets(ctx, SECRETS.map((s) => s.envVar), { force: true });
   }
 
-  // Open 1Password on startup if not running
-  pi.on("session_start", async (_event, _ctx) => {
+  // Open 1Password on startup if not running, then start loading the provider
+  // keys pi needs before the first turn. Deliberately not awaited: op read can
+  // wait minutes on the 1Password prompt, and a session_start handler that
+  // blocks holds up startup for that long. The load runs in the background and
+  // reports through notify(); a cancelled attempt stays pending so the next
+  // session_start or /load-secrets retries without backoff.
+  pi.on("session_start", async (_event, ctx) => {
     await open1Password();
+    // The omniroute key backs a *provider* registered by
+    // .pi/agent/extensions/local-model-discovery.ts: pi resolves that provider's
+    // `$OMNIROUTE_API_KEY` when it refreshes models, which happens before any
+    // tool call, so no tool_trigger below can cover it. Kick it off at startup.
+    void loadSecrets(ctx, ["OMNIROUTE_API_KEY"]);
   });
 
   // On-demand via command (allows retry after failure)
@@ -172,6 +182,8 @@ export default function (pi: ExtensionAPI) {
   // Auto-load on first use; a failure backs off for RETRY_COOLDOWN_MS, /load-secrets retries immediately
   const HF_CMD = /\bhf\s+(download|cache|auth|models|env|cp|version|whoami)\b/;
   const PORTAINER_CMD = /portainer[\\/]scripts[\\/]portainer|rpi:9443/;
+  // Direct hits against the omniroute gateway (curl /v1/models, debug probes).
+  const OMNIROUTE_CMD = /rpi:20128|OMNIROUTE_API_KEY/;
   pi.on("tool_call", async (event, ctx) => {
     if (event.toolName === "web_search") {
       await loadSecrets(ctx, ["BRAVE_API_KEY", "EXA_API_KEY"]);
@@ -182,6 +194,7 @@ export default function (pi: ExtensionAPI) {
       const vars: string[] = [];
       if (HF_CMD.test(cmd)) vars.push("HF_TOKEN");
       if (PORTAINER_CMD.test(cmd)) vars.push("PORTAINER_API_KEY");
+      if (OMNIROUTE_CMD.test(cmd)) vars.push("OMNIROUTE_API_KEY");
       if (vars.length > 0) await loadSecrets(ctx, vars);
     }
   });
