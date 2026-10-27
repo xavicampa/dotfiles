@@ -99,6 +99,13 @@ hermesstack.yml
 .config/opencode/auth.json
 .config/transmission/
 
+# .agents/skills/readynas/ documents ReadyNAS root access (passwordless root in OS 6
+# recovery) plus the factory admin credential, and telnet-step.exp drives it. Kept
+# out of the public repo; add with `git add -f` only after scrubbing.
+.agents/skills/readynas/
+.config/go/
+.config/pi/web-search-cache/
+
 # Belt-and-braces for secret-shaped names at any depth under the home work-tree.
 # No tracked path matches any of these today (checked with `git ls-files -i -c
 # --exclude-standard`); use `git add -f` if you ever track a cert deliberately.
