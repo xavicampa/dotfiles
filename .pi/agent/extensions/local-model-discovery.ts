@@ -2,13 +2,35 @@
  * Auto-discover models from local OpenAI-compatible APIs.
  * Registers the "local" (localhost:8080) and "rpi" (rpi:20128) providers.
  *
- * Startup discovery happens in the (async) extension factory: pi awaits the
- * factory before it continues startup (offline model refresh + initial model
- * resolution), so the default model can be selected immediately. Each fetch
- * is bounded by a local deadline, so an unresponsive host degrades to an
- * empty initial catalog within seconds instead of hanging startup — live
- * discovery still runs later via `refreshModels` (network phase) and the
- * manual /refresh-local-models command.
+ * Refresh policy (ProviderConfig.deferred):
+ *  - "local" (127.0.0.1:8080) is EAGER: discovered in the (async) extension
+ *    factory at startup and re-fetched by pi's background refreshes.
+ *  - "rpi" (rpi:20128) is DEFERRED: never fetched at startup and never by
+ *    background refreshes. It registers with an empty catalog and is only
+ *    fetched when the user explicitly asks — /refresh-local-models or
+ *    /refresh-rpi-models. Once fetched, its catalog is kept for the rest of
+ *    the process and handed back by later refreshes without any network call.
+ *    Its `$OMNIROUTE_API_KEY` is therefore no longer loaded at startup either:
+ *    the refresh commands request it from load-secrets.ts over pi.events right
+ *    before they hit the gateway.
+ *  - "Deferred" means unregistered-from-refresh, not merely "returns a cache":
+ *    such a provider is registered WITHOUT a refreshModels hook until the user
+ *    asks. pi picks the providers to refresh by the presence of that hook and
+ *    resolves their apiKey before calling it, so an advertised hook plus an
+ *    unset `$OMNIROUTE_API_KEY` surfaced on every model-picker open as
+ *    "Could not refresh rpi; showing cached models." Returning the cache from
+ *    the hook was not enough to silence it — see registerProvider().
+ *
+ * The eager factory fetch matters because pi awaits the factory before it
+ * continues startup (offline model refresh + initial model resolution), so the
+ * default model is selectable immediately. Each fetch is bounded by a local
+ * deadline, so an unresponsive host degrades to an empty initial catalog
+ * within seconds instead of hanging startup — live discovery still runs later
+ * via `refreshModels` (network phase).
+ *
+ * Deferring rpi also removes a guaranteed startup failure: the rpi key is
+ * injected by load-secrets.ts after extension import, so a factory-time rpi
+ * fetch always went out without Authorization and came back 401.
  *
  * Pi invokes refreshModels twice per refresh cycle: an offline cached-state
  * phase (allowNetwork: false, never touches the network) and a network
@@ -67,6 +89,13 @@ interface ProviderConfig {
   /** Literal key only for public/no-auth endpoints ("not-needed"). */
   apiKey?: string;
   /**
+   * Defer all network discovery for this provider: skipped by the startup
+   * factory and short-circuited to cache by refreshModels' network phase, so
+   * its catalog is only ever fetched through the explicit refresh commands
+   * (see onDemandRefresh).
+   */
+  deferred?: boolean;
+  /**
    * Name of the env var holding the key. Resolved lazily by apiKeyFor(), never
    * written into this file: this tree is a PUBLIC repo (github.com/xavicampa/
    * dotfiles), so any literal here is published to git history for good.
@@ -121,6 +150,7 @@ const PROVIDERS: ProviderConfig[] = [
     id: "rpi",
     label: "RPI",
     baseUrl: "http://rpi:20128/v1",
+    deferred: true,
     // Was a hardcoded literal until 2026-10-27 — that value is already in
     // public history, so it must be revoked/rotated on the rpi gateway.
     apiKeyEnv: "OMNIROUTE_API_KEY",
@@ -382,6 +412,15 @@ async function fetchModelsImpl(
 // resolution.
 const lastDiscovered = new Map<string, ProviderModelConfig[]>();
 
+// Providers whose network discovery the user explicitly asked for. This set IS
+// the on-demand signal for deferred providers: the refresh command adds its
+// provider ids immediately before ctx.modelRegistry.refresh(), and refreshModels
+// refuses to touch the network for a deferred provider that is not listed.
+// Nothing else in pi can put a provider here, so "on-demand" really means
+// "the user ran a refresh command" — a background refresh, a model-picker open
+// or an auth flow never reaches rpi:20128.
+const onDemandRefresh = new Set<string>();
+
 // Model the llama.cpp router currently has loaded, from its /v1/models
 // status. Fallback default when the VRAM tier's model is not in the catalog.
 let lastLoadedLocalModelId: string | undefined;
@@ -511,61 +550,103 @@ function resolvePreferredLocalModel(): string | undefined {
 }
 
 export default async function (pi: ExtensionAPI) {
-  // Discover at startup, bounded: pi awaits the factory before the offline
-  // model refresh and initial model resolution, so the configured default
-  // model (e.g. local/unsloth/...) is resolvable on first launch. All
-  // providers are fetched in parallel; a dead host contributes nothing
-  // instead of blocking startup.
-  const startupSignal = AbortSignal.timeout(STARTUP_FETCH_TIMEOUT_MS);
-  const discovered = await Promise.all(
-    PROVIDERS.map(async (provider) => {
-      try {
-        const models = await fetchModels(provider, startupSignal);
-        lastDiscovered.set(provider.id, models);
-        return models;
-      } catch (err) {
-        log(
-          `[${provider.id}-model-discovery] startup discovery failed: ` +
-            `${(err as Error)?.message ?? err}`,
-        );
-        return [];
-      }
-    }),
-  );
-
-  for (const [index, provider] of PROVIDERS.entries()) {
+  /**
+   * Register (or re-register — pi merges a re-registration over the previous
+   * one) one of our providers. `withRefresh` decides whether pi may treat the
+   * provider as refreshable at all, which is the whole deferred mechanism:
+   * pi-ai collects the providers that expose refreshModels, reads their
+   * credential and resolves the composed apiKey BEFORE calling the hook, and a
+   * provider whose key is unresolvable is reported as a refresh error. With
+   * $OMNIROUTE_API_KEY deliberately unset at startup, advertising refreshModels
+   * for rpi made every model-picker open fail with "Failed to resolve API key
+   * … OMNIROUTE_API_KEY" → "Could not refresh rpi; showing cached models.",
+   * even though our hook never touches the network for a deferred provider.
+   * So rpi is registered as a plain static (empty) catalog and only gains its
+   * refreshModels — after its secret is loaded — when the user asks for it.
+   */
+  const registerProvider = (
+    provider: ProviderConfig,
+    options: { withRefresh: boolean; models?: ProviderModelConfig[] },
+  ) => {
     const config: RegisteredProviderConfig = {
       name: provider.label,
       baseUrl: provider.baseUrl,
       apiKey: registeredApiKeyFor(provider),
       api: "openai-completions",
-      models: discovered[index],
+      models: options.models ?? lastDiscovered.get(provider.id) ?? [],
       compat: { supportsDeveloperRole: true, supportsReasoningEffort: false },
       // pi's provider composer merges this provider-level compat into every
       // model; buildModels() also sets both flags per model, so the two agree.
-      async refreshModels({ allowNetwork, stored, signal }) {
-        // Offline phase: never touch the network. Serve the last known-good
-        // catalog (stale is fine). Never return [] here: the returned list
-        // replaces the provider catalog, and the offline phase runs after
-        // startup registration.
-        const cached = lastDiscovered.get(provider.id);
-        if (!allowNetwork) {
-          if (cached) return cached;
-          // No discovery succeeded in this process: hand back pi's stored
-          // snapshot. It holds normalized model records rather than
-          // ProviderModelConfig inputs — pi accepts both here, the cast only
-          // papers over the declared type (and drops the readonly marker).
-          return stored ? ([...stored.models] as ProviderModelConfig[]) : [];
-        }
-        const models = await fetchModels(
-          provider,
-          AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)]),
-        );
-        lastDiscovered.set(provider.id, models);
-        return models;
-      },
+      ...(options.withRefresh
+        ? {
+            async refreshModels({ allowNetwork, stored, signal }) {
+              // The offline phase (allowNetwork: false) runs after startup
+              // registration and its returned list replaces the provider
+              // catalog, so it must serve the last known-good models rather
+              // than an empty list — otherwise the startup discovery done in
+              // the factory would be wiped before initial model resolution.
+              const cached = lastDiscovered.get(provider.id);
+              // Offline phase: no network by definition. Deferred providers
+              // also skip the network phase unless the user asked for it
+              // (below), which is what keeps rpi out of every background
+              // refresh once it is refreshable at all.
+              if (!allowNetwork || (provider.deferred && !onDemandRefresh.has(provider.id))) {
+                if (cached) return cached;
+                if (provider.deferred) return [];
+                // No discovery succeeded in this process: hand back pi's
+                // stored snapshot. It holds normalized model records rather
+                // than ProviderModelConfig inputs — pi accepts both here, the
+                // cast only papers over the declared type (and drops the
+                // readonly marker).
+                return stored ? ([...stored.models] as ProviderModelConfig[]) : [];
+              }
+              const models = await fetchModels(
+                provider,
+                AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)]),
+              );
+              lastDiscovered.set(provider.id, models);
+              return models;
+            },
+          }
+        : {}),
     };
     pi.registerProvider(provider.id, config);
+  };
+
+  // Discover at startup, bounded and LOCAL-ONLY: pi awaits the factory before
+  // the offline model refresh and initial model resolution, so the configured
+  // default model (e.g. local/unsloth/...) is resolvable on first launch.
+  // Eager providers are fetched in parallel; a dead host contributes nothing
+  // instead of blocking startup. Deferred providers (rpi) are not fetched here
+  // at all — they register empty and fill in on demand.
+  const startupSignal = AbortSignal.timeout(STARTUP_FETCH_TIMEOUT_MS);
+  const discovered = new Map<string, ProviderModelConfig[]>();
+  await Promise.all(
+    PROVIDERS.filter((provider) => !provider.deferred).map(async (provider) => {
+      try {
+        const models = await fetchModels(provider, startupSignal);
+        lastDiscovered.set(provider.id, models);
+        discovered.set(provider.id, models);
+      } catch (err) {
+        log(
+          `[${provider.id}-model-discovery] startup discovery failed: ` +
+            `${(err as Error)?.message ?? err}`,
+        );
+      }
+    }),
+  );
+
+  for (const provider of PROVIDERS) {
+    if (provider.deferred) {
+      log(
+        `[${provider.id}-model-discovery] deferred: registered with an empty catalog and no ` +
+          "refreshModels, so pi leaves it alone; run /refresh-rpi-models to fetch it",
+      );
+    }
+    registerProvider(provider, {
+      withRefresh: !provider.deferred,
+      models: discovered.get(provider.id) ?? [],
+    });
   }
 
   // VRAM-based local default. Pi resolves the configured defaultModel before
@@ -641,37 +722,124 @@ export default async function (pi: ExtensionAPI) {
 
   // Manual refresh with an explicit deadline (pi's background refreshes are
   // already bounded; this public entry point is unbounded unless signalled).
-  pi.registerCommand("refresh-local-models", {
-    description: "Re-discover and refresh models from all local APIs",
-    handler: async (_args, ctx) => {
-      // Published on the shared bus rather than setStatus(): context-bar owns the
-      // footer's status line with a full-width bar, and a setStatus() value here
-      // would be truncated off the end of it.
-      pi.events.emit("status-bar:text", { key: "local-models", text: "Refreshing models…" });
-      try {
-        const result = await ctx.modelRegistry.refresh({
-          allowNetwork: true,
-          force: true,
-          providers: PROVIDERS.map((p) => p.id),
-          signal: AbortSignal.timeout(MANUAL_REFRESH_TIMEOUT_MS),
-        });
-        if (result.aborted) {
-          ctx.ui.notify("Model refresh timed out", "error");
-          return;
+  // These commands are the only way a deferred provider (rpi) reaches the
+  // network: running one IS the on-demand request, and it is also what pulls
+  // that provider's secret out of 1Password.
+  // pi never awaits event-bus handlers (emit() returns void), so cross-extension
+  // work that must finish before we continue uses a request/reply pair:
+  // subscribe to the reply channel first, then emit the request. load-secrets.ts
+  // owns 1Password access (app launch, op read, back-off) and answers there.
+  // The deferred rpi provider needs OMNIROUTE_API_KEY in process.env — both for
+  // this extension's own /v1/models fetch and for pi's `$OMNIROUTE_API_KEY`
+  // resolution at request time — and that secret is no longer fetched at
+  // startup, so it is asked for when a refresh command actually needs it.
+  const SECRET_REQUEST_CHANNEL = "secrets:ensure";
+  const SECRET_REPLY_CHANNEL = "secrets:ensured";
+  // Matches load-secrets' own `op read` timeout: 1Password can sit on its
+  // unlock prompt for a while, and the command is already showing progress.
+  const SECRET_WAIT_TIMEOUT_MS = 120_000;
+
+  /** Await the named env vars; resolves with the ones still missing afterwards. */
+  const ensureSecrets = (envVars: string[]): Promise<string[]> => {
+    const missing = envVars.filter((name) => !process.env[name]);
+    if (missing.length === 0) return Promise.resolve([]);
+    return new Promise((resolve) => {
+      let settled = false;
+      let unsubscribe: (() => void) | undefined;
+      const finish = (failed: string[]) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unsubscribe?.();
+        resolve(failed);
+      };
+      // No answer at all means load-secrets is not loaded (or 1Password never
+      // answered): give up rather than hang the refresh command.
+      const timer = setTimeout(() => finish(missing), SECRET_WAIT_TIMEOUT_MS);
+      unsubscribe = pi.events.on(SECRET_REPLY_CHANNEL, (data) => {
+        const reply = data as { envVars?: unknown; failed?: unknown } | undefined;
+        if (!Array.isArray(reply?.envVars)) return;
+        if (!missing.every((name) => (reply.envVars as unknown[]).includes(name))) return;
+        const failedNames = Array.isArray(reply.failed)
+          ? (reply.failed as { envVar?: unknown }[])
+              .map((entry) => entry?.envVar)
+              .filter((name): name is string => typeof name === "string")
+          : [];
+        // Trust process.env over the reply: a load reported ok but not present
+        // in the env is still missing for both us and pi's $VAR resolution.
+        finish(missing.filter((name) => failedNames.includes(name) || !process.env[name]));
+      });
+      pi.events.emit(SECRET_REQUEST_CHANNEL, { envVars: missing });
+    });
+  };
+
+  const refreshOnDemand = async (ctx: ExtensionContext, providers: ProviderConfig[]) => {
+    // Published on the shared bus rather than setStatus(): context-bar owns the
+    // footer's status line with a full-width bar, and a setStatus() value here
+    // would be truncated off the end of it.
+    pi.events.emit("status-bar:text", { key: "local-models", text: "Refreshing models…" });
+    for (const provider of providers) onDemandRefresh.add(provider.id);
+    try {
+      const keyEnvVars = [
+        ...new Set(providers.map((p) => p.apiKeyEnv).filter((name): name is string => !!name)),
+      ];
+      if (keyEnvVars.length > 0) {
+        pi.events.emit("status-bar:text", { key: "local-models", text: "Unlocking 1Password…" });
+        const failedVars = await ensureSecrets(keyEnvVars);
+        pi.events.emit("status-bar:text", { key: "local-models", text: "Refreshing models…" });
+        if (failedVars.length > 0) {
+          ctx.ui.notify(
+            `Could not load ${failedVars.join(", ")} from 1Password — the refresh will likely ` +
+              "fail. Open 1Password and retry, or use /load-secrets.",
+            "warning",
+          );
         }
-        for (const provider of PROVIDERS) {
-          const error = result.errors.get(provider.id);
-          if (error) {
-            ctx.ui.notify(`${provider.label} model refresh failed: ${error.message}`, "error");
-          } else {
-            ctx.ui.notify(`Refreshed ${provider.label} models`, "info");
-          }
-        }
-      } catch (err) {
-        ctx.ui.notify(`Model refresh failed: ${(err as Error)?.message ?? err}`, "error");
-      } finally {
-        pi.events.emit("status-bar:text", { key: "local-models", text: "" });
       }
-    },
+      // Deferred providers are registered without refreshModels so pi never
+      // resolves their credential in the background; this is the moment they
+      // become refreshable — the secret is loaded (or the load failed, in
+      // which case pi/us report it honestly) — so hand over the hook and let
+      // the refresh below reach them.
+      for (const provider of providers) {
+        if (provider.deferred) registerProvider(provider, { withRefresh: true });
+      }
+      const result = await ctx.modelRegistry.refresh({
+        allowNetwork: true,
+        force: true,
+        providers: providers.map((p) => p.id),
+        signal: AbortSignal.timeout(MANUAL_REFRESH_TIMEOUT_MS),
+      });
+      if (result.aborted) {
+        ctx.ui.notify("Model refresh timed out", "error");
+        return;
+      }
+      for (const provider of providers) {
+        const error = result.errors.get(provider.id);
+        if (error) {
+          ctx.ui.notify(`${provider.label} model refresh failed: ${error.message}`, "error");
+        } else {
+          const count = lastDiscovered.get(provider.id)?.length ?? 0;
+          ctx.ui.notify(`Refreshed ${provider.label} models (${count})`, "info");
+        }
+      }
+    } catch (err) {
+      ctx.ui.notify(`Model refresh failed: ${(err as Error)?.message ?? err}`, "error");
+    } finally {
+      // One request is one permission: drop it so the next background refresh
+      // goes back to serving rpi from cache.
+      for (const provider of providers) onDemandRefresh.delete(provider.id);
+      pi.events.emit("status-bar:text", { key: "local-models", text: "" });
+    }
+  };
+
+  pi.registerCommand("refresh-local-models", {
+    description: "Re-discover models from the local API and (on demand) from rpi",
+    handler: async (_args, ctx) => refreshOnDemand(ctx, PROVIDERS),
+  });
+
+  pi.registerCommand("refresh-rpi-models", {
+    description: "Fetch the rpi model catalog (deferred at startup and in background refreshes)",
+    handler: async (_args, ctx) =>
+      refreshOnDemand(ctx, PROVIDERS.filter((provider) => provider.deferred)),
   });
 }

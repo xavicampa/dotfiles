@@ -16,7 +16,9 @@ export default function (pi: ExtensionAPI) {
   ];
 
   type State = "pending" | "loaded" | "failed";
-  type LoadResult = { label: string; ok: boolean; reason?: string; cancelled?: boolean };
+  /** One `op read` outcome, before the secret it belongs to is attached. */
+  type LoadOutcome = { label: string; ok: boolean; reason?: string; cancelled?: boolean };
+  type LoadResult = LoadOutcome & { envVar: string };
   const state = new Map<string, State>();
   const loading = new Map<string, Promise<LoadResult>>();
   /** When each secret last failed, so the automatic path can back off. */
@@ -52,11 +54,18 @@ export default function (pi: ExtensionAPI) {
 
   function notify(ctx: Context, message: string, level: "info" | "warning" | "error"): void {
     try {
-      ctx.ui.notify(message, level);
+      ctx.ui?.notify(message, level);
     } catch {
       // No UI in print/JSON mode; a status message must never break a tool call.
     }
   }
+
+  /**
+   * Stand-in context for loads no handler owns (the event-bus path). No signal:
+   * there is no turn to cancel against, so the op read is bounded by
+   * OP_READ_TIMEOUT_MS alone. No ui: that path loads with silent: true.
+   */
+  const busCtx = { signal: undefined, ui: undefined } as unknown as Context;
 
   // Everything below runs through pi.exec (async spawn, no shell, honours timeout and the
   // turn's abort signal). execSync would freeze the whole Pi process — UI, other extensions,
@@ -81,11 +90,13 @@ export default function (pi: ExtensionAPI) {
     child.unref();
   }
 
-  async function doLoad(secret: Secret, ctx: Context): Promise<LoadResult> {
+  async function doLoad(secret: Secret, ctx: Context): Promise<LoadOutcome> {
     const { label, envVar, opPath } = secret;
     if (!(await is1PasswordRunning())) {
-      markFailed(envVar);
-      return { label, ok: false, reason: "1Password app not running" };
+      // Cold start: launch the app and let `op read` wait on its unlock prompt
+      // rather than failing the load outright. Nothing warms 1Password up in
+      // advance anymore, so every trigger path has to be able to start it.
+      await open1Password();
     }
     const res = await pi.exec("op", ["read", opPath], { timeout: OP_READ_TIMEOUT_MS, signal: ctx.signal });
     if (ctx.signal?.aborted) {
@@ -116,10 +127,11 @@ export default function (pi: ExtensionAPI) {
     const inFlight = loading.get(secret.envVar);
     if (inFlight) return inFlight; // join a running attempt, keeping its outcome and reason
     const p = doLoad(secret, ctx)
-      .catch((err: unknown): LoadResult => {
+      .catch((err: unknown): LoadOutcome => {
         markFailed(secret.envVar);
         return { label: secret.label, ok: false, reason: err instanceof Error ? err.message : String(err) };
       })
+      .then((outcome): LoadResult => ({ ...outcome, envVar: secret.envVar }))
       .finally(() => {
         if (loading.get(secret.envVar) === p) loading.delete(secret.envVar);
       });
@@ -127,25 +139,37 @@ export default function (pi: ExtensionAPI) {
     return p;
   }
 
-  async function loadSecrets(ctx: Context, envVars: string[], opts: { force?: boolean } = {}): Promise<void> {
+  /**
+   * @param opts.force retry immediately, ignoring the failure back-off — the
+   *   caller asked explicitly (/load-secrets, or a provider refresh).
+   * @param opts.silent skip notify(): the caller reports the outcome itself.
+   *   Used by the event-bus path, where the requesting extension owns the UI.
+   */
+  async function loadSecrets(
+    ctx: Context,
+    envVars: string[],
+    opts: { force?: boolean; silent?: boolean } = {},
+  ): Promise<LoadResult[]> {
     const now = Date.now();
     const wanted = SECRETS.filter((s) => envVars.includes(s.envVar)
       && state.get(s.envVar) !== "loaded"
       // Back off after a failure instead of retrying on every matching tool call: each attempt can
       // wait minutes on 1Password. /load-secrets passes force to retry right away.
       && (opts.force === true || !inCooldown(s.envVar, now)));
-    if (wanted.length === 0) return;
+    if (wanted.length === 0) return [];
     // Concurrent: several `op read` calls waiting on the app at once cost one wait, not several.
     const results = await Promise.all(wanted.map((s) => loadOne(s, ctx)));
     const settled = results.filter((r) => !r.cancelled);
-    if (settled.length === 0) return;
-    const failed = settled.filter((r) => !r.ok);
-    if (failed.length > 0) {
-      const details = failed.map((r) => (r.reason ? `${r.label}: ${r.reason}` : r.label)).join("; ");
-      notify(ctx, `Secret load failed — ${details}. Retry with /load-secrets.`, "error");
-      return;
+    if (!opts.silent && settled.length > 0) {
+      const failed = settled.filter((r) => !r.ok);
+      if (failed.length > 0) {
+        const details = failed.map((r) => (r.reason ? `${r.label}: ${r.reason}` : r.label)).join("; ");
+        notify(ctx, `Secret load failed — ${details}. Retry with /load-secrets.`, "error");
+      } else {
+        notify(ctx, `${settled.map((r) => r.label).join(", ")} loaded`, "info");
+      }
     }
-    notify(ctx, `${settled.map((r) => r.label).join(", ")} loaded`, "info");
+    return results;
   }
 
   async function forceReload(ctx: Context): Promise<void> {
@@ -156,19 +180,14 @@ export default function (pi: ExtensionAPI) {
     await loadSecrets(ctx, SECRETS.map((s) => s.envVar), { force: true });
   }
 
-  // Open 1Password on startup if not running, then start loading the provider
-  // keys pi needs before the first turn. Deliberately not awaited: op read can
-  // wait minutes on the 1Password prompt, and a session_start handler that
-  // blocks holds up startup for that long. The load runs in the background and
-  // reports through notify(); a cancelled attempt stays pending so the next
-  // session_start or /load-secrets retries without backoff.
-  pi.on("session_start", async (_event, ctx) => {
+  // Warm 1Password up on startup so the first load (triggered later by a
+  // matching tool call or by a provider refresh) does not also pay for the app
+  // launch. No secret is fetched here: the rpi provider catalog went on-demand
+  // (see local-model-discovery.ts), so nothing 1Password-backed is needed
+  // before the first turn. Not awaited — a cold app start must never hold up
+  // startup; doLoad also starts the app when a load arrives with it closed.
+  pi.on("session_start", async () => {
     await open1Password();
-    // The omniroute key backs a *provider* registered by
-    // .pi/agent/extensions/local-model-discovery.ts: pi resolves that provider's
-    // `$OMNIROUTE_API_KEY` when it refreshes models, which happens before any
-    // tool call, so no tool_trigger below can cover it. Kick it off at startup.
-    void loadSecrets(ctx, ["OMNIROUTE_API_KEY"]);
   });
 
   // On-demand via command (allows retry after failure)
@@ -197,5 +216,29 @@ export default function (pi: ExtensionAPI) {
       if (OMNIROUTE_CMD.test(cmd)) vars.push("OMNIROUTE_API_KEY");
       if (vars.length > 0) await loadSecrets(ctx, vars);
     }
+  });
+
+  // On-demand key requests from other extensions. pi's event bus is
+  // fire-and-forget — emit() returns void and handlers are never awaited — so
+  // the requester subscribes to the reply channel before it emits, and the
+  // answer comes back there once the loads settle.
+  //
+  // This is what replaced the startup load of OMNIROUTE_API_KEY: that key backs
+  // the deferred "rpi" provider in local-model-discovery.ts, whose registered
+  // api key is `$OMNIROUTE_API_KEY` — pi resolves it from process.env at
+  // refresh/request time, so the var only has to be filled when a refresh
+  // command actually runs. force: the request is always user-initiated, so a
+  // stale failure must not be swallowed by the back-off; silent: the requester
+  // reports the outcome in its own command UX.
+  pi.events.on("secrets:ensure", async (data) => {
+    const requested = (data as { envVars?: unknown } | undefined)?.envVars;
+    if (!Array.isArray(requested)) return;
+    const envVars = requested.filter((v): v is string => typeof v === "string");
+    if (envVars.length === 0) return;
+    const results = await loadSecrets(busCtx, envVars, { force: true, silent: true });
+    pi.events.emit("secrets:ensured", {
+      envVars,
+      failed: results.filter((r) => !r.ok).map((r) => ({ envVar: r.envVar, reason: r.reason })),
+    });
   });
 }
