@@ -11,10 +11,10 @@
     "--adapt-every": "1",
     "--adapt-swaps": "160",
     "--batch-mtp": "on",
-    "--conversation-cache-mib": "10240",
+    "--conversation-cache-mib": "6144",
     "--conversation-cache-min-tokens": "256",
     "--conversation-cache-park-gain": "2048",
-    "--conversation-cache-slots": "10",
+    "--conversation-cache-slots": "6",
     "--kv-resident": "20480",
     "--layer-split": "32",
     "--pcie-frac": "0.00",
@@ -24,7 +24,7 @@
     "--spec-min-p": "0.70",
     "--trim-stage-weights": "on",
     "--vram-reserve-later-mib": "1024",
-    "--vram-reserve-mib": "1024"
+    "--vram-reserve-mib": "1280"
   },
   "family": "qwen",
   "gpu_roles": null,
@@ -33,7 +33,7 @@
     1
   ],
   "kv": "int8",
-  "last_used": "2026-10-27 11:10:09.255639",
+  "last_used": "2026-10-27 12:29:51.080487",
   "model": "IQ3_S",
   "model_path": "/data/gguf/IQ3_S",
   "mtp": null,

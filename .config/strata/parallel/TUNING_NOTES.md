@@ -177,6 +177,59 @@ The consumer that decides how many streams arrive is `~/.pi/agent/extensions/sub
 - Workflow scripts may pass their own `globalConcurrencyLimit` per call (workflow-only, not forwarded to child
   calls) — a script asking for 8 lanes oversubscribes the engine. Pass ≤ 3 explicitly.
 
+## VRAM margin + conversation-cache sizing (2026-10-27 ~13:20, **saved, needs one engine start**)
+
+Log review of the live load (12:50-13:05, 69 proxy requests, all 200, zero 429s, max 6 in flight vs
+`admission_limit 7` — the 4+3 bound never engaged). Two findings became these two edits:
+
+1. **`--vram-reserve-mib` 1024 -> 1280** (preset `extra`; `--vram-reserve-later-mib` left at 1024). The WARNING
+   this boot: `only 505-509 MiB of VRAM free at the start of this request (below 512 MiB) … decode falls to a few
+   tok/s and a window may never finish (#2065). Add --vram-reserve-mib 1088 …`. Sizing it from the log rather than
+   from instinct — dip = (free with everything loaded) − (the number in the warning), per boot:
+
+   | batch | free w/ everything loaded | warnings | worst dip | free needed for the 512 guard |
+   |---|---|---|---|---|
+   | 4 (now) | 667 / 998 | 3 (505-509) | **162 MiB** | 674 → we were **7 MiB short** |
+   | 5 (old) | 665 / 708 | 7 (to 247) | 418 MiB | — |
+   | 3 (old) | 246-869 | 28 | 23 MiB | — |
+
+   So +256 MiB is the answer: free goes 667 → ~923, i.e. 411 MiB above the guard, enough to swallow even the
+   418 MiB dip the 5-slot setup produced. **1536 (+512) was excessive and was walked back** — that margin has never
+   been used, and the flag is setup's "VRAM kept free for other programs: the experts' share is set lower"
+   (`setup.py:7500`), so margin is bought with expert residency: CUDA0's arena is 9.72 GiB / 5270 slots = 1.88 MiB
+   per slot, so +256 MiB ≈ 136 slots (2.6%), where +512 was ~272 (5.2%) against a hit rate already at 70.6%. The
+   engine's own suggested 1088 (+64) clears the one request it measured with only 57 MiB to spare — too thin.
+   Deliberately **not** raised on `--vram-reserve-later-mib`: CUDA1's arena is the tuned win (8192 of its 8192
+   profiled pairs resident), and shrinking it is a decode cost, not a margin.
+   **Check at the next boot:** CUDA0 free should go up ~256 MiB (667 -> ~923) and CUDA1 must keep
+   `8192 of its 8192 profiled pairs` + ~998 MiB free. If CUDA1's residency drops, the flag reached the wrong card —
+   revert the preset value (one line).
+2. **`--conversation-cache-mib` 10240 -> 6144 and `--conversation-cache-slots` 10 -> 6** (both the run config args
+   and the preset `extra`, kept identical so nothing disagrees). The cache was **RAM-admission bound**, not
+   budget-bound: 10 `skip parking (physical RAM admission; need 1328 MiB plus 2560 MiB floor, 3885 MiB available …
+   evicted 7, 0 still parked)` in 15 min, 23 this boot, 208 cumulative evictions, and the parked count rode to the
+   10-slot ceiling then collapsed — 28 sawtooth flushes in 347 requests. `MemAvailable` is ~4.5 GiB (engine RSS
+   50.6 GiB of 62, Shmem 40.5 GiB = 27.66 GiB expert RAM tier + parked snapshots at ~0.92 GiB per 45-50k-token
+   conversation; swap 2.6 GiB used, PSI 0.00), so a 10 GiB budget over 10 slots can never fill and admission
+   flushes the whole cache instead of evicting LRU. Cost measured: **545k cold tokens = 297 s of prefill** in that
+   window (191.5 s of it in one 15-request stretch), including three fully cold prefills of 95-114k tokens at
+   ~1.9-2.1k tok/s = 152 s; reuse 80.7% vs 90.6% the previous window, recovering to 98.8% as the cache refilled.
+   6144 MiB / ~1 GiB per snapshot = 6 conversations, and 6 also covers the real session count (4 slots + 3 queued,
+   and Pi is 4 conversations). Engine default is 4 slots / up-to-8192 MiB (`--help`), so 6/6144 is mid-range, not exotic.
+   Left alone: `--conversation-cache-min-free-mib` (the 2560 MiB floor is the safety, and lowering it trades evictions
+   for swap).
+
+Backups: `strata-iq3_s.json.bak-pre-cc-cache`, `strata/launch-presets/docker.json.bak-pre-cc-cache`.
+Verified by dry-running the launcher in the container (`derive_config(install config, preset)`):
+`--vram-reserve-mib 1280`, `--vram-reserve-later-mib 1024`, `--conversation-cache-mib 6144`,
+`--conversation-cache-slots 6`, 29 engine flags intact, `max_queue 3 / queue_timeout 90` still carried.
+
+**These need a real start, not a runtime restart:** `strata runtime restart --plan` says `changed: false` because it
+diffs the profile revision and the sha256 of the *derived* state file, and the tree edits are only re-derived by
+`strata launch` at start. A plain container restart applies all of it — including `--parallel 4` and the queue
+bound — with nothing to re-apply. Re-measure afterwards with `python3 /tmp/logscan.py 75` (reuse %, cold-prefill
+seconds, skip-parking count, parked series).
+
 ## batch 4 + queue back-pressure (2026-10-27, **LIVE** — `--batch 4`, `max_queue 3`, `queue_timeout 90`)
 
 ### Where each setting lives — declarative (2026-10-27; supersedes the CLI recipe I used first)
