@@ -429,6 +429,53 @@ in
           };
         };
 
+        # Strata: Qwen3.8-Flash-Next Coder (expert-pruned), 4-slot batch on 5801 — NOTES.md § llama-swap/strata-coder
+        "qwen3.8-flash-next-coder-iq1_m-parallel" = {
+          # FAMILY+MODEL are family+size, not a path; the blob mounts use fam["file"] verbatim;
+          # the /nix/store mount gives the image's nvidia-smi its loader — NOTES.md § llama-swap/strata-coder.
+          # Tuning (layer-split, kv-resident, conversation cache) lives in the mounted preset and
+          # ~/.config/strata/coder/TUNING_NOTES.md, never here.
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            --network host
+            --device nvidia.com/gpu=all
+            --ulimit memlock=-1
+            --cgroup-conf memory.swap.max=0
+            --shm-size 2g
+            --stop-timeout 120
+            --pull newer
+            -v strata-data:/data
+            -v /nix/store:/nix/store:ro
+            -v /home/javi/.config/strata/coder:/data/install
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF/blobs/bfa3644db4adfff072fc946c20994f2909d2cf89879d83f80a4c811d4016c211:/data/gguf/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF/blobs/316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113:/data/gguf/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf:ro
+            -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF/blobs/b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0:/data/gguf/coder-IQ1_M/mmproj-Qwen3.8-Flash-Next-BF16.gguf:ro
+            -e XDG_CONFIG_HOME=/data/install
+            -e MODEL_PATH=/data/gguf/coder-IQ1_M
+            -e MODEL=IQ1_M
+            -e FAMILY=coder
+            -e PARALLEL=4
+            -e PORT=''${PORT}
+            -e STRATA_PF_FUSED=1
+            -e STRATA_ADAPT_LAG=2
+            -e STRATA_EXCHANGE_ROTATE=1
+            -e STRATA_SPLIT_RING=384
+            ghcr.io/niko1221/strata:latest-cuda13
+          '';
+          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
+          checkEndpoint = "/health";
+          ttl = 0;
+          # so clients that name the HF repo get this backend (includeAliasesInList is on)
+          aliases = [ "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF:IQ1_M" ];
+          capabilities = {
+            # must equal the preset's --max-context (131072, not the parallel tree's 98304) + Pi contextWindow — NOTES.md § llama-swap/strata-coder
+            context = 131072;
+            "in" = [ "text" "image" ];
+            out = [ "text" ];
+            tools = true;
+          };
+        };
+
         # Maya: GLM-5.3-Flash MoE, images built locally; model bytes stay in /hf-cache — NOTES.md § llama-swap/maya
         "glm-5.3-flash-maya-s24" = {
           cmd = ''
@@ -498,6 +545,7 @@ in
             members = [
               "qwen3.8-flash-next-iq3_s"
               "qwen3.8-flash-next-iq3_s-parallel"
+              "qwen3.8-flash-next-coder-iq1_m-parallel"
               "glm-5.3-flash-maya-s24"
               # "bartowski/Qwen3.8-27B-GGUF:Q8_0" # parked
             ];
@@ -513,7 +561,7 @@ in
       # 4 streams = 179.3 agg / 45.0 per stream, 5 = 150.2); pi-subagents caps children at 3, so
       # 3 children + this session = the 4 slots. Only one entry: the exclusive gpu group evicts
       # whatever else it preloads.
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
     };
   };
 

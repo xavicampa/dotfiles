@@ -667,7 +667,8 @@ What that wiring learned, kept because the facts are the engine's, not swift's:
   parallel entry keeps that collision and separates the *directory* instead.
 - **A fine-tune of the same weights shares the MTP draft and the shipped expert profile**: setup
   builds `mtp/rt` from the original Qwen checkpoint for every family (`setup.py:8737-8745`) and
-  only `coder` overrides the profile (`"profile": "expert-profile-coder.bin"`, `setup.py:585`).
+  only `coder` overrides the profile (`"profile": "expert-profile-coder.bin"`, `setup.py:592` in engine 0.1.52
+  — the family entry starts at 586; it was 585 on 0.1.48).
 - **`--expert-profile-save` had quietly left `docker.json` and `docker-p3.json`** — it lived in
   `user_args`, which every setup run empties, while the launcher re-saves the preset on each
   start; `profile-learned.bin` stopped changing at 2026-10-24 22:53 while both entries kept
@@ -875,6 +876,82 @@ through the page cache — RAM where they fit, NVMe otherwise). Image from
   65536 and the `CONTEXT` env) — keep the two in step; the pack and the config are
   written at setup time with it. The vision tower runs on GPU 0 beside the model
   (`in: [text, image]`); tools = OpenAI + Anthropic tool calls.
+
+### llama-swap/strata-coder — `qwen3.8-flash-next-coder-iq1_m-parallel` (wired 2026-10-28)
+
+Third Strata backend: `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF`, the expert-**pruned** coding
+build of the same family (256 of 512 routed experts per layer survive). Install tree
+`~/.config/strata/coder/`, forked from `parallel/` (§ llama-swap/strata-parallel — where each serving setting
+lives); **port 5801**, which only overlaps the retired 1slot engine, so it never coexists with anything
+holding GPU memory. It shares the exclusive GPU group, so llama-swap will not run it alongside iq3_s or Maya.
+
+> **Tuning numbers live in the tree, not here:** `~/.config/strata/coder/TUNING_NOTES.md` carries the model shape,
+> the layer-split and kv-resident arithmetic with the measured ladder, the conversation-cache sizing, the
+> boot checklist and the failure-mode table. This section covers the **entry** — env, mounts, advertised
+> capabilities, and the store mount that makes the model installable at all.
+
+- **`-e FAMILY=coder -e MODEL=IQ1_M` — `MODEL` is a SIZE, not a name or path.** A repo's short name is not
+  a valid `MODEL`: family+size resolve against `setup.py:570`'s `FAMILIES` table (the coder entry sits at
+  `setup.py:586`), and `IQ1_M` is the only size coder offers — `setup.py:420` spells it out:
+  `"IQ1_M": {"about": "the Coder's only size: half the experts, stored like IQ3_S (3.5 bits)", "download_gb": 58.4}`,
+  with the two shard names and hashes pinned just above it (`setup.py:398-402`). `tag_of()` = `fam["tag"] + model`, which names the run config
+  (`strata-coder-iq1_m.json`), the pack (**`packs/coder-iq1_m`**, so coder cannot reuse or clobber the base
+  model's `packs/iq3_s` — 1.5 GB per pack, one per quant), and the model folder. A family the table does not
+  know dies before setup starts: `strata-setup failed (rc=1)` with nothing in the log.
+- **`MODEL_PATH=/data/gguf/coder-IQ1_M` and the three blob mounts use `fam["file"]` verbatim** —
+  `Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf`, `…-00002-of-00002.gguf`,
+  `mmproj-Qwen3.8-Flash-Next-BF16.gguf`. **There is no "Coder" in those names.** Rename the files and setup
+  reports "the model folder you pointed at is empty" and re-downloads the 58.4 GB pair. Shard 1 is **29.6 GB** (the pruned
+  expert mass, vs IQ3_S's 54.8 GB: IQ4_NL 9.2 vs 18.4, IQ3_XXS 5.5 vs 10.9) — that ~25 GB is what lets 4 × 128k
+  conversations fit in RAM (§ parallel/TUNING_NOTES.md § the RAM wall: ~3.5 GiB per 128k slot, engine HWM
+  55.9 of 62.3 GiB). Shard 2 (**28.8 GB**, the n-gram PLE table) and the mmproj are the base model's own files,
+  mounted from the same blob hashes as the `-parallel` entry.
+- **`--max-context 131072` here, unlike the parallel tree's 98304.** Four places have to agree — preset
+  `extra` (the layer that reaches argv), preset `"context"` (the reuse check only), `capabilities.context`
+  below (llama-swap advertises `context_window` / `n_ctx`), and Pi's `modelOverrides[…].contextWindow` in
+  `~/.pi/agent/models.json` (Pi does not discover the engine's context; unset means 128000). The engine arg
+  is the only one the server obeys; the rest are agreements or advertisements. § TUNING_NOTES.md § kv-resident
+  has the budget arithmetic for why 131072 of *context* is fine while 131072 of *kv-residency* is not.
+- **`--pcie-frac 0.20`** instead of that tree's `0.00` — the streaming-headroom default, which is right for
+  coder. The 1slot engine measured `pcie_share ~0.000-0.011` at expert hit rates in the high 90s, and
+  **PCIe is not the limiter here at any frac** (measured: 12.44 ms streamed of a 4500 ms request, hit rate 91%,
+  share 0.0027 at frac 0.05). CUDA1's card is `00:06.1` behind an **x4** bridge (`max_link_width = 4`, 6.6 GB/s
+  usable of the slot's 19.7) and cannot be raised without changing upstreams. What `frac` decides is *where*
+  experts land; the miss cost is asymmetric (26.7 vs 6.6 GB/s, ×4.07), which is the reason the layer split is
+  biased toward CUDA0 (§ TUNING_NOTES.md § Layer split).
+- **The run config's `--expert-profile` is `expert-profile-coder.bin`** (`fam["profile"]`), not the shipped
+  base profile: the base profile mispredicts coder's routing, and the whole residency picture (12288 pairs,
+  6912/5376 per card) is read off that file.
+- **`-v /nix/store:/nix/store:ro` — without it the model is not installable at all.** The image ships
+  `nvidia-smi` copied off a NixOS host, so its `PT_INTERP` is
+  `/nix/store/pqyiidz5mi73wv5f91d48s9plcqyj5bz-glibc-2.44-57/lib/ld-linux-x86-64.so.2`; that path is absent
+  inside the container, `execve` fails with **ENOENT**, and `setup.py:9099` concludes "no NVIDIA GPU found
+  (nvidia-smi did not answer)". The launcher then takes the adopt path — `launch/runner.py:1233`
+  `adopt_prepared_files` — which raises "the files Strata would need to write the settings itself are not all
+  there" at `runner.py:1256` with exit 5. Packs are **downloaded** by setup, never built by the Terminal: the
+  manifest entries in `setup.py` (279-292) name `pack/dense.bin`, `pack/index.txt` and
+  `pack/native_experts.txt` with byte sizes and sha256. Mounting
+  the store read-only gives the loader back: `nvidia-smi` answers both cards (5070 Ti 16303 MiB / 3090 Ti
+  24564 MiB, driver 615.78.08), setup runs its GPU fit, and `packs/coder-iq1_m` is prepared on first start.
+  Verify once with `podman run --rm --entrypoint '' /bin/sh -c 'readelf -lW /usr/bin/nvidia-smi | grep INTERP'`.
+  - **Deliberately NOT added to the two iq3_s entries**: their starts never reach the GPU fit (they short-circuit
+    on an existing pack + run config, "qwen IQ3_S is already installed with these choices"), and letting setup
+    size cards it has never sized before could walk the tuned `layer-split` / `kv-resident` / conversation-cache
+    choices those trees have accumulated. Add it there only on purpose.
+- **`user_args` shadowing is a hazard for the *entry* too**, because the entry's env is the only layer that
+  cannot drift: `--parallel` comes from `-e PARALLEL=4`, which overrides the preset at start *and* writes it back
+  (`--save-preset`). The conversation-cache flags live in both the preset and the run config's persisted
+  `user_args`, and the latter is appended last (§ TUNING_NOTES.md § Where each setting lives) — editing only the
+  preset is silently ignored for those flags. Observed live 2026-10-28: preset said 8192 / 10 / 4096, start logged
+  6144 / 6 / 256; the same preset edit *did* move `--kv-resident` and `--layer-split` (absent from `user_args`).
+- **Verified live 2026-10-28** (preset at `layer-split 21`, `kv-resident 86016`, conv-cache 8192 / 10 / 4096): argv
+  `--kv-resident 86016 --layer-split 21 --max-context 131072 --pcie-frac 0.20 --batch 4 --parallel 4 --port 5801
+  --conversation-cache-mib 8192 --conversation-cache-slots 10 --conversation-cache-min-tokens 4096`;
+  `layer split: 100% of the experts resident`, `expert_slots 12288` / `expert_slots_primary 5376`, free
+  **675 / 1343 MiB** (`nvidia-smi` 626 / 1258 after window capture), no `- LOW`, RAM 31.1 of 62.3 GiB,
+  `KV streaming: 86016 of 131072`. Config hash for the whole system was unchanged by these edits (`agf6264v…`):
+  tuning lives in the bind-mounted preset, so a `podman restart` is enough — a `capabilities.*`, env or mount
+  change is not.
 
 ### llama-swap/llamacpp — PARKED 2026-10-20
 
