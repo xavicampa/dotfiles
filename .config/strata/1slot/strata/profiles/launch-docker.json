@@ -2,7 +2,7 @@
   "id": "launch-docker",
   "overrides": {
     "host": "0.0.0.0",
-    "port": 5801
+    "port": 5802
   },
   "schema_version": 1,
   "source_config": "/data/state/strata/launch/docker.json"
