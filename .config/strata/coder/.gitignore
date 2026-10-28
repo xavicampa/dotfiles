@@ -1,0 +1,36 @@
+# Choices only, same rules as ../parallel/.gitignore restated per directory.
+# coder is the batch (4-slot) Strata install bound as /data/install by
+# qwen3.8-flash-next-coder-iq1_m-parallel, copied from parallel/ on 2026-10-28; the
+# engine writes into it the same way, so only the choices are tracked: run config
+# (strata-coder-iq1_m.json), launch preset, profile, strata-vision.
+
+# setup.py's safety copies of the run config
+strata-*.json.bak*
+
+# Hand backups taken at the tree root before a notes/gitignore edit
+/*.bak*
+
+# Bytecode from bench scripts run here
+__pycache__/
+
+# The engine's log: the run config carries "log": /data/install/strata-<model>.log
+strata-*.log
+
+# Written by the image's setup pass: a symlink into the image's own seed tree
+third_party/
+
+# The web app's per-profile bookkeeping (flock files, .history/, .ops/). The
+# <name>.json profiles themselves stay in.
+strata/profiles/.*
+
+# Safety copies taken by hand before a preset or profile edit
+strata/launch-presets/*.bak*
+strata/profiles/*.bak*
+
+# Measurements, not choices: calibration backups and `strata tune` results are
+# keyed to the engine build they were measured against
+.strata-calibration-backups/
+strata/presets/
+
+# Host Strata and the container each rewrite data_dir/installs to their own paths
+strata/settings.json
