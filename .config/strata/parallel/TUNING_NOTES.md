@@ -177,7 +177,7 @@ The consumer that decides how many streams arrive is `~/.pi/agent/extensions/sub
 - Workflow scripts may pass their own `globalConcurrencyLimit` per call (workflow-only, not forwarded to child
   calls) — a script asking for 8 lanes oversubscribes the engine. Pass ≤ 3 explicitly.
 
-## VRAM margin + conversation-cache sizing (2026-10-27 ~13:20, **saved, needs one engine start**)
+## VRAM margin + conversation-cache sizing (2026-10-27 ~13:20, **LIVE since the 13:29 restart**; superseded on context/floor by § the RAM wall)
 
 Log review of the live load (12:50-13:05, 69 proxy requests, all 200, zero 429s, max 6 in flight vs
 `admission_limit 7` — the 4+3 bound never engaged). Two findings became these two edits:
@@ -229,6 +229,101 @@ diffs the profile revision and the sha256 of the *derived* state file, and the t
 `strata launch` at start. A plain container restart applies all of it — including `--parallel 4` and the queue
 bound — with nothing to re-apply. Re-measure afterwards with `python3 /tmp/logscan.py 75` (reuse %, cold-prefill
 seconds, skip-parking count, parked series).
+
+## Post-restart verification + a silent engine bump (2026-10-27 ~21:57, live)
+
+The switch recreated the container and `--pull newer` brought **engine 0.1.52** (was 0.1.48 for the whole tuning
+history in this file). All 30 tuned flags parsed, no unknown/deprecated warnings, no WARNING/ERROR lines in the boot
+or the ~60 requests since. Boot checklist, new numbers:
+
+| line | 0.1.48 @ reserve 1024 | 0.1.48 @ reserve 1280 | **0.1.52 @ 1280 + ctx 98304** |
+|---|---|---|---|
+| CUDA0 expert cache | 5270 / 9.72 GiB | 5134 / 9.47 GiB | **5226 / 9.64 GiB** |
+| CUDA1 expert cache | 8192 / 16.52, 8192 of 8192 pairs | same | **unchanged** |
+| slot sessions CUDA0 | 0.40 GiB each, 1.61 total | 0.40 / 1.61 | **0.36 / 1.45** (context cap) |
+| KV resident | 20480 of 131072 cells, 1.03 GiB pinned | same | **20480 of 98304, 0.77 GiB pinned** |
+| conv-cache RAM floor | 2560 (default) | 2560 | **1536** (memory guard line says `floor 1536 MiB`) |
+| free at boot | 667 / 998 MiB | 925 / 998 | **922 / 1108** (live under load 839 / 1019) |
+
+Measured over the 60 requests after the restart, against the 100 before it — this is the payoff for the context cap +
+floor change, and it is bigger than expected:
+
+    reuse            80.8% -> **95.9%**   (cold tokens 1,085,439 -> 147,644)
+    KV VRAM hit med  56.5% -> **96.8%**
+    decode tok/s med 72.2  -> **117.3**   (max 153.7)
+    expert hit med   68.8% -> **80.5%**
+    conversation cache: parked 2, **evictions 0**, skips 1 (53 tokens, below the 256 minimum - benign)
+      the parked series no longer wipes to zero: [1,2] vs [1,2,3,4,5,1,2,3,4,5,1,2,3,4] before
+    drafts accepted 82.1%; MemAvailable 3.8 -> **12 GiB**; WARN/ERROR 0; 58 requests, all 200,
+      peak overlap 4, no 429, telemetry `admission_limit 7 / queue_timeouts 0`
+    llama-swap `/v1/models` now advertises `context_window: 98304` for this model (nix `capabilities.context` live)
+
+Watch items, not fixes: **major faults 4 -> 336** in the window (expert mmap page-cache pressure; OS MB read med
+141 -> 127, so it is faults not volume), and CUDA0 now sits 327 MiB above the 512 guard instead of the 411 the
+reserve change was sized for — the new engine fits 92 more slots than the old one at the same reserve. Observed
+dips since boot are small (922 -> 839 under load, verify windows 922 -> 912). If a CUDA0 `only N MiB of VRAM free`
+warning appears, the fix is `--vram-reserve-mib 1408`, not a batch change.
+
+**Hazard worth deciding on:** `--pull newer` in the nix cmd means the engine can change under a rebuild, and it just
+did — every number in this file was measured on 0.1.48. Nothing broke, but a re-run of the steady-state curve
+(`bench-cc-curve.py`) and `parallel-overload-v1` on 0.1.52 is worth doing before trusting old margins; and if
+reproducibility matters more than free upgrades, pin the image by digest.
+
+
+
+## 4 x 100k conversations: the RAM wall, and the context cap (2026-10-27 ~15:10, **LIVE since the 21:57 restart** — measurements above)
+
+A second parallel review (this one with 60-100k-token conversations, `prompt med 63,676`, `max 101,297`) broke the
+conversation cache again, and the numbers say my 6144/6 sizing was wrong for this shape:
+
+    skip parking (physical RAM admission; need 1355-2257 MiB plus 2560 MiB floor, 3598-4495 MiB available,
+      source meminfo; evicted 0-4, 0 still parked)        x10 in 80 request blocks
+    parked series: 4,5,1,2,3,4,5,6, 1,2,3,4, 1,2,3,4, 1,2,3,4     <- rebuilt, wiped, rebuilt, wiped
+    prompt 100544 cold 100544 prefill 47.3 s      prompt 96545 cold 96545 prefill 48.8 s
+    (the four 98-101k requests that stayed warm: cold 1, prefill 0.4 s)
+
+**Snapshot cost scales with conversation size, not slot count.** `park tokens med 58,913` -> **1.4-2.3 GiB per
+snapshot**, so 6 slots x ~2 GiB = 12 GiB of demand against `MemAvailable ~4.0 GiB - 2560 MiB floor = ~1.4 GiB` of
+real headroom: at most ONE big snapshot fits, and the engine flushed the whole cache instead of evicting LRU. The
+0.92 GiB I sized from earlier assumed ~45-50k conversations. Reuse fell to 85.4% (716k cold tokens) from 87.7%.
+
+Underneath it, RAM is structurally oversubscribed at 4 x 128k: `Shmem 43.2 GiB` (expert RAM tier 27.9 GiB + pinned
+KV + snapshots ~ 15 GiB, i.e. ~3.5 GiB per 128k slot), engine RSS 52.3 GiB (HWM 55.9) of 62.3 GiB, MemAvailable
+3.8 GiB, swap 1.4 GiB used, memory PSI avg10 0.00 (admission control is refusing correctly, nothing is stalling).
+VRAM follows the same pressure: free 662 / 616 MiB (CUDA1 only 104 MiB over the 512 guard), KV VRAM hit 59.1%
+median (was 98%) with 23.5 GiB of KV streamed from RAM in one request, KV copy-in 207 ms med / 579 max.
+
+**Applied (three layers, one truth): `--conversation-cache-min-free-mib 1536` (new; engine default 2560) and
+`--max-context 131072 -> 98304`** — the context cap goes in the run-config args, the preset `extra` (the layer that
+wins; `apply_to_argv` deletes the base flag so the derived argv carries it exactly once) **and** the preset
+`"context"` (never reaches argv, but it is the reuse-test half — mismatch it and setup rewrites the run config).
+The floor change buys ~1 GiB of usable parking headroom - enough for one big snapshot plus a mid-size one - with
+swap 30 GiB free and PSI 0.00 as the safety net. The context cap is the engine's
+own advice (`lower --max-context / --batch`) and attacks both walls at once: pinned KV and snapshots shrink ~25%
+(~3-4 GiB back) and CUDA1's margin stops shrinking. Not applied: cache slots/budget (still 6/6144 - with the floor
+lowered and the context capped, ~1-2 snapshots is the real capacity and LRU now governs it), and
+`--vram-reserve-later-mib` (raising it would drop CUDA1 below its 8192 profiled pairs; no CUDA1 warning has fired).
+
+**Two more places carry the same number, and neither is an engine arg:** llama-swap's
+`capabilities.context = 98304` in `configuration.nix` (it is advertised as `context_window`/`n_ctx`; it was still
+131072, so the router promised a context the engine would refuse — needs a nix switch), and pi's
+`modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304` (pi defaults to **128000** when unset,
+which is why 101k prompts went through; with 98304 + default `reserveTokens 16384` compaction starts at 81,920).
+
+**Pi had to move with it.** `~/.pi/agent/models.json` -> `modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304`.
+Pi does not discover the engine's context: unset means the documented default **128000**, so capping only the engine
+would have Pi sending 110-120k prompts into a 98304 engine (400s). With `contextWindow 98304` and the default
+`reserveTokens 16384`, Pi auto-compacts above **81,920** tokens. Takes effect at the next pi start - this session
+still carries 128000, so a manual `/compact` may be needed after the restart.
+
+Backups: `strata-iq3_s.json.bak-pre-ctx98k`, `strata/launch-presets/docker.json.bak-pre-ctx98k`,
+`~/.pi/agent/models.json.bak-pre-ctx98k`. Verified by dry-running `derive_config` against **both** bases (installed
+run config and the state file): 30 engine flags, `--max-context x1 = 98304`,
+`--conversation-cache-min-free-mib 1536`, cache 6144/6, reserve 1280/1024, `max_queue 3 / queue_timeout 90`.
+
+**Careless-mistake note (mine):** editing the args array, `args.index('--max-context')` is the *flag* index; I wrote
+the new value over the flag name and left `131072` orphaned. The derive dry-run caught it (`--max-context (absent)`);
+restored from `bak-pre-ctx98k` and re-applied at index+1. Always dry-run `derive_config` after touching args.
 
 ## batch 4 + queue back-pressure (2026-10-27, **LIVE** — `--batch 4`, `max_queue 3`, `queue_timeout 90`)
 
