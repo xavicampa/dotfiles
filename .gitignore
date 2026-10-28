@@ -2,8 +2,10 @@
 .DS_Store
 *.swp
 
-# --- DMS / Hyprland generated artifacts (derived from .config/DankMaterialShell/settings.json) ---
+# --- DMS / Hyprland generated artifacts (derived from .config/dms/settings.json) ---
 # These are all re-derived by DMS from the tracked settings.json, so they are noise.
+# DMS 2.0 (2026-10-28) moved user config/state/cache from `DankMaterialShell` to `dms`, leaving
+# the old names as symlinks; the rules below were re-pointed to the new path the same day.
 .config/hypr/dms/binds.lua
 .config/hypr/dms/colors.lua
 .config/hypr/dms/layout.lua
@@ -13,15 +15,17 @@
 
 # EXCEPTION — do NOT ignore .config/hypr/dms/outputs.lua: DMS's Settings -> Displays
 # page writes monitor mode/position/scale/VRR only there (and in the untracked
-# ~/.local/state/DankMaterialShell/session.json under hyprlandOutputSettings), never
+# ~/.local/state/dms/session.json under hyprlandOutputSettings), never
 # in settings.json. It is the only durable, source-controllable record of the display
 # scale (HDMI-A-1 scale = 1.3333). hyprland.lua require()s it behind a hostname guard
 # (HOST == "homepc") because this generated file is per-host — expect a dirty diff
 # whenever displays are reconfigured, and commit it from the host it belongs to.
-.config/DankMaterialShell/firefox.css
-.config/DankMaterialShell/settings.json.bak*
-.config/DankMaterialShell/.changelog-*
-.config/DankMaterialShell/.firstlaunch
+.config/dms/firefox.css
+.config/dms/settings.json.bak*
+.config/dms/.changelog-*
+.config/dms/.firstlaunch
+# the compat symlink DMS 2.0 leaves behind (DankMaterialShell -> dms), not a directory any more
+.config/DankMaterialShell
 .config/hypr/hyprland.lua.bak
 .config/hypr/hyprland.lua.backup*
 .config/hypr/.dms-backups/
@@ -46,11 +50,11 @@
 *.bak.*
 
 # Installed registry themes (Settings -> Browse Themes / `dms theme install`) are reproducible from the
-# registries in .config/DankMaterialShell/registries.json, and each card preview now embeds the theme's
+# registries in .config/dms/registries.json, and each card preview now embeds the theme's
 # screenshot (~20 KB per theme), so this is generated state, not configuration. Untracked 2026-10-24;
 # the files stay on disk. Recreate: dms registry add omarchy ~/dev/personal/dms-omarchy-themes and
 # install from Browse Themes, or python3 ~/dev/personal/dms-omarchy-themes/tool/install_local.py <slug>.
-.config/DankMaterialShell/themes/
+.config/dms/themes/
 
 # ============================================================================
 # Secrets, app state and personal data — MIGRATED OUT OF .dotfiles/info/exclude
