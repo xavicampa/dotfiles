@@ -40,6 +40,7 @@
           }
         },
         "qwen3.8-flash-next-iq3_s-parallel": {
+          "contextWindow": 98304,
           "thinkingLevelMap": {
             "minimal": null,
             "low": "low",
