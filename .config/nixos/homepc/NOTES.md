@@ -26,18 +26,68 @@ Index: [hardware](#hardware) · [wifi-firmware](#wifi-firmware) · [boot](#boot)
 - **`package = unstable.linuxPackages_6_18.nvidiaPackages.latest`** — the kernel *and*
   the driver must come from the **same `linuxPackages` set**; mixing them once failed
   with "inconsistent kernel versions" in the modules aggregator (that is also why
-  `boot.kernelPackages` is the same expression). This pins **6.18.53 LTS + nvidia
-  615.71.09 / CUDA 13.4**, both prebuilt on `cache.nixos.org`. The nixos-26.05 channel
+  `boot.kernelPackages` is the same expression). It pinned **6.18.53 LTS + nvidia
+  615.71.09 / CUDA 13.4** when written, both prebuilt on `cache.nixos.org`. The nixos-26.05 channel
   only prebuilds nvidia for 6.12/6.18 at **595.71.05 (CUDA 12.x)**, which would break
   the CUDA-13 `llama-cuda` container — hence `<nixpkgs-unstable>`.
-  - 2026-09-22: this was `linuxPackages_7_2` (non-LTS) before.
+  - 2026-09-22: this was `linuxPackages_7_2` (non-LTS) before. The same expression now
+    resolves to **6.18.58 + nvidia 615.78.08** (confirmed booted: userspace and the loaded
+    open module report the same version) — see the channel pin below, which is what
+    actually decides the driver build today.
   - Still-disabled alternatives in the file: `config.boot.kernelPackages.nvidiaPackages.beta`
     and a hand-rolled `mkDriver` for the 570.124.04 legacy branch.
+- **`nvidia-smi` segfaulting (`rc=139`) is a patchelf bug, not a GPU failure** — hit
+  2026-10-25/26, and it fails *silently* for anything that shells out to the binary: the
+  temp-monitor dashboard simply stopped showing its `gpu_N` cards. Diagnose before touching
+  the driver:
+
+  ```bash
+  nvidia-smi -L                                                  # rc=139 + "Segmentation fault" = this bug
+  readelf -lW "$(command -v nvidia-smi)" | awk '/LOAD/{print}'    # RW LOAD overlapping the R LOAD that holds .dynamic
+  ```
+
+  [NixOS/nixpkgs#576412](https://github.com/NixOS/nixpkgs/issues/576412): patchelf 0.19.2
+  handed `--interpreter` **and** `--set-rpath` in one invocation emits an ELF whose writable
+  `LOAD` runs into the read-only one holding `.dynamic`, so `ld.so` segfaults in `dl_main`
+  *before* any NVIDIA library loads. The kernel module, `/dev/nvidia*`,
+  `/proc/driver/nvidia` and NVML itself (`ctypes` → `libnvidia-ml.so.1`) were all healthy the
+  whole time — so **do not** work around it by rewriting consumers to call NVML.
+  The crashing binary was
+  `/nix/store/liy6bd3ijqgc7pnr8mfh4zx6cig7fr8h-nvidia-x11-615.78.08-bin/bin/nvidia-smi`
+  (1982 `coredumpctl` entries over the two days, plus two `ld-linux-x86-64` cores at the
+  same moments — the loader dying, not the driver).
+- **Fixed upstream in the builder, not in patchelf** — since 2026-10-21
+  [PR #576397](https://github.com/NixOS/nixpkgs/pull/576397) splits the call in
+  `pkgs/os-specific/linux/nvidia-x11/builder.sh` (`--set-rpath`, then `--interpreter`
+  separately), so any current `nixos-unstable` gives a working `nvidia-smi`. The upstream
+  patchelf bug itself is only half closed:
+  [patchelf#672](https://github.com/NixOS/patchelf/pull/672) merged 2026-10-20 but is
+  **unreleased** — nixpkgs still ships patchelf **0.19.2**, [patchelf#674](https://github.com/NixOS/patchelf/issues/674)
+  and [#576412](https://github.com/NixOS/nixpkgs/issues/576412) are still open, and the
+  `autoPatchelfHook` path stays broken for non-PIE binaries (worked around per-package with
+  `patchelfFlags = [ "--page-size" "2097152" ]`). Only the NVIDIA binaries are covered.
+- **Channel pin history (2026-10-26 → 2026-10-28, now REMOVED).** Root's `nixpkgs-unstable`
+  was pinned to rev `d059931ba096` (the first rev carrying #576397). It was never about the
+  GPU after that fix reached the tip: the tip renamed `dms-shell → dux-shell` 2.0.0
+  (`pkgs/by-name/du/dux-*`, aliases kept in `pkgs/top-level/aliases.nix`) and the local
+  preview-path patch stopped applying. It was re-anchored for 2.0.0 (§ dms-shell) and the
+  channel unpinned on 2026-10-28 — Flow A build on `nixos-unstable`
+  `26.11pre1103272.31ecbaca1bde`, `dux-shell`/`dux-greeter` 2.0.0 in the closure. If a future
+  tip again breaks the DMS pairing, that pin is the escape hatch; a root-level channel
+  setting is invisible in this repo, so record it here the moment it changes.
 - `modesetting.enable` is commented out (the channel default already enables it).
 - `nvidia.prime` (offload + the two bus IDs) is commented out — this is not a laptop
   Optimus setup; both cards are always present.
 - `nvidia-container-toolkit.enable = true` gives the `--device nvidia.com/gpu=all`
-  CDI hook used by the llama-swap backends ([§ llama-swap](#llama-swap)).
+  CDI hook used by the llama-swap backends ([§ llama-swap](#llama-swap)). Separate bug,
+  same binary: the CDI-injected `nvidia-smi` is **not runnable inside the Strata image**
+  (its `PT_INTERP` is a `/nix/store` path absent there) — § llama-swap/strata.
+- After a driver/kernel bump the **userspace and loaded module versions can disagree until
+  reboot**; the 2026-10-26 upgrade moved 6.18.57 → 6.18.58 and GPU workloads kept running on
+  the old loaded module while `nvidia-smi` already reported the new one. `cat
+  /proc/driver/nvidia/version` (loaded) vs `modinfo -F version nvidia` (on disk) tells
+  them apart; compare `/run/current-system` and `/run/booted-system` by **full store path**,
+  not version string (they can share a version string and still differ).
 - `graphics.extraPackages` = `intel-media-driver` + `vpl-gpu-rt` (the iGPU's
   Quick Sync/oneVPL stack); `bluetooth`, `i2c` are plain enables, matching the
   `i2c-dev` kernel module used by `ddcutil`.
@@ -143,21 +193,42 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   package/service is declared here.
 - **Version pairing.** The nixos-26.05 channel build is **1.4.6, two majors behind**
   upstream, and the module's feature toggles track it. So the shell *and* quickshell
-  are taken from `<nixpkgs-unstable>` **together** — DMS 1.6.2 QML API + `qs` 0.3.1 —
-  because mixing 1.6.2 with the channel's quickshell 0.3.0 risks QML calling into `qs`
-  APIs that do not exist yet.
-- **Local patch** (`./patches/dms-preview-path.patch`, added 2026-10-24): Settings →
-  Browse Themes builds every card's preview URL as
-  `https://raw.githubusercontent.com/AvengeMedia/dms-plugin-registry/main/themes/<id>/preview.svg`
-  and ignores the `previewPath` the daemon already resolves for third-party registries
-  (core/internal/themes/registry.go stats `themes/<id>/preview.svg` in the local clone),
-  so all `omarchy-*` cards render blank. That is the two-line fix. Drop the override
-  once upstream ships it — check for `theme.previewPath` in
-  `quickshell/Modules/Settings/ThemeBrowser.qml` of the new version (upstream master
-  still has the hardcoded line as of writing).
-  The `postPatch` wrapper needs its own care: nixpkgs sets `sourceRoot = "source/core"`,
-  the QML tree is one level up, and the fetched tree is read-only → `chmod -R u+w`
-  before `patch`.
+  are taken from `<nixpkgs-unstable>` **together** — Dux Shell **2.0.0** (renamed from
+  `dms-shell`/DankMaterialShell upstream at 2.0.0, 2026-10-20; old name kept only as a
+  `warnAlias`) + `qs` 0.3.2 — because mixing shell and quickshell across sets risks QML
+  calling into `qs` APIs that do not exist yet. Both are on the tip and unchanged there.
+  **The option namespace stays `programs.dms-shell`** (and `services.displayManager.dms-greeter`):
+  the NixOS *module* is evaluated from the **nixos-26.05 channel** — only packages come from
+  `<nixpkgs-unstable>` — and 26.05 has no `programs.dux-shell` at all, so writing the new name
+  fails with "The option `programs.dux-shell` does not exist". When the system's modules move
+  to 26.11, rename the options *and* drop the feature toggles (next bullet).
+- **Local patch** (`./patches/dux-preview-path.patch`, added 2026-10-24 as
+  `dms-preview-path.patch`, re-anchored for 2.0.0 on 2026-10-28): Settings →
+  Browse Themes builds every card's preview URL from the official registry
+  (`…/dux-plugin-registry/master/themes/<id>/preview.svg` since 2.0.0; the AvengeMedia URL
+  before it) and ignores the `previewPath` the daemon already resolves for third-party
+  registries (core/internal/themes/registry.go stats `themes/<id>/preview.svg` in the local
+  clone), so all `omarchy-*` cards render blank. That is the two-line fix. Still needed at
+  v2.0.0 — `themePreviewUrl()` (ThemeBrowser.qml:113) has no `previewPath` branch. Drop the
+  override once upstream ships it: check for `theme.previewPath` in
+  `quickshell/Modules/Settings/ThemeBrowser.qml` of the new tag.
+  The `postPatch` wrapper needs its own care: nixpkgs sets
+  `sourceRoot = "${src.name}/core"`, the QML tree is one level up, and the fetched tree is
+  read-only → `chmod -R u+w` before `patch`. It is a **build-time** fix: neither 1.6.3 nor
+  2.0.0 installs the QML into the output (no `share/quickshell/dms/…` in either package;
+  the tree is compiled into `bin/dms`, `tags = [ "withshell" ]`), so verify it took by the
+  build log printing `patching file quickshell/Modules/Settings/ThemeBrowser.qml` — a failed
+  hunk fails the build outright, since `patch -N --batch` exits non-zero on a reject.
+- **2.0.0 renames that do *not* reach this config** (release notes: package names, binary
+  names and systemd units are unchanged): `dms`, `dms.service`, `bin/dms-greeter` all stay,
+  and both new attrs set `meta.mainProgram` (`dux-shell` → `dms`, `dux-greeter` →
+  `dms-greeter`), which is why `lib.getExe unstable.dux-greeter` in the forced greetd command
+  still resolves. What does change for us: the desktop files and window class move to the app
+  ID **`dev.duxlabs.shell`** (was `com.danklinux.dms`) — the rule in
+  `~/.config/hypr/dms/windowrules.lua` is DMS-generated and gitignored, so DMS rewrites it;
+  and user config/state/cache move from `DankMaterialShell` to `dms` on first run with the old
+  paths left as **symlinks**, which is what keeps the greeter's `configHome` copy
+  (§ greeter) resolving.
 - **`systemd.enable = true`**: `dms.service` ships in the package
   (`lib/systemd/user/dms.service`) and the module pulls it in through `systemd.packages`.
   uwsm brings up `graphical-session.target`, which the unit is `PartOf`/`Requisite` of,
@@ -167,6 +238,15 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   `enableDynamicTheming` (matugen: wallpaper → DMS/rofi/gtk palette),
   `enableCalendarEvents` (khal; needs `~/.config/khal`), `enableClipboardPaste`
   (wtype for Shift+Return in clipboard history).
+  They are **26.05-module** options, and the packages they add come from the **channel**, not
+  from unstable — `dgop 0.2.2`, `matugen`, `cava`, `khal`, `wtype`, `glib`/`networkmanager`
+  (`optionalPackages` in the 26.05 module) — so the shell 2.0.0 runs against a channel dgop.
+  That skew predates the 2.0.0 bump; it is the thing to look at first if the CPU/RAM/net
+  widgets stop updating. In nixpkgs ≥ the 2.0.0 module every one of these is
+  `mkRemovedOptionModule` (monitoring/theming/cava are built in, matugen and cava move into
+  the package with `programs.dux-shell.excludePackages` to drop them, and a calendar backend
+  must be installed separately) — so these assignments become hard errors the moment the
+  system's modules pass 26.05.
 - **`enableVPN = false`** — the VPN widget drives NetworkManager, which is inactive
   here (plain iwd).
 - **`enableAudioWavelength` is deliberately left at its default (true → installs cava).**
@@ -175,7 +255,7 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   whenever it is off PATH, whether or not the visualizer widget is used).
   **Do not re-add the assignment:** newer nixpkgs removes the option entirely (cava is
   unconditional in `programs.dms-shell`'s environment), so the assignment breaks the
-  build on the next channel bump. `CavaService.qml` still gates the process on the
+  build on the modules past 26.11 (§ dms-shell). `CavaService.qml` still gates the process on the
   widget actually asking for it, and `DMS_DISABLE_CAVA=1` disables it.
 
 ## hyprland
@@ -213,9 +293,11 @@ this is proven. To roll it out, move the block into `common.nix` and drop the sd
 `mkForce` there instead. `sddm.enable = lib.mkForce false` overrides the enable in
 `common.nix`.
 
-- **`package = unstable.dms-greeter`** — 1.6.x ships the greeter as its own package
-  (`bin/dms-greeter`). The module default would be `programs.dms-shell`'s package,
-  whose 1.6.x build no longer contains the Greetd assets this module execs.
+- **`package = unstable.dux-greeter`** — the greeter has always shipped as its own package
+  (`bin/dms-greeter` unchanged through the 2.0.0 rename, and `meta.mainProgram` is set, so
+  `lib.getExe` still finds it). The module default would be `programs.dms-shell`'s package,
+  whose build no longer contains the Greetd assets this module execs — same reason applies to
+  2.0.0, which installs no `share/quickshell/dms` tree at all.
 - **`compositor.name = "hyprland"`** — the greeter runs inside hyprland (the module
   asserts `programs.hyprland.enable` and uses `programs.hyprland.package`).
 - **`compositor.customConfig` must be LUA (`hl.*`), not hyprlang.** The greeter runs
@@ -701,6 +783,29 @@ Three knobs, three different layers, and only one of them is a launch flag. Read
   `podman exec -e PYTHONPATH=/opt/strata/terminal <ctr> /opt/strata/terminal/python/bin/python3 -c "…derive_config…"`
   printed `max_queue 3 / queue_timeout 90 / 29 tuned args intact`.
   Effect: `admission_limit = slots + max_queue = 7` — 4 decoding, 3 waiting, 429 past that.
+- **Context cap → five places have to agree** (lowered 131072 → **98304** on 2026-10-27 ~15:10 because 4 × 100k
+  conversations hit the RAM wall; rationale and measurements in `~/.config/strata/parallel/TUNING_NOTES.md`
+  § the RAM wall). The engine arg is the only one the server *obeys*; the rest are either agreements or
+  advertisements, and getting them wrong fails in different ways:
+  1. `~/.config/strata/parallel/strata-iq3_s.json` args `--max-context 98304` — what `serve/server.py` reads.
+  2. preset `extra` `"--max-context": "98304"` — the layer that wins, and `tune_knobs.apply_to_argv` deletes the
+     base config's flag before appending it, so there is exactly one in the derived argv (verified: x1, 30 flags).
+  3. preset `"context": 98304` — **never reaches argv** (`derive_config` puts only `extra` there, §
+     llama-swap/strata-p3); it exists for the *reuse test* against the installed file, and a mismatch there sends
+     the start through setup, which rewrites the run config from defaults.
+  4. nix `capabilities.context = 98304` on this entry — llama-swap advertises it as `context_window` / `n_ctx` in
+     `/v1/models`; leaving it at 131072 makes the router promise a context the engine refuses. Needs a switch to
+     regenerate the llama-swap config; check `curl -s localhost:8080/v1/models` → `context_window: 98304`.
+  5. `~/.pi/agent/models.json` → `modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304`. **pi
+     does not discover the engine's context** — unset means the documented default **128000**, which is why 101k
+     prompts were accepted happily before. With 98304 and pi's default `reserveTokens 16384`, auto-compaction
+     starts above 81,920 tokens. Not nix-managed (plain file, not a repo) and read at pi start, so a running
+     session keeps the old number.
+  Checking the derived argv without touching the live engine:
+  `podman exec -i -e PYTHONPATH=/opt/strata/terminal <ctr> /opt/strata/terminal/python/bin/python3 -c "…derive_config…"`
+  → `--max-context x1 = 98304`, `--conversation-cache-min-free-mib 1536`, `max_queue 3/90`. Do this after every
+  edit to the args array: mine once wrote the value **over** the flag name (`args.index(flag)` is the flag index,
+  the value is `+1`) and left `131072` orphaned, which would have broken the next start.
 - **The saved profile is not a config place.** `launch/runner.py:ensure_profile` replaces its whole override
   set with exactly `host port parallel`, taken from the preset — "the overrides are replaced as a set". Two
   `strata profile set launch-docker max_queue=…` edits were silently undone by the following container starts.
@@ -708,6 +813,13 @@ Three knobs, three different layers, and only one of them is a launch flag. Read
   --output json`) *does* make them live inside a running container — measured once: `admission_limit 7`, one
   429 at c=8, `queue_timeouts 0` — but that is a hotfix for a live box, not a setting; leave the profile at
   whatever the launch writes (`47e97cdb5e924d68` = `host port parallel:4`) so there is one source of truth.
+- **`--pull newer` in the cmd means a switch can swap the engine under you.** The 2026-10-27 ~21:57 switch (the one
+  that made `capabilities.context = 98304` live) pulled `strata:latest-cuda13` and the container came up on engine
+  **0.1.52** instead of 0.1.48 — the version every number in `~/.config/strata/parallel/TUNING_NOTES.md` was measured
+  on. It accepted all 30 tuned flags with no unknown/deprecated warnings, and actually fit **more** CUDA0 experts
+  (5226 slots / 9.64 GiB vs 5134 / 9.47 at the same 1280 MiB reserve), so nothing broke. But the margins in that file
+  are 0.1.48 numbers, and the same surprise will happen on any future switch. If that bothers you more than free
+  upgrades, pin the image by digest instead of `latest-cuda13`.
 - **Verify after any restart.** `--parallel 4` shows on the serve cmdline, but values that came from the run
   config do **not** — read telemetry instead: bench report `environment` → `slots_effective 4`, `max_queue 3`,
   `queue_timeout_s 90`, and `before/after` → `admission_limit 7`. A `parallel-mixed-v1`/`parallel-overload-v1`

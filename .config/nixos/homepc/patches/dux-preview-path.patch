@@ -1,6 +1,6 @@
 --- a/quickshell/Modules/Settings/ThemeBrowser.qml
 +++ b/quickshell/Modules/Settings/ThemeBrowser.qml
-@@ -103,6 +103,12 @@ DankFloatingWindow {
+@@ -111,7 +111,13 @@
      }
  
      function themePreviewUrl(theme) {
@@ -10,6 +10,7 @@
 +        if (theme.previewPath)
 +            return "file://" + theme.previewPath;
 +
-         const base = "https://raw.githubusercontent.com/AvengeMedia/dms-plugin-registry/main/themes/" + (theme.sourceDir || theme.id) + "/";
+         const base = "https://raw.githubusercontent.com/duxlabs-dev/dux-plugin-registry/master/themes/" + (theme.sourceDir || theme.id) + "/";
          const variants = theme.variants || null;
          if (!variants)
+             return base + "preview.svg";

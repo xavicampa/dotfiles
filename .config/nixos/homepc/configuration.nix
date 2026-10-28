@@ -56,6 +56,8 @@ in
 
       # kernel + driver must be the same linuxPackages set; CUDA 13 needs unstable — NOTES.md § hardware
       package = unstable.linuxPackages_6_18.nvidiaPackages.latest;
+      # nvidia-smi rc=139 SIGSEGV was patchelf's broken ELF (nixpkgs#576412), fixed by the channel pin:
+      # root's nixpkgs-unstable = rev d059931ba096 until dux-shell 2.0.0 builds — NOTES.md § hardware
       # package = config.boot.kernelPackages.nvidiaPackages.beta;
       # package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       #   version = "570.124.04";
@@ -167,18 +169,21 @@ in
   };
 
   # Desktop shell — homepc-only, unstable pairing — NOTES.md § dms-shell
+  # Option namespace stays `dms-shell`: the NixOS *module* comes from the nixos-26.05 channel
+  # (only packages come from <nixpkgs-unstable>), and 26.05 has no `programs.dux-shell`.
   programs = {
     dms-shell = {
       enable = true;
 
-      # DMS + quickshell from unstable as a pair; local previewPath patch — NOTES.md § dms-shell
-      package = unstable.dms-shell.overrideAttrs (final: prev: {
+      # Dux Shell (renamed from dms-shell upstream at 2.0.0) + quickshell from unstable as a
+      # pair; local previewPath patch — NOTES.md § dms-shell
+      package = unstable.dux-shell.overrideAttrs (final: prev: {
         postPatch = (prev.postPatch or "") + ''
           # sourceRoot is core/; QML tree one up, fetched tree read-only
           root=..
           [ -f ../quickshell/Modules/Settings/ThemeBrowser.qml ] || root=.
           chmod -R u+w "$root"
-          patch -p1 -d "$root" -N --batch < ${./patches/dms-preview-path.patch}
+          patch -p1 -d "$root" -N --batch < ${./patches/dux-preview-path.patch}
         '';
       });
       quickshell.package = unstable.quickshell;
@@ -189,7 +194,7 @@ in
         restartIfChanged = true;
       };
 
-      enableSystemMonitoring = true; # dgop: CPU/RAM/net + process list
+      enableSystemMonitoring = true; # dgop (26.05 channel pkg): CPU/RAM/net + process list
       enableDynamicTheming = true; # matugen: wallpaper -> DMS/rofi/gtk palette
       enableCalendarEvents = true; # khal widget
       enableClipboardPaste = true; # wtype for Shift+Return
@@ -215,7 +220,7 @@ in
 
       dms-greeter = {
         enable = true;
-        package = unstable.dms-greeter; # 1.6.x ships it separately
+        package = unstable.dux-greeter; # renamed from dms-greeter at 2.0.0; option name is the 26.05 module's
         compositor.name = "hyprland";
 
         # must be LUA (hl.*), hyprlang would stop working in Hyprland 0.57 — NOTES.md § greeter
@@ -248,7 +253,7 @@ in
               pkgs.glib # gdbus: fprintd probe + portal reads
             ]
           }
-          ${lib.getExe unstable.dms-greeter} --cache-dir /var/lib/dms-greeter --command hyprland${
+          ${lib.getExe unstable.dux-greeter} --cache-dir /var/lib/dms-greeter --command hyprland${
             lib.optionalString (
               config.services.displayManager.dms-greeter.compositor.customConfig != ""
             ) " -C ${pkgs.writeText "dmsgreeter-compositor-config.lua" config.services.displayManager.dms-greeter.compositor.customConfig}"
@@ -378,6 +383,9 @@ in
         # slots = -e PARALLEL below (env beats the preset and is written back into it); the
         # queue bound has no launch flag/env, so max_queue + queue_timeout sit as top-level
         # keys in ~/.config/strata/parallel/strata-iq3_s.json, which derive_config copies.
+        # Context cap (98304 since 2026-10-27) is NOT an env knob here: the number the engine obeys is
+        # --max-context in the preset extra + the run config, "context" below only carries the reuse test, and
+        # capabilities.context below is what gets advertised - keep them and pi's contextWindow in step.
         "qwen3.8-flash-next-iq3_s-parallel" = {
           # swap.max=0 keeps the anon arena resident; no comments inside cmd — NOTES.md § llama-swap/strata
           cmd = ''
@@ -410,7 +418,11 @@ in
           ttl = 0;
           # without this Strata under-reports to capability discovery
           capabilities = {
-            context = 131072; # the cap here is --max-context 131072 in the parallel tree, not 256k
+            # llama-swap advertises this as context_window / n_ctx to clients, so it must equal the engine's
+            # --max-context in the parallel tree (98304 since 2026-10-27 ~15:10, and Pi's
+            # modelOverrides[...].contextWindow in ~/.pi/agent/models.json). Cap rationale:
+            # ~/.config/strata/parallel/TUNING_NOTES.md § the RAM wall.
+            context = 98304;
             "in" = [ "text" "image" ];
             out = [ "text" ];
             tools = true;
