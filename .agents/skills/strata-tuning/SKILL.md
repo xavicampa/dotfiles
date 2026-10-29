@@ -103,6 +103,7 @@ python3 /home/javi/.config/strata/parallel/erastats.py --pack coder-iq1_m   # me
 ```
 
 - GPU side, always both: `nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu,power.draw --format=csv,noheader`, and for placement/leaks `nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader` (map uuid → index; the vision tower is its **own** process row).
+- One knob per arm. Everything else byte-identical, else the result is unattributable.
 - Pool samples, not medians: the boot line carries the effective argv, so **eras self-label by arm** (`--layer-split` / `--pcie-frac` / `--gpu` / `--mtp`). Parse the `strata serve: prompt … generated …` lines across eras to get 12 decode samples from 5 boots instead of 5 medians — and filter by the full argv, or the next arm that shares your split lands in your pool (it did: an MTP arm polluted the split-30/frac-0.00 pool).
 - Gate the bench on the boot: parse the new era for `<n> of its <n> profiled pairs` (short = residency lost), both `MiB of VRAM free with everything loaded` lines (≥512), and absence of `LOW`/`WARNING` — then bench. A failed gate costs one reload, not a reload plus a wasted bench. Keep the runner as a script (`/tmp/gpuswap/arm.sh <label> <split> <mtp:on|off> <vision:gpu|cpu>` does exactly this) so every arm is switched identically.
 
