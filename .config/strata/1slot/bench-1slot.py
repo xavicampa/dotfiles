@@ -23,7 +23,7 @@ import threading
 import time
 import urllib.request
 
-URL = "http://127.0.0.1:5801/v1/chat/completions"
+URL = "http://127.0.0.1:5802/v1/chat/completions"
 LOG = ("/home/javi/.local/share/containers/storage/volumes/strata-data/_data/"
        "state/strata/launch/docker.engine.log")
 MODEL = "qwen3.8-flash-next-iq3_s"

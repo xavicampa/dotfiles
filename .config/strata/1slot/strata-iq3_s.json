@@ -36,7 +36,7 @@
   "--expert-profile-save",
   "/data/state/strata/profile-learned.bin",
   "--layer-split",
-  "32",
+  "30",
   "--pcie-frac",
   "0.00",
   "--pipeline-windows",
@@ -63,7 +63,7 @@
   "exe": "/data/install/strata-vision",
   "mmproj": "/data/gguf/IQ3_S/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
   "model": "/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
-  "gpu": true,
+  "gpu": false,
   "cuda_device": 1,
   "max_tokens": 512
  }
