@@ -33,15 +33,15 @@
     "--adapt-async",
     "1",
     "--conversation-cache-mib",
-    "8192",
+    "12288",
     "--conversation-cache-slots",
     "10",
     "--conversation-cache-min-free-mib",
     "1536",
     "--conversation-cache-min-tokens",
-    "4096",
+    "16384",
     "--conversation-cache-park-gain",
-    "2048"
+    "12288"
   ],
   "cwd": "/opt/strata/terminal",
   "tokenizer": "/data/Strata-data/packs/coder-iq1_m/tokenizer",
@@ -67,20 +67,24 @@
   "max_queue": 3,
   "queue_timeout": 90,
   "user_args": [
+    "--kv-resident",
+    "86016",
+    "--kv",
+    "int8",
     "--adapt-every",
     "1",
     "--adapt-async",
     "1",
     "--conversation-cache-mib",
-    "8192",
+    "12288",
     "--conversation-cache-slots",
     "10",
     "--conversation-cache-min-free-mib",
     "1536",
     "--conversation-cache-min-tokens",
-    "4096",
+    "16384",
     "--conversation-cache-park-gain",
-    "2048"
+    "12288"
   ],
   "args_written": [
     "--pack",
@@ -115,14 +119,14 @@
     "--adapt-async",
     "1",
     "--conversation-cache-mib",
-    "8192",
+    "12288",
     "--conversation-cache-slots",
     "10",
     "--conversation-cache-min-free-mib",
     "1536",
     "--conversation-cache-min-tokens",
-    "4096",
+    "16384",
     "--conversation-cache-park-gain",
-    "2048"
+    "12288"
   ]
 }
