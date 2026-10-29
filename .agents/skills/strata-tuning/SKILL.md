@@ -1,13 +1,11 @@
 ---
 name: strata-tuning
 description: >-
-  Retune and measure the Strata engine containers on the home PC from a pi session: change one knob,
-  restart that engine through llama-swap without switching model, then read the arm. Load when asked to
-  tune, bench, A/B, sweep, pick a layer-split / slot count / expert cache / vision placement, free VRAM
-  headroom, reload or stop a strata container, diagnose a strata 502/OOM, or while editing anything under
-  ~/.config/strata. Hard rules: never switch model mid-tuning (llama-swap swaps out the engine under test),
-  never test a knob with a hand-run `podman run` (llama-swap recreates the container with --replace), never
-  edit a preset and leave the old engine warm, and never leave a GPU stage under ~512 MiB free.
+  Tune/measure the Strata engine containers on the home PC: trees, presets, run configs, the llama-swap
+  reload dance, bench commands, 502/OOM boot diagnosis, and the hard rules (never switch model mid-tuning,
+  never hand-run `podman run`, never leave a warm engine after a preset edit, keep ~512 MiB free per GPU stage).
+  Explicit-only — run with /skill:strata-tuning.
+disable-model-invocation: true
 ---
 
 # Tuning Strata from pi
@@ -22,15 +20,25 @@ Three Strata trees, each its own container/model pair:
 
 Each tree has a `TUNING_NOTES.md` — **read it before touching that tree, write the finding there after measuring.** Findings that live only in chat have been re-litigated.
 
+## Hard rules
+
+1. **Never switch model mid-tuning.** llama-swap swaps out the engine under test; a request for another model id unloads the arm you are measuring and silently benches a cold boot or the wrong engine. Stop the other arm first or ask the user.
+2. **Never test a knob with a hand-run `podman run`.** Only llama-swap recreates the container (with `--replace`) from the preset + env + run config; a manual container measures something that will not exist on the next boot.
+3. **Never edit a preset and leave the old engine warm** — do the stop + reload in section 3 in the same tool call. That same-call rule is also what keeps *your own session* alive when pi is served by the arm under test (§3).
+4. **Never leave a GPU stage under ~512 MiB free** — window graphs are captured on first use and later context growth fails.
+
 ## 1. Establish which arm is live (first tool call of every session)
 
 Do not assume; the user switches models by using the client.
 
 ```bash
-podman ps --format '{{.Names}} {{.Status}}' | grep strata
-podman inspect -f '{{.State.CreatedAt}} {{.Config.Env}}' <container>
-for p in 5801 5802; do printf "%s=%s\n" "$p" "$(curl -s -o /dev/null -w '%{http_code}' http://$p/health)"; done
+podman ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}' | grep -i strata   # filter on the IMAGE, not the name
+podman inspect -f 'created={{.Created}} started={{.State.StartedAt}} pid={{.State.Pid}} {{range .Config.Env}}{{println .}}{{end}}' <container>
+for p in 5801 5802 8080; do printf "%s=%s\n" "$p" "$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:$p/health)"; done
+env | grep -E '^PI_MODEL=|ANTHROPIC_BASE_URL='                            # is this session served by the arm? see §3
 ```
+
+Engine containers are named **exactly the model id** (`qwen3.8-flash-next-iq3_s`), so grepping names for `strata` finds nothing; the image (`ghcr.io/niko1221/strata`) also matches the dashboard containers, which you tell apart by cmd — engine `cmd=[run]`, dashboard `cmd=[strata monitor --url http://127.0.0.1:<engine-port>]`. `{{.State.CreatedAt}}` is not a field in this podman (`can't evaluate field CreatedAt`) — use `.Created` / `.State.StartedAt`. The port that answers `200` is the live engine; `000` means nothing is listening there (another arm's port, or the arm under test is unloaded — llama-swap boots it on the next request for its id).
 
 Ports come from `-e PORT` in the llama-swap entry (`~/.config/nixos/homepc/configuration.nix`), front door is **:8080**. Two ids for the same arm: the **proxy id** (`…-parallel`, what llama-swap routes) and the **engine id** (what the engine itself answers). Reload requests must use the proxy id; benches must target the engine port with the engine id.
 
@@ -59,7 +67,23 @@ curl -s -m 190 http://localhost:8080/v1/chat/completions \
 
 Stop → request must be in the **same call**: a stopped container stays unloaded (`ttl = 0`), and a separate later call risks the client or another arm grabbing the swap. Expect `reload=200 t≈19-24s` (cold boot + graph capture). llama-swap's `unloadTimeout = 40` bounds only its own stop hook — an unload timeout logged while the engine is still flushing is not a failure. `502`/`500`/`exited: 1` = read the boot before trying anything else; common causes in `references/engine-log.md`.
 
-Never issue a request for a **different model id** while tuning an arm: llama-swap swaps the engines (unload of the one under test → the next arm silently measures a cold boot or the wrong engine). If another arm is live, stop it first or ask the user.
+Never issue a request for a **different model id** while tuning an arm (hard rule 1). If a hand-run container is tempting: hard rule 2 — llama-swap recreates the container with `--replace` from preset + env + run config, so a manual `podman run` measures something that will not exist on the next boot.
+
+### When pi is served by the arm under test
+
+Check it in §1: `PI_MODEL` equals the arm's model id and the base URL is the llama-swap front door (`http://localhost:8080`). Then the loop is closed — this session's tokens, its slot session and its conversation cache all live inside the engine being stopped, and the session is the "traffic in flight" that cold-booted it. The dance still works synchronously, and rule 3 is exactly what makes it work:
+
+- A tool call runs while the engine is **idle**: pi generates tokens only *between* tool calls, so `podman stop` inside a call never cuts one of your own generations in half.
+- The reload `curl` at the end of that call blocks until llama-swap has recreated the container and the engine answers (`reload=200 t≈19-24s`). The engine is warm again *before* the tool result has to become the next assistant turn — **one synchronous call, session survives it.** Do the whole switch (preset edit → stop → sleep 2 → curl → read the boot) in a single tool call.
+- Expect, and do not chase, the cost: the restart drops the conversation cache, so your next request re-reads the whole session cold — a few seconds of extra latency per arm switch, growing with session length.
+
+What not to do in this state:
+
+- **Never run the stop detached** (`setsid`, `&`, a background sweep script) "to protect the session". It decouples the reload curl from the tool call, and pi's own next request then races llama-swap's cold boot: two boots, `502` on the retry, and a bench window that measures your session's retry instead of the arm. Detached is only sound for a step that no longer needs the engine — and a tuning session always does.
+- **Never move pi to another model id** to "free the arm": `ttl = 0` means that request unloads the engine under test (hard rule 1).
+- A bad boot leaves you with no session *and* no way to read why, so archive the boot inside the same call — `tail -n +<era-line> "$L" > /tmp/<arm>-boot.txt` (era pattern in `references/engine-log.md`) — before reasoning about the `502`/`exited: 1`.
+
+Benching while your own session is live: a bench issued **from** a tool call has no self-generated traffic in flight (the engine is idle during it), so decode is measured on a quiet box. Your live conversation does still occupy the single slot / conversation cache — the same for every arm, so the A/B stays valid, but do not compare those numbers against a table measured with the session closed.
 
 ## 4. Measure
 
@@ -102,6 +126,8 @@ Record the accepted arm in `TUNING_NOTES.md` with the boot lines quoted, and kee
 - Free VRAM on a stage is **working memory** (slot sessions, long-context KV, window graphs), not spare capacity: pushing the split past the optimum costs 4-9% per step, and past the fill ceiling it falls off (~115 tok/s).
 - Bench CPU sampling must use the **host** PID from `podman inspect -f '{{.State.Pid}}'` (namespaced PIDs read 0.00 cores); engine restarts between requests need re-finding.
 - Era stats must be split by `--pack` — `erastats.py --pack coder-iq1_m`, or the newest boot may be the other model's.
+- The engine **port moves** with the llama-swap entry (1slot is `PORT=5802`; its notes and `bench-1slot.py` said 5801). Read `-e PORT` from `podman inspect` and patch the tree's bench script (with a `.bak`) — a bench aimed at a dead port prints `HTTP` failures or measures another arm.
+- If `PI_MODEL` is the arm under test, §3 "When pi is served by the arm under test" applies — the reload is synchronous by design, and the tempting "detached sweep script" breaks the measurement rather than protecting the session.
 
 ## 7. Etiquette
 
