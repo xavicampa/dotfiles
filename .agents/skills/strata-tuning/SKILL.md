@@ -95,7 +95,7 @@ python3 /home/javi/.config/strata/parallel/bench-util.py \
 
 - **400-token streams, not 250**: short generations are dominated by warm-up and verify overhead and understate decode.
 - Discard the first stream at each level (window-graph capture / cache fill), and treat level 1 as decode and levels 2-3 as fan-out admission.
-- Same config can drift **152 → 164 tok/s** between runs. For any A/B, interleave arms (`31 33 31 33`) or the drift decides the winner.
+- Fixed-config drift is bigger than it looks: five **identical** baseline runs on `1slot` gave stage A 167.7-182.6, B 136.6-159.1, **C 130.0-159.5 (±11 %)**. The **cold prompt read is the stable control** (4,798.6-4,848.9, ±1 %) — if a knob moves it (e.g. −5 %), the effect is real even when decode medians overlap. Interleave arms (`31 33 31 33` / `V A V A`) and take **n≥4 per arm** for any effect under ~15 %, or the drift decides the winner.
 - Engine-side truth, per era (both containers share one log — pick the boot by pack):
 
 ```bash
@@ -104,6 +104,7 @@ python3 /home/javi/.config/strata/parallel/erastats.py --pack coder-iq1_m   # me
 
 - GPU side, always both: `nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu,power.draw --format=csv,noheader`, and for placement/leaks `nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader` (map uuid → index; the vision tower is its **own** process row).
 - One knob per arm. Everything else byte-identical, else the result is unattributable.
+- Gate the bench on the boot: parse the new era for `<n> of its <n> profiled pairs` (short = residency lost), both `MiB of VRAM free with everything loaded` lines (≥512), and absence of `LOW`/`WARNING` — then bench. A failed gate costs one reload, not a reload plus a wasted bench. Keep the runner as a script (`/tmp/gpuswap/arm.sh <label> <split> <mtp:on|off> <vision:gpu|cpu>` does exactly this) so every arm is switched identically.
 
 ## 5. Accept / reject
 
