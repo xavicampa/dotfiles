@@ -65,7 +65,7 @@ curl -s -m 190 http://localhost:8080/v1/chat/completions \
   -o /dev/null -w 'reload=%{http_code} t=%{time_total}\n'   # llama-swap recreates + cold-boots the engine
 ```
 
-Stop → request must be in the **same call**: a stopped container stays unloaded (`ttl = 0`), and a separate later call risks the client or another arm grabbing the swap. Expect `reload=200 t≈19-24s` (cold boot + graph capture). llama-swap's `unloadTimeout = 40` bounds only its own stop hook — an unload timeout logged while the engine is still flushing is not a failure. `502`/`500`/`exited: 1` = read the boot before trying anything else; common causes in `references/engine-log.md`.
+Stop → request must be in the **same call**: a stopped container stays unloaded (`ttl = 0`), and a separate later call risks the client or another arm grabbing the swap. Expect `reload=200 t≈19-24s` (cold boot + graph capture) on the batched arms; the solo `1slot` arm measured **36-40 s** (two pipeline-window stages to capture) — a slow reload there is not a failure. llama-swap's `unloadTimeout = 40` bounds only its own stop hook — an unload timeout logged while the engine is still flushing is not a failure. `502`/`500`/`exited: 1` = read the boot before trying anything else; common causes in `references/engine-log.md`.
 
 Never issue a request for a **different model id** while tuning an arm (hard rule 1). If a hand-run container is tempting: hard rule 2 — llama-swap recreates the container with `--replace` from preset + env + run config, so a manual `podman run` measures something that will not exist on the next boot.
 
@@ -128,6 +128,7 @@ Record the accepted arm in `TUNING_NOTES.md` with the boot lines quoted, and kee
 - Era stats must be split by `--pack` — `erastats.py --pack coder-iq1_m`, or the newest boot may be the other model's.
 - The engine **port moves** with the llama-swap entry (1slot is `PORT=5802`; its notes and `bench-1slot.py` said 5801). Read `-e PORT` from `podman inspect` and patch the tree's bench script (with a `.bak`) — a bench aimed at a dead port prints `HTTP` failures or measures another arm.
 - If `PI_MODEL` is the arm under test, §3 "When pi is served by the arm under test" applies — the reload is synchronous by design, and the tempting "detached sweep script" breaks the measurement rather than protecting the session.
+- The `gpus` role swap only pays if the **last** stage's card can hold its whole span in VRAM (it also carries head + drafter). It depends on the pack's pairs/layer: accepted on the pruned coder pack (256 pairs/layer → 17 layers = 8.78 GiB fits the 5070 Ti, +13 % decode), **rejected** on `iq3_s` (512 pairs/layer → 17 layers = 17.55 GiB never fits 16.3 GiB; the fitted `[1,0]/38` boot was clean — stage 1 fully resident, 802/1,459 MiB free, acceptance unchanged — yet decode −33…−42 % and cold prompt read −66 %). Never copy a split or an order between packs; recompute from pairs/layer.
 
 ## 7. Etiquette
 
