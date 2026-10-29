@@ -33,9 +33,11 @@ Three layers, and the middle one wins.
 --conversation-cache-min-tokens 256` — the stale `user_args`. The *same* preset edit did move
 `--kv-resident 86016` and `--layer-split 21`, because those flags are absent from `user_args`. Rule:
 **edit both layers, or strip the flag from `user_args` to make the preset the single source.**
-`args` / `args_written` in the same file are an old launch's argv (they said `--kv-resident 32768`,
-`--spec-min-p 0.5`); they are not re-derived at start, so stale values there are a trap for any future
-flow that reads them verbatim — they were aligned to 86016 / 0.70 on 2026-10-28.
+`args` / `args_written` in the same file are **regenerated at every start** (they said `--kv-resident 32768`,
+`--spec-min-p 0.5` because that is what the generator writes, not because a hand edit left them behind — see §
+The 0.1.54 bump regenerated the run config); they are never input, so values in them are cosmetic. The
+`user_args` layer itself is still honored under 0.1.54 (`serve/server.py:3168` merges it over the generated
+`args`), and losing it is what let hand-set knobs silently fall back.
 Backup of the pre-edit run config: `strata-coder-iq1_m.json.pre-conv-cache`.
 
 Check the derived argv **without** restarting the live engine:
@@ -859,6 +861,46 @@ The cap is now raised — **`vision.max_tokens: 1024`** (was 300, the point wher
 - Text decode is untouched: 173.6 tok/s at split 31 after the change.
 
 So the 1024 cap costs ~0.5 s once per new image and 110 MiB, buys finer spatial sampling of screenshots, and adds 1024 prompt tokens of KV per image to the session.
+
+## The 0.1.54 bump regenerated the run config and dropped hand-set keys (2026-10-30 00:45, applied)
+
+The engine moved **0.1.52 → 0.1.54** under this tree (`--pull newer`), and the first launch after that rewrote
+`strata-coder-iq1_m.json` in place (pre-edit copy: `strata-coder-iq1_m.json.bak-20261030-pre-hygiene`). What the
+rewrite cost — all of it restored:
+
+| key | state after the rewrite | why it matters |
+|---|---|---|
+| `user_args` | **gone** | `serve/server.py:3168` — `if cfg.get("user_args"): args = user_args.merge(args, cfg["user_args"])`. This is the layer that wins over the args regenerated at every start; with it absent the hand-set knobs live only in the preset's `extra` and the generator can reset them silently. |
+| `max_queue: 3`, `queue_timeout: 90` | **gone** | no preset/argv path at all: `server.py:8841/8845` read `cfg.get("max_queue")` / `cfg.get("queue_timeout")` and 0.1.54 does **not** put them on the wrapper's argv — so reading the wrapper cmdline proves nothing about the queue. The wrapper fell back to defaults; § The queue 429's `3 + 3` arithmetic was no longer the live capacity. |
+| `vision.cuda_device: 1` | **gone** | hard rule 4. The tower defaulted to **physical** index 0 = the 5070 Ti, the card already short on room (its `used` carried a 222 MiB vision row). |
+| `args` / `args_written` | reset to generator values (`--spec-min-p 0.5`, `--kv-resident 32768`, `--vram-reserve-mib 700`) | **`args` is regenerated at every start** — those were never "stale echoes", they were generated. The values in them are cosmetic; I aligned them to 0.70 / 86016 / 1024 for readability only. |
+
+Precedence restated for 0.1.54 (unchanged in substance, now verified in the package source): generated `args` <
+preset `extra` < `user_args`. **Confirm from the boot's argv, never from the file.**
+
+Also applied: `--pipeline-windows 2` removed from `launch-presets/docker.json` — inert on this arm, the boot printed
+`is off: not with --batch slots`, and the binary's own wording ties the knob to "two stages without the draft layer
+on the first card", which `--batch-mtp` rules out (§ GPU role swap). The solo `1slot` tree keeps it.
+
+Measured boot (era-line 157648, archived at `.tune/coder-hygiene2.boot.txt`, reload `200 t=25.7 s`):
+
+```
+layer split: CUDA1 runs layers 31-47, expert cache 4352 slots (8.78 GiB), 4352 of its 4352 profiled pairs; slot 0 verified
+layer split: 100% of the experts resident, the prompt path's streamed ring 384 slots
+1400 MiB of VRAM free with everything loaded
+CUDA1: 779 MiB of VRAM free with everything loaded
+```
+
+against the previous boot's `4344 of its 4352` and `CUDA1: 566 MiB`. The vision placement is the only real effect of
+this pass: the tower left the 5070 Ti (one 1336 MiB row on `GPU-a1f70b5b` = nvidia-smi index 1 = the 3090 Ti,
+verified with `--query-compute-apps`), CUDA1 returns to the § Vision on the GPU figure of 779 MiB, and CUDA1's
+expert coverage closes to all 4352 pairs. No `LOW` / `WARNING` / `not enough room`; drafting intact (`accept 82.5%`,
+`drafts/step 5.70`, `yield gen/fed 1.464`) — but only 3 requests in that era, so **this is hygiene, not a measurement**;
+no decode claim belongs to it.
+
+**Standing rule from this:** after any engine bump, `diff strata-coder-iq1_m.json` against the newest `.bak` and restore
+whatever the regeneration dropped (`user_args`, `max_queue`, `queue_timeout`, `vision.*`) — that is how the 12 GiB
+conversation-cache budget, the 3+3 queue and the vision card assignment left the box without a single warning line.
 
 ## Failure modes, in the order they will bite
 

@@ -22,7 +22,6 @@
     "--layer-split": "31",
     "--max-context": "131072",
     "--pcie-frac": "0.20",
-    "--pipeline-windows": "2",
     "--resident-experts": "on",
     "--spec": "4",
     "--spec-min-p": "0.70",
@@ -37,7 +36,7 @@
     0
   ],
   "kv": "int8",
-  "last_used": "2026-10-29 21:10:28.336103",
+  "last_used": "2026-10-29 23:49:24.450128",
   "model": "IQ1_M",
   "model_path": "/data/gguf/coder-IQ1_M",
   "mtp": null,
