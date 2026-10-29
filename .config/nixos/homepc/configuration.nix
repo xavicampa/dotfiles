@@ -1,4 +1,6 @@
-# Full rationale lives in ./NOTES.md; the § refs below point into it.
+# House rule: comments here are ONE LINE — what + why, ending with a `— NOTES.md § <topic>`
+# pointer. Full rationale, incident history and gotchas belong in ./NOTES.md, not here.
+# (Pre-existing multi-line blocks are commented-out code or older entries — don't treat them as the style.)
 {
   config,
   lib,
@@ -17,6 +19,102 @@ let
   #   rm -f $out/lib/firmware/iwlwifi-gl-c0-fm-c0-c106.ucode
   #   rm -f $out/lib/firmware/iwlwifi-gl-c0-fm-c0-c103.ucode
   # '';
+
+  # engine logs sit in the shared volume under a PRESET key, so the next launch truncates the dead run — NOTES.md § strata-logs
+  strataLogDir = "/home/javi/.local/state/strata-logs";
+
+  # copies live engine/server logs + a context snapshot; fingerprint (size:mtime) skips no-ops — NOTES.md § strata-logs
+  strataLogArchive = pkgs.writeShellScriptBin "strata-log-archive" ''
+    set -u
+    VOL=/home/javi/.local/share/containers/storage/volumes/strata-data/_data
+    ARC=${strataLogDir}
+    TAG=$1
+    if [ -z "$TAG" ]; then TAG=launch; fi
+    LIVE=$VOL/state/strata/launch/docker.engine.log
+    if [ ! -f "$LIVE" ]; then exit 0; fi
+    FP=$(stat -c '%s:%Y' "$LIVE" $VOL/state/strata/runtime/launch-docker.server.log 2>/dev/null | paste -sd, -)
+    if [ "$FP" = "$(cat $ARC/.fingerprint 2>/dev/null)" ]; then exit 0; fi
+    D=$ARC/$(date -u +%Y-%m-%dT%H%M%SZ)-$TAG
+    mkdir -p "$D"
+    cp -f $VOL/state/strata/launch/*.engine.log "$D/" 2>/dev/null || true
+    cp -f $VOL/state/strata/runtime/*.server.log "$D/" 2>/dev/null || true
+    cp -f $VOL/state/strata/launch/*.choices.json "$D/" 2>/dev/null || true
+    cp -f /home/javi/.config/strata/*/strata-*.log "$D/" 2>/dev/null || true
+    { date -u
+      echo tag=$TAG
+      echo == strata containers ==
+      /run/current-system/sw/bin/podman ps -a --format '{{.Names}} {{.Image}} {{.Status}}' 2>/dev/null | grep -iE "strata|maya" || true
+      echo == gpus ==
+      /run/current-system/sw/bin/nvidia-smi --query-gpu=index,memory.used,memory.free,utilization.gpu,clocks.sm,power.draw,temperature.gpu --format=csv,noheader 2>/dev/null || true
+      echo == host load mem PSI ==
+      cat /proc/loadavg
+      free -m
+      cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io 2>/dev/null
+      echo == kernel warn+ this boot ==
+      /run/current-system/sw/bin/journalctl -k -b 0 -p 4 -n 40 --no-pager -o short-iso 2>/dev/null || true
+      echo == wedged iGPU error state, lost on reboot ==
+      cat /sys/class/drm/card*/error 2>/dev/null | head -20 || true
+    } > "$D/context.txt" 2>/dev/null
+    echo "$FP" > "$ARC/.fingerprint"
+    echo "$(date -u +%FT%TZ) $TAG $D" >> "$ARC/index.txt"
+    ls -1d $ARC/*/ 2>/dev/null | grep -v samples | head -n -25 | xargs -r rm -rf
+    exit 0
+  '';
+
+  # no per-model hooks in v262: archive rides on cmdStop, before podman stop (unloadTimeout < stop wait) — NOTES.md § strata-logs
+  strataLogStop = pkgs.writeShellScriptBin "strata-log-stop" ''
+    set -u
+    ${strataLogArchive}/bin/strata-log-archive "$1"
+    /run/current-system/sw/bin/podman stop -t 120 "$1"
+  '';
+
+  # 10 s host/GPU/request samples — tells VRAM wall from GPU starvation from clock drops after the fact — NOTES.md § strata-logs
+  strataTokSample = pkgs.writeShellScriptBin "strata-toksample" ''
+    set -u
+    ARC=${strataLogDir}
+    mkdir -p "$ARC"
+    F=$ARC/samples.csv
+    HEAD=ts,load1,mem_avail_mib,swap_used_mib,psi_cpu,psi_mem,psi_io,g0_used_mib,g0_free_mib,g0_util_pct,g0_clk_mhz,g0_w,g1_used_mib,g1_free_mib,g1_util_pct,g1_clk_mhz,g1_w,igpu_card,igpu_rc6_ms,gt0_rc6_ms,gt0_cur_mhz,gt0_act_mhz,gt0_thr,gt1_rc6_ms,gt1_cur_mhz,gt1_act_mhz,gt1_thr,req_id,req_model,req_tps,req_prompt_tps,req_cached,req_draft,req_draft_acc,req_dur_ms,req_code
+    if [ ! -f "$F" ] || [ "$(head -n 1 "$F")" != "$HEAD" ]; then
+      mv -f "$F" "$ARC/samples-$(date -u +%Y%m%d).csv" 2>/dev/null || true
+      echo "$HEAD" > "$F"
+    fi
+    psi() {
+      ${pkgs.gawk}/bin/awk '/some/ { for (i = 1; i <= NF; i++) if (substr($i, 1, 6) == "avg10=") { sub("avg10=", "", $i); print $i; exit } }' /proc/pressure/$1
+    }
+    # iGPU RC6 residency, invisible to nvidia-smi — NOTES.md § strata-logs; `gt/` marks the i915 card
+    rd() { cat "$1" 2>/dev/null | tr -d '\n'; }
+    igpu() {
+      GT=$(ls -d /sys/class/drm/card*/gt 2>/dev/null | head -1)
+      [ -n "$GT" ] || { echo "na,na,na,na,na,na,na,na,na,na"; return; }
+      C=$(basename "$(dirname "$GT")")
+      for g in gt0 gt1; do
+        if [ -d "$GT/$g" ]; then
+          set -- "$(rd $GT/$g/rc6_residency_ms)" "$(rd $GT/$g/rps_cur_freq_mhz)" "$(rd $GT/$g/rps_act_freq_mhz)" "$(rd $GT/$g/throttle_reason_status)"
+          eval "$g=\$1,$2,$3,$4"
+        else
+          eval "$g=na,na,na,na"
+        fi
+      done
+      echo "$C,$(rd $(dirname $GT)/power/rc6_residency_ms),$gt0,$gt1"
+    }
+    while :; do
+      if [ "$(stat -c %s "$F" 2>/dev/null || echo 0)" -gt 20000000 ]; then
+        mv -f "$F" "$ARC/samples-$(date -u +%Y%m%d-%H%M%S).csv"
+        echo "$HEAD" > "$F"
+        ls -1 $ARC/samples-*.csv 2>/dev/null | head -n -20 | xargs -r rm -f
+      fi
+      G=$(/run/current-system/sw/bin/nvidia-smi --query-gpu=memory.used,memory.free,utilization.gpu,clocks.sm,power.draw --format=csv,noheader,nounits 2>/dev/null | paste -sd, - | tr -d ' ')
+      A=$(${pkgs.gawk}/bin/awk '/MemAvailable/ { print int($2/1024) }' /proc/meminfo)
+      S=$(${pkgs.gawk}/bin/awk '/SwapTotal/ { t = $2 } /SwapFree/ { f = $2 } END { print int((t-f)/1024) }' /proc/meminfo)
+      L=$(cut -d' ' -f1 /proc/loadavg)
+      R=$(/run/current-system/sw/bin/curl -sf -m 3 http://127.0.0.1:8080/api/metrics/activity 2>/dev/null | ${pkgs.jq}/bin/jq -r '.data[0] | [ (.id//""), (.model//""), (.tokens.tokens_per_second//""), (.tokens.prompt_per_second//""), (.tokens.cache_tokens//""), (.tokens.draft_tokens//""), (.tokens.draft_acc_tokens//""), (.duration_ms//""), (.resp_status_code//"") ] | join(",")' 2>/dev/null)
+      [ -n "$R" ] || R=",,,,,,,,"   # keep the 9 req fields present when the engine is down
+      I=$(igpu)
+      echo "$(date -u +%FT%TZ),$L,$A,$S,$(psi cpu),$(psi memory),$(psi io),$G,$I,$R" >> "$F"
+      sleep 10
+    done
+  '';
 in
 {
   # Hardware — NOTES.md § hardware
@@ -363,7 +461,7 @@ in
             -e STRATA_SPLIT_RING=384
             ghcr.io/niko1221/strata:latest-cuda13
           '';
-          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
+          cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
           # without this Strata under-reports to capability discovery
@@ -413,7 +511,7 @@ in
             -e STRATA_SPLIT_RING=384
             ghcr.io/niko1221/strata:latest-cuda13
           '';
-          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
+          cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
           # without this Strata under-reports to capability discovery
@@ -429,7 +527,8 @@ in
           };
         };
 
-        # Strata: Qwen3.8-Flash-Next Coder (expert-pruned), 4-slot batch on 5801 — NOTES.md § llama-swap/strata-coder
+        # Strata: Qwen3.8-Flash-Next Coder (expert-pruned), 3-slot batch on 5801 — NOTES.md § llama-swap/strata-coder
+        # (kv k8v4 + 3 slots: coder/TUNING_NOTES.md § 4-slot load / KV tier)
         "qwen3.8-flash-next-coder-iq1_m-parallel" = {
           # FAMILY+MODEL are family+size, not a path; the blob mounts use fam["file"] verbatim;
           # the /nix/store mount gives the image's nvidia-smi its loader — NOTES.md § llama-swap/strata-coder.
@@ -454,7 +553,7 @@ in
             -e MODEL_PATH=/data/gguf/coder-IQ1_M
             -e MODEL=IQ1_M
             -e FAMILY=coder
-            -e PARALLEL=4
+            -e PARALLEL=3
             -e PORT=''${PORT}
             -e STRATA_PF_FUSED=1
             -e STRATA_ADAPT_LAG=2
@@ -462,7 +561,7 @@ in
             -e STRATA_SPLIT_RING=384
             ghcr.io/niko1221/strata:latest-cuda13
           '';
-          cmdStop = ''podman stop -t 120 ''${MODEL_ID}'';
+          cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
           # so clients that name the HF repo get this backend (includeAliasesInList is on)
@@ -556,11 +655,7 @@ in
       # activity -> sqlite; dir from StateDirectory below
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
-      # preload Strata at boot; Maya swaps in on request — NOTES.md § llama-swap
-      # The batch entry is the keeper once concurrent clients are real (parallel/TUNING_NOTES.md:
-      # 4 streams = 179.3 agg / 45.0 per stream, 5 = 150.2); pi-subagents caps children at 3, so
-      # 3 children + this session = the 4 slots. Only one entry: the exclusive gpu group evicts
-      # whatever else it preloads.
+      # preload = the boot default (no default_model key in v262); keep it on the model that serves — NOTES.md § llama-swap
       hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
     };
   };
@@ -597,11 +692,38 @@ in
             "CONTAINER_HOST=unix:///run/user/1000/podman/podman.sock"
           ];
           # host binds must exist as directories, not empty ones — NOTES.md § systemd
+          # 1st entry archives the previous engine run before the preload truncates it — NOTES.md § strata-logs
           ExecStartPre = [
+            "-${strataLogArchive}/bin/strata-log-archive boot"
             "/run/current-system/sw/bin/mkdir -p /home/javi/.config/strata"
             "/run/current-system/sw/bin/mkdir -p /home/javi/.config/maya"
           ];
         };
+      };
+
+      # 10 s GPU/RAM/PSI + llama-swap samples, appended to strataLogDir/samples.csv — NOTES.md § strata-logs
+      strata-toksample = {
+        description = "Timestamped GPU/RAM/PSI + llama-swap samples for post-incident triage";
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          ExecStart = "${strataTokSample}/bin/strata-toksample";
+          User = "javi";
+          Group = "users";
+          Restart = "always";
+          RestartSec = 10;
+          StandardOutput = "null"; # the loop is the point; keep it out of journald
+          StandardError = "journal";
+        };
+      };
+
+      # LACT writes the i915 clock files on every reload; detach the iGPU so it never can (per-start) — NOTES.md § lact
+      lactd = {
+        serviceConfig.ExecStartPost = pkgs.writeShellScript "lact-detach-igpu" ''
+          sleep 3
+          ${config.services.lact.package}/bin/lact cli --gpu-id=8086:7D67-1849:7D67-0000:00:02.0 detach || true
+        '';
       };
 
       # stops llama-swap before NVIDIA suspend, restarts after resume — NOTES.md § systemd
@@ -641,6 +763,10 @@ in
     pkgs.libmtp
     pkgs.nvidia_oc
     pkgs.nvtopPackages.nvidia
+    # post-incident triage: activity.sqlite holds per-request tok/s/drafts (survives reboots)
+    # and the sampler's CSV needs jq — NOTES.md § strata-logs
+    pkgs.sqlite
+    pkgs.jq
     unstable.btop-cuda
   ];
   environment.etc."lact/config.yaml".source =

@@ -9,7 +9,7 @@ Index: [hardware](#hardware) · [wifi-firmware](#wifi-firmware) · [boot](#boot)
 [memlock](#memlock) · [network](#network) · [readynas](#readynas) ·
 [libvirt](#libvirt) · [dms-shell](#dms-shell) · [hyprland](#hyprland) ·
 [waybar](#waybar) · [greeter](#greeter) · [udev](#udev) · [wifi-suspend](#wifi-suspend) ·
-[llama-swap](#llama-swap) · [systemd](#systemd) · [packages](#packages)
+[llama-swap](#llama-swap) · [strata-logs](#strata-logs) · [lact](#lact) · [systemd](#systemd) · [packages](#packages)
 
 ---
 
@@ -984,13 +984,115 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
   in-memory ring buffers either way. The directory comes from `StateDirectory` in the
   unit override below: `ProtectSystem=strict` leaves `/var` read-only apart from what
   systemd opens.
-- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ]` — renamed 2026-10-27 from
-  `…-parallel5`; changed 2026-10-26 from
-  `qwen3.8-flash-next-iq3_s`: the group is exclusive, so preloading the single-stream tree meant every
-  concurrent-client request paid a group swap (full reload + cold re-prefill) on its first hit. Strata
+- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ]` — changed 2026-10-29 from
+  `qwen3.8-flash-next-coder-iq1_m-parallel` (which was renamed 2026-10-27 from `…-parallel5`, and
+  before that 2026-10-26 from `qwen3.8-flash-next-iq3_s`): llama-swap v262 has no `default_model`
+  key — the preload list *is* the boot default — and the model actually being served was the
+  single-stream one, so a parallel preload meant paying an exclusive-group swap (full reload + cold
+  re-prefill) on the first request after every boot. Flip back to the batch entry when concurrency
+  is the real workload (parallel/TUNING_NOTES.md: 4 streams = 179.3 agg / 45.0 per stream). Either
+  way only one entry: the exclusive gpu group evicts whatever else is preloaded. Strata
   is still loaded at boot, not on first request. **Maya is deliberately not
   preloaded**: its cold load is minutes and it pins 44 GiB, so it swaps in on request
   (its first request pays for that, and `sendLoadingState` says so).
+
+## strata-logs
+
+Post-incident forensics: what survives an engine restart, a model swap, or a hard reset.
+
+- **Why this exists (2026-10-29 09:36 incident).** The engine logs live in the *shared*
+  `strata-data` volume under a **preset**-keyed name — `state/strata/launch/docker.engine.log`
+  and `state/strata/runtime/launch-docker.server.log` — not a per-model name. All three strata
+  entries boot on the `docker` preset, so the next launch truncates the run that just died. The
+  coder session that slowed to 18 tok/s and ended in the wedge was overwritten at the 09:38
+  relaunch: its per-request file-tier/KV-streaming counters were gone. journald carried the boot
+  (`Storage=persistent`; the hard reset only rotated `system.journal`, logged as
+  "corrupted or uncleanly shut down, renaming and replacing"), the engine's own log did not.
+- **`strata-log-archive`** (`let` binding) copies the live logs + `docker.choices.json` + the
+  `~/.config/strata/*/strata-*.log` install logs + a `context.txt` (strata containers, per-GPU
+  memory/free/clock/watt/temp, load, `free -m`, **PSI cpu/mem/io**, this boot's kernel warn+,
+  and `/sys/class/drm/card*/error` — that last one only exists *before* the reboot, which is why
+  it is captured here) into `~/.local/state/strata-logs/<UTC>-<tag>/`. Two triggers:
+  `llama-swap`'s first `ExecStartPre` (`tag=boot` — covers boot after a hard reset, running
+  before `hooks.on_startup.preload` truncates the log) and every strata model's `cmdStop`, which
+  runs `${strataLogStop}/bin/strata-log-stop` → **archive first, then `podman stop -t 120`**.
+  Archive-first is not cosmetic: `unloadTimeout = 40` cuts the `cmdStop` client off long before
+  a slow stop finishes, so a post-stop archive is the one that gets skipped. v262 has no
+  per-model shell hooks (`hooks.on_startup` is the preload list only), which is why this rides on
+  `cmdStop` at all. Skips when nothing was written since the last run (`.fingerprint` =
+  `size:mtime` of the two live logs), keeps the newest 25 dirs, appends `index.txt`. Hand-run it
+  any time: `strata-log-archive manual`.
+- **`strata-toksample.service`** (system unit, `User=javi`, `Restart=always`) appends one line
+  every 10 s to `~/.local/state/strata-logs/samples.csv`: host (`load1`, MemAvailable, swap used,
+  **PSI** cpu/mem/io avg10) + both GPUs (`used,free,util,clk,w`) + the **iGPU idle state**
+  (`igpu_card`, `igpu_rc6_ms`, per-GT `gt0_rc6_ms` / `gt0_cur_mhz` / `gt0_act_mhz` / `gt0_thr` and the
+  `gt1_` twins, read from `/sys/class/drm/<card>/gt/gt*/…` and resolved by the presence of `gt/` so a
+  card rename can't break it) + llama-swap's newest request
+  (`tok/s`, `prompt/s`, cached KV, **draft / accepted draft tokens**, duration, status). Those
+  three groups are what separate the failure modes the engine log cannot: VRAM/KV wall
+  (`g*_free_mib` ~0 with high `req_cached`), GPU starved on tier paging (low util + low watts at
+  low tok/s), clocks throttled (`g*_clk_mhz` down, and `journalctl -k | grep throttled`), host
+  reclaim/IO stall (`psi_mem`/`psi_io`). Rotates at 20 MB, keeps 20 files. stdout is `null` on
+  purpose: the loop is the point and it must not land in journald (see the conmon flood below).
+- **Why the iGPU idle columns exist.** The wedge signature here is GuC dying on the wake out of RC6
+  (Render Standby) — upstream [i915 kernel#14469](https://gitlab.freedesktop.org/drm/i915/kernel/-/issues/14469),
+  blamed by the i915 team in [Dasharo#1786](https://github.com/Dasharo/dasharo-issues/issues/1786) — and
+  boot `-1` had 15 min of complete i915 silence before the first `TLB invalidation response timed out`,
+  so nothing pinned the idle→wake sequence. Exposure here is extreme because all graphics load is on
+  NVIDIA: GT1 sat in RC6 ~96% of uptime, GT0 ~75%. These columns are measurement only — `rc6_enable`
+  is read-only in 6.18 (`power/rc6_enable` and `gt/gt*/rc6_enable`) and `i915.enable_rc6` was removed
+  in 2018; see NOTES § lact for what can actually be changed.
+- **Gotcha editing these scripts.** A `writeShellScriptBin` service gets a PATH of only coreutils,
+  findutils, gnugrep, gnused, systemd — so `gawk`/`jq`/`curl`/`nvidia-smi` need absolute store paths,
+  while plain `ls`/`head`/`tr`/`cut` are already there (they are **coreutils**: `${pkgs.findutils}/bin/head`
+  does not exist, and the failure is silent — the iGPU columns came out `na`, one field short of the
+  header). Inspect the unit's real env with `systemctl show <unit> -p Environment`; and note that a
+  header change rotates the current CSV into `samples-<date>.csv` by itself.
+- **Triage after the fact, in order.**
+  1. `~/.local/state/strata-logs/index.txt` → the last archived run; read its `context.txt`.
+  2. `/var/lib/llama-swap/activity.sqlite` **already survives reboots** (`StateDirectory`) and
+     holds every request: `tok/s`, `prompt/s`, cached/input/draft tokens, duration, status.
+     `sqlite3 /var/lib/llama-swap/activity.sqlite` (copy it plus the `-wal` first; the CLI is in
+     `environment.systemPackages`). Group by `draft_tokens > 0`: across the whole history that
+     split is ~118–131 tok/s vs ~32–49 tok/s per stream — the 2026-10-29 window was 52 rows
+     without drafts (26.5 avg) against 4 with (98.2), i.e. MTP/spec drafting falling out is the
+     single biggest tok/s lever on this box, not VRAM size or clocks.
+  3. `journalctl -b <n>` (find the boot with `journalctl --list-boots`) for the machine side: the
+     wedge read as 16× `i915 *ERROR* GT0: GUC: TLB invalidation response timed out` inside 29
+     `*ERROR*` lines (the other 13 = `Failed to set param 6/7 … -ENODEV`, i.e. GuC clock writes on
+     the dead GPU) → `Failed to reset GuC, ret = -110` → `device wedged,
+     needs recovery` (29 in that boot, 0 in every boot since) → Hyprland's GL assert + the
+     quickshell crash-loop. The kernel was alive throughout (llama-swap served to 09:36:46, then
+     `Activating special unit System Power Off` at 09:37:19 = power button), so the "lockup" was
+     the display path, not the machine. LACT then looped on DRM change events → GPU reload →
+     iGPU clock writes against a dead GPU (`min/max_freq_mhz_dev_store` WARNINGs) every few
+     seconds; its stale PCI entries (`could not find GPU … defined in configuration`, also at a
+     clean boot) are noise, and the i915 min/max-clock churn is its own doing → § lact.
+     Grep the GPU narrowly or the machine side lies to you — and check the index first with
+     `journalctl --list-boots`, because `-1` walks back every reboot (the wedge boot was `-1`
+     that morning, `-2` after the next reboot):
+     `journalctl -k -b -2 | grep -E "i915.*(\*ERROR\*|wedged|GPU HANG|Resetting chip|Failed to reset GuC|freq_mhz_dev_store)"`
+     → 32 hits in the wedge boot, 0 in every clean boot. Do **not** grep a bare `GUC` (it matches
+     the normal `GUC: submission/SLPC/RC enabled` bring-up lines) or bare `TLB invalidation|WARNING`
+     (that catches the IOMMU boot banner `iommu: DMA domain TLB invalidation policy: lazy mode`,
+     which is the VT-d **IOTLB** flush policy for `dma_unmap` — lazy = batched flush queue,
+     strict = synchronous via `iommu.strict=1` — not the GPU's GTTLB that GuC failed to flush, and
+     moot here anyway: every group in `/sys/kernel/iommu_groups/*/type` reads `identity`, and
+     `pci-stub.ids` is the audio IRQ-storm fix → § boot, not VFIO, so strict mode buys nothing).
+  4. Two gotchas: llama-swap's `prompt_per_second` counts **new tokens only**, so a request that
+     restores 44k cached KV and reads 34 new tokens prints ~19 "prompt" tok/s — that is the KV
+     restore, not prefill (real prefill stayed 1,500–2,300 tok/s through the collapse). And the
+     `strata monitor` containers paint their TUI to stdout, so conmon pushes it to journald
+     (~76 lines/s, 32k lines in 7 min) — which is exactly where the tok/s curve came from when
+     the engine log was gone, and why the sampler writes CSV instead.
+
+## lact
+
+LACT manages every GPU it detects, so there is no iGPU entry in `~/.config/lact/config.yaml` to delete — the iGPU (`8086:7D67-1849:7D67-0000:00:02.0`) only shows up at runtime (`lact cli list`). That file is hand-edited: `services.lact` does not generate it, `environment.etc."lact/config.yaml".source` symlinks `/etc/lact/config.yaml` to it. Edit with `lactd` stopped, because the daemon rewrites it.
+
+What turned the 09:36 wedge into a 22-second kernel WARNING storm was LACT's **clock reset** path: every config reload resets clock tables for each GPU it holds, including i915's min/max clock files. With GuC dead those writes failed inside i915 — `lact: could not reset max/min clock` plus 28 i915 `min/max_freq_mhz_dev_store` / `max_freq_mhz_dev_store` backtraces in ~12 s — and the daemon stop at 09:37:19 failed the same way on NVIDIA (`could not reset the clocks table: Could not reset VF curve`). Two switches, both active: `daemon.disable_clocks_cleanup: true` in that config (daemon-level, so it needs `systemctl restart lactd`), and `systemd.services.lactd.serviceConfig.ExecStartPost`, which runs `lact cli --gpu-id=8086:7D67-1849:7D67-0000:00:02.0 detach` on every lactd start. `detach`/`reattach` (0.10.0+) is runtime daemon state — no config key for it — so it is re-applied per start; `lact cli list` afterwards should list only the two NVIDIA cards.
+
+Stale GPU ids from another machine (`0c:00.0`, `01:00.0`, `81:00.0`, `05:00.0`) were pruned: they logged `could not find GPU … defined in configuration` on every start and could apply a profile to the wrong card if slot numbering shifted after resume. Live ids are `10DE:2203-1458:40A6-0000:03:00.0` (3090 Ti) and `10DE:2C05-19DA:2765-0000:02:00.0` (5070 Ti), with `current_profile: LLM`. None of this fixes the wedge itself — i915 GuC on Meteor Lake after an S3 cycle is the trigger, and the display still hangs on card1.
 
 ## systemd
 
