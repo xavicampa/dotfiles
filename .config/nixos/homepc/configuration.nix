@@ -533,7 +533,9 @@ in
           # FAMILY+MODEL are family+size, not a path; the blob mounts use fam["file"] verbatim;
           # the /nix/store mount gives the image's nvidia-smi its loader — NOTES.md § llama-swap/strata-coder.
           # Tuning (layer-split, kv-resident, conversation cache) lives in the mounted preset and
-          # ~/.config/strata/coder/TUNING_NOTES.md, never here.
+          # ~/.config/strata/coder/TUNING_NOTES.md, never here. Engine placement has no preset path either
+          # (the run config carries args/user_args/vision only — no env layer), and STRATA_MTP_STAGE0=1 measured
+          # inert under --batch: see coder/TUNING_NOTES.md § CUDA1 headroom, so nobody re-adds it.
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
@@ -656,7 +658,7 @@ in
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
       # preload = the boot default (no default_model key in v262); keep it on the model that serves — NOTES.md § llama-swap
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-coder-iq1_m-parallel" ];
     };
   };
 

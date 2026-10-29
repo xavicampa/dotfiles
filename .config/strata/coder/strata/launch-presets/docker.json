@@ -19,7 +19,7 @@
     "--conversation-cache-slots": "10",
     "--kv": "int8",
     "--kv-resident": "86016",
-    "--layer-split": "21",
+    "--layer-split": "31",
     "--max-context": "131072",
     "--pcie-frac": "0.20",
     "--pipeline-windows": "2",
@@ -33,11 +33,11 @@
   "family": "coder",
   "gpu_roles": null,
   "gpus": [
-    0,
-    1
+    1,
+    0
   ],
   "kv": "int8",
-  "last_used": "2026-10-29 12:12:09.037559",
+  "last_used": "2026-10-29 21:10:28.336103",
   "model": "IQ1_M",
   "model_path": "/data/gguf/coder-IQ1_M",
   "mtp": null,

@@ -757,6 +757,109 @@ MiB, and host `MemAvailable` a few GiB higher. If CUDA0 ever prints `< 512` at 8
 raise the reserve flags (§ How much `--kv-resident` can be raised — the expert cache sits at its cap either way).
 
 
+## CUDA1 headroom — the drafting state on the tight card (2026-10-29 ~18:05)
+
+The tight card is CUDA1, not CUDA0. At the live split 19 boot:
+
+```
+strata generate: layer split: CUDA1 runs layers 19-47, expert cache 7424 slots (14.66 GiB), 7424 of its 7424 profiled pairs
+strata generate: layer split: CUDA0 runs layers 0-18
+strata serve: 2759 MiB of VRAM free with everything loaded
+strata serve: CUDA1: 747 MiB of VRAM free with everything loaded
+```
+
+What CUDA1 holds besides its 29 layers (all from one boot):
+`--batch: 3 slot sessions on CUDA1 (0.81 GiB each)` = 2.43 GiB (CUDA0's share is 0.59 GiB each —
+KV per slot follows the layer span, so the big stage pays more KV),
+`strata mtp: draft layer loaded, 835 MiB of VRAM (experts 675, dense 111)`,
+`strata mtp: draft head over 106299 tokens (212.9 MiB)`,
+`--batch-mtp: 3 slot drafters on CUDA1 (50 MiB of private K/V state and buffers each, sharing the solo drafter's weights)`.
+That is **~1.2 GiB of drafting state on CUDA1** — which makes "move it to CUDA0" the obvious fix, and below is why it does not work.
+
+**Vision is already free there.** `strata-vision: on the CPU, 12 threads, no warm-up`, installed config `"vision": {... "gpu": false}`; the preset's `"vision": "on"` is what keeps it CPU-side. `"vision": "gpu"` is the setting that would put the projector on CUDA1 (`cuda_device: 1`) — do not turn it on to "help CUDA0"; there is nothing to reclaim.
+
+Preset-only attempts to widen CUDA1's stage, all measured, all rejected:
+
+- reserve 512/512 at split 18: `100% of the experts resident` but `CUDA1: 137 MiB of VRAM free ... - LOW: its window graphs are captured on first use and need room`, 146.7 tok/s.
+- split 17: `7610 of its 7936 profiled pairs`, `98% resident`, `CUDA1: 95 MiB free - LOW`; decode collapsed (122.7, and a rerun at 68.5 with one stream at 0.0 and TTFT 17.98). **Never run CUDA1 below the 512 MiB floor** — the window graphs are captured on first use and fail into the slow path.
+- `--mtp-q4 proj` (shrink the draft instead of moving it): 97% resident, 68.5 tok/s, `accept 0.0%`, `drafts/step 0.00`, `yield 9.000`. Rejected outright.
+
+Measured split ladder at reserve 1024 (level 1, 250-token streams): 19 = 149.5 tok/s (long-request 154.7, 747 MiB free) · 20 = 146 (1719 MiB) · 21 = 141.3 (2231 MiB) · 22 = ~139 (2775 MiB) · 24 = 134, `93% resident`. More layers on CUDA1 helps only until CUDA1 runs out of room; the speed curve peaks at 19-20 today.
+
+The placement knob has no preset path at all: the run config (`/data/state/strata/launch/docker.json`) keys are `args` / `user_args` / `vision` / `gpu` / `layer_split` / `max_queue` — **no env layer** — and a hand-run container with the env set gets replaced by llama-swap on the next request (`podman run --replace --name ${MODEL_ID}`), so it cannot even be tested that way.
+
+**`STRATA_MTP_STAGE0=1` does not move it — measured 2026-10-29 ~18:00, after `switch`.** The env was live in the container (`podman inspect` shows it, created 17:56:56) and the boot came out identical to the env-less one:
+
+```
+strata mtp: draft layer loaded, 835 MiB of VRAM (experts 675, dense 111)
+strata generate: --batch-mtp: 3 slot drafters on CUDA1 (50 MiB of private K/V state and buffers each, sharing the solo drafter's weights); 15.89 GiB free there
+strata serve: 2759 MiB of VRAM free with everything loaded
+strata serve: CUDA1: 747 MiB of VRAM free with everything loaded
+```
+
+CUDA0's free VRAM did not drop by the draft layer's 835 MiB, so nothing moved. In the engine binary the name occurs once, in the knob table beside `--pipeline-windows %d on a layer split of two stages without the draft layer on the first card ... STRATA_MTP_STAGE0=1 asks for it` — and batch mode prints `--pipeline-windows 2 is off: not with --batch slots`, so under `--batch-mtp` the draft chain stays pinned where its verifier is (`--batch-mtp`: "slot drafters sit on the last stage's GPU"). Decode unchanged: 146.6 tok/s at split 19 (runs 146/147/147/147) against the 148.5-151.7 spread from before. **The `-e` was reverted from `configuration.nix` the same day**; the knob only means something on the pipelined solo arm, where `--pipeline-windows 2` is live.
+
+What CUDA1's room actually turns on, at `--batch`:
+
+- the split: 19 (747 MiB free, 149.5) · 20 (1719, 146) · 21 (2231, 141.3) · 22 (2775, ~139) · 24 (93% resident, 134).
+- the slot sessions: `--batch: 3 slot sessions on CUDA1 (0.81 GiB each)` vs CUDA0's 0.59 each — `--kv-resident` is the knob, and cutting it pays inside long prompts (see the decode-throughput section for why 86016 was chosen).
+- the cache ceiling: `layer split, CUDA1: 15.89 GiB free of 23.60, room for experts 14.80 GiB` — `--expert-cache 7168` instead of `auto` would park ~2 GiB on CUDA1 and push 256 slots into the page-locked pool (`resident RAM mode: 7.06 GiB of experts in RAM (page-locked), 4864 in the GPU cache; adaptive swaps exchange them with the GPU cache (no file reads)`). **Untested at this split**; the sub-100%-resident arms measured 134-137, so budget a few percent for it.
+
+## GPU role swap — the 3090 Ti as stage 0 (2026-10-29 ~20:00, applied: `"gpus": [1, 0]`)
+
+The preset's `"gpus"` is `--gpu LIST`, which "sets CUDA_VISIBLE_DEVICES/CUDA_DEVICE_ORDER inside the engine" — so the *stage order* follows the list, and the head + draft chain follow the **last** stage. That is the CUDA1-headroom lever `STRATA_MTP_STAGE0=1` could not give under `--batch`, and it lives entirely in the preset.
+
+At `"gpus": [1, 0]` + `--layer-split 31`, from one boot:
+
+```
+strata generate: layer split across 2 GPUs: CUDA0, then CUDA1 (split 31)
+strata generate: layer split: CUDA1 holds its weights, session [31, 48) and the head; 12.81 GiB free
+strata generate: --batch: 3 slot sessions on CUDA0 (0.82 GiB each); 17.60 GiB free
+strata generate: --batch: 3 slot sessions on CUDA1 (0.58 GiB each); 11.06 GiB free
+strata generate: --batch-mtp: 3 slot drafters on CUDA1 (50 MiB ... sharing the solo drafter's weights)
+strata generate: layer split: CUDA1 runs layers 31-47, expert cache 4352 slots (8.78 GiB), 4352 of its 4352 profiled pairs
+strata serve: layer split: 100% of the experts resident, the prompt path's streamed ring 384 slots
+```
+
+The 3090 Ti takes 31 layers, and the 835 MiB draft layer + draft head + slot drafters land on the 5070 Ti instead. KV per slot follows the span, so the big stage pays more KV (0.82 vs 0.58 GiB) — that shift is expected, not a leak.
+
+**Reading trap:** after the swap, `CUDA0` in the log is nvidia-smi index **1** (RTX 3090 Ti). Confirm with `nvidia-smi --query-gpu=index,memory.used` (15.3 GiB on the 5070 Ti, 21.7 on the 3090 Ti), not with the label.
+
+Measured at reserve 1024 (level 1, 300-token streams): split 29 = `96% of the experts resident`, 565 MiB free on the 5070 Ti, 144.5 tok/s · **split 31 = 100% resident, 2743 MiB free (3090 Ti) / 779 MiB (5070 Ti), 164.1 tok/s, long-request med 167.0, level 3 = 150.6 aggregate (50.3/stream)** · split 33 = 100% resident, 1155 / 2371 MiB, 149.8. Fan-out holds too: level 2 = 140.8 aggregate (70.7/stream).
+
+The 105k-prompt stress is unchanged: `prompt 105360 tokens = 0 reused + 105360 read in 27516 ms (3829.1 tok/s)`, no paging warnings, flat GPU memory. Single-stream decode now sits at the solo arm's level (164-167 vs 1slot's 142-165) **with** fan-out still available — that closes the gap this whole tree was chasing.
+
+Headroom, restated: the tight card is now the 5070 Ti at **779 MiB**. The boundary is a sharp optimum — split 31 = 2743 / 779 MiB free and **164.1 tok/s** at 300 tokens, **171.7 / 171.6** at 400 tokens (long-request 174.7) · split 32 = 1729 / 1801 MiB and 149.4 · split 33 = 1155 / 2371 MiB and 160.5-168.6 (long 163-171) · **split 34 = `99% of the experts resident`, 751 / 2989 MiB, 115.0 tok/s** · split 35 = 97% resident, 751 / 3547 MiB, 128.3. Pushing more layers onto the 3090 Ti *fits* but is not free: past 33 the first stage fills to 751 MiB — under the 1024 MiB `--vram-reserve-mib` — residency slips and the page-locked-RAM expert path (the same regime as split 24 in the old order: 134 tok/s at 93%) joins the critical path. Between 31 and 33 residency stays 100% and cost still rises 4-9%: those GiB on the first card are doing work (0.82 GiB of slot session per slot at 31 layers, plus the long-context KV and the window graphs), so spending them on layers takes it back out.
+
+**Why the draft chain sits on the small stage and cannot move off it:** the output head consumes layer 47's hidden state, and the drafter consumes the same end-of-sequence hidden state — both must live on the stage that owns layer 47, i.e. the *last* stage. `--gpu` order is the only lever over which card that is (and `STRATA_MTP_STAGE0=1` is inert here, see above), so the swap moved them rather than the split. The rule that made the swap pay off: give the last stage the **fewer layers**, since it also carries head + drafter. What it costs, from the mtp files themselves (`draft layer loaded, 835 MiB of VRAM (experts 675, dense 111)` = `Strata-data/mtp/rt/experts.bin` 707,788,800 B + `dense.bin` 116,099,072 B), plus `draft head over 106299 tokens (212.9 MiB)` and 3 × 50 MiB slot drafters ≈ **1.2 GiB**. It is not cuttable: `--mtp-draft-vocab` has nothing to grab (the shipped `rt/draft_vocab.bin` is 425,196 B = 106,299 × 4 B — the full vocab, exactly the count in that head line), `--mtp-q4` measured `accept 0.0%`, and the chain earns its keep at `accept 86-88%`, `drafts/step 7.3-8.6`, `yield gen/fed 1.38-1.50`.
+Keep `--pcie-frac 0.20` explicit: the split search prices expert misses against the *first* stage's link, which after the swap is the 6.6 GB/s PCIe probe line — do not return to `--layer-split auto`. This is a preset-only change: no `configuration.nix` edit, so it survives a llama-swap relaunch on its own. `1slot/` and `parallel/` still carry `"gpus": [0, 1]`; the same swap is untested there.
+
+Slot count comes from `-e PARALLEL=…` in `configuration.nix` (the env beats the preset and is written back into it), so a 4th slot is a nix change, not a preset one. Arithmetic at split 31: the 4th slot costs 0.82 GiB on the 3090 Ti (fits in 2743) plus 0.58 GiB on the 5070 Ti (leaves ~185 MiB, under the 512 MiB window-graph floor), so `--parallel 4` means split 33 (2371 MiB on the 5070 Ti) and its 4–6% decode cost. Untested.
+
+## Vision on the GPU — the device index does NOT follow the `--gpu` swap (2026-10-29 ~21:30, applied)
+
+Vision placement is not a preset key: the run config carries it — `/home/javi/.config/strata/coder/strata-coder-iq1_m.json` → `vision: {"gpu": true, "cuda_device": 1}` (mounted at `/data/install/strata-coder-iq1_m.json`; the launcher mirrors it into `/data/state/strata/launch/docker.json`, so editing the tree file is enough — no `configuration.nix` change).
+
+**Trap:** `cuda_device` is the *physical* nvidia-smi index — `strata-vision` is a separate process and does not inherit the engine's `CUDA_VISIBLE_DEVICES` remap. Measured: `cuda_device: 0` put the tower on `GPU-600417b3` = index 0 = the **5070 Ti**. With `"gpus": [1, 0]` in force, the 3090 Ti is `cuda_device: 1`. Verify rather than reason, with:
+
+```
+nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader
+```
+
+— the tower shows up as its own row (`strata-vision --mmproj …`, **1226 MiB**), the engine as two rows (15090 MiB on the 5070 Ti stage, 21424 on the 3090 Ti stage). Putting it on the 5070 Ti would have eaten 1226 MiB of the card that already has only 779 MiB free; on the 3090 Ti it costs the same but leaves that card with `1863 MiB` physical free.
+
+Cost on the first stage, from one boot with the tower GPU-resident: `strata-vision: warmed up at 289 image tokens in 0.2 s` and `1510 MiB of VRAM free with everything loaded` (vs 2743 with `"gpu": false`) — the engine's `expert cache auto` sizing sees the tower's VRAM before it plans, so that 1.2 GiB is paid in cache slots, not just sitting alongside. Still 100% resident, no LOW/`WARNING`, decode unaffected (`124-145 tok/s` on the image requests).
+
+Latency is a wash at this config — the tower is capped by `vision.max_tokens: 300` image tokens: 48×48 image `gpu 0.31/0.34 s` vs `cpu 0.35 s`; 1024×1024 image `gpu 1.35/1.40 s` vs `cpu 1.37 s`. The one real gain is the **cold** image: `gpu 2.81 s` vs `cpu 3.86 s`, because the GPU path warms up at boot (`warmed up at 289 image tokens`) while the CPU path prints `on the CPU, 12 threads, no warm-up`. The other gain is not paying the projection on 12 CPU threads while the expert pool wants 15 — relevant when an image lands mid-generation.
+
+The cap is now raised — **`vision.max_tokens: 1024`** (was 300, the point where the tower printed `load_hparams: if you encounter problems with accuracy, try adding --image-min-tokens 1024`, which no longer appears). Effects, measured:
+
+- `strata-vision: warmed up at 1024 image tokens in 0.4 s`; the tower's row grows **1226 → 1336 MiB** (+110 MiB of activations, weights unchanged), so the first stage reads `1510 → 1402 MiB of VRAM free with everything loaded`. Physical free on the 3090 Ti: 1755 MiB. Still 100% resident, no LOW/`WARNING`.
+- An image request's prompt goes **350 → 1085 tokens**. The cold read pays: `1085 read in 1902 ms (570.5 tok/s)` vs `350 read in 1375 ms`. Repeats are free either way — `1080 reused + 5 read in 34 ms` — so end-to-end request time is unchanged (`1.37 / 1.40 s`). Small images are unaffected (48×48 → `71 tokens`, 0.64 s).
+- Text decode is untouched: 173.6 tok/s at split 31 after the change.
+
+So the 1024 cap costs ~0.5 s once per new image and 110 MiB, buys finer spatial sampling of screenshots, and adds 1024 prompt tokens of KV per image to the session.
+
 ## Failure modes, in the order they will bite
 
 | symptom in the log | meaning | lever, in order |

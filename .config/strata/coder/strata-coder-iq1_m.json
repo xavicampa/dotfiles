@@ -1,5 +1,4 @@
 {
-  "exe": "component:strata-engine",
   "args": [
     "--pack",
     "/data/Strata-data/packs/coder-iq1_m",
@@ -28,49 +27,6 @@
     "--vision",
     "--pool-workers",
     "15",
-    "--adapt-every",
-    "1",
-    "--adapt-async",
-    "1",
-    "--conversation-cache-mib",
-    "12288",
-    "--conversation-cache-slots",
-    "10",
-    "--conversation-cache-min-free-mib",
-    "1536",
-    "--conversation-cache-min-tokens",
-    "16384",
-    "--conversation-cache-park-gain",
-    "12288"
-  ],
-  "cwd": "/opt/strata/terminal",
-  "tokenizer": "/data/Strata-data/packs/coder-iq1_m/tokenizer",
-  "model_name": "qwen3.8-flash-next-coder-iq1_m",
-  "log": "/data/install/strata-coder-iq1_m.log",
-  "lib_dirs": [],
-  "port": 8080,
-  "gpu": [
-    0,
-    1
-  ],
-  "gpus_asked": true,
-  "layer_split": "auto",
-  "vision": {
-    "exe": "/opt/strata/components/engine/0.1.52-linux-x86_64-cuda-cuda13/strata-vision",
-    "mmproj": "/data/gguf/coder-IQ1_M/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
-    "model": "/data/gguf/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
-    "gpu": false,
-    "max_tokens": 300,
-    "threads": 12,
-    "cuda_device": 1
-  },
-  "max_queue": 3,
-  "queue_timeout": 90,
-  "user_args": [
-    "--kv-resident",
-    "86016",
-    "--kv",
-    "int8",
     "--adapt-every",
     "1",
     "--adapt-async",
@@ -128,5 +84,49 @@
     "16384",
     "--conversation-cache-park-gain",
     "12288"
-  ]
+  ],
+  "cwd": "/opt/strata/terminal",
+  "exe": "component:strata-engine",
+  "gpu": [
+    0,
+    1
+  ],
+  "gpus_asked": true,
+  "layer_split": "auto",
+  "lib_dirs": [],
+  "log": "/data/install/strata-coder-iq1_m.log",
+  "max_queue": 3,
+  "model_name": "qwen3.8-flash-next-coder-iq1_m",
+  "port": 8080,
+  "queue_timeout": 90,
+  "tokenizer": "/data/Strata-data/packs/coder-iq1_m/tokenizer",
+  "user_args": [
+    "--kv-resident",
+    "86016",
+    "--kv",
+    "int8",
+    "--adapt-every",
+    "1",
+    "--adapt-async",
+    "1",
+    "--conversation-cache-mib",
+    "12288",
+    "--conversation-cache-slots",
+    "10",
+    "--conversation-cache-min-free-mib",
+    "1536",
+    "--conversation-cache-min-tokens",
+    "16384",
+    "--conversation-cache-park-gain",
+    "12288"
+  ],
+  "vision": {
+    "cuda_device": 1,
+    "exe": "/opt/strata/components/engine/0.1.52-linux-x86_64-cuda-cuda13/strata-vision",
+    "gpu": true,
+    "max_tokens": 1024,
+    "mmproj": "/data/gguf/coder-IQ1_M/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+    "model": "/data/gguf/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
+    "threads": 12
+  }
 }
