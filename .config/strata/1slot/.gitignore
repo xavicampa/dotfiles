@@ -60,3 +60,6 @@ strata/settings.json
 # /opt/strata/components/engine/<version> path, and it resolves the reader from whichever
 # engine package the image ships. Losing it means images silently off after an update.
 # (Tracked, not ignored - this line is documentation; no pattern above matches the name.)
+
+# strata tuning artifacts (boot archives, bench logs, era markers)
+.tune/
