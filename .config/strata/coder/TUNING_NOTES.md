@@ -131,8 +131,11 @@ from the preset so the engine keeps its built-in 700 MiB margin.
 
 `--max-context` stays **131072**: with `kv-resident` set explicitly, extra cells land in *pinned RAM*
 (`the K/V in 0.64 GiB of pinned RAM`), not VRAM. Raising it to 196608 would cost ~7-8 GiB of the 31 GiB
-available for prompts pi trims at 131072 anyway. It has to agree with three other places
-(`capabilities.context` in `configuration.nix`, pi's `contextWindow`, preset `"context"`) — § llama-swap/strata-coder.
+available for prompts pi trims at 131072 anyway. It has to agree with two other places
+(`capabilities.context` in `configuration.nix` — llama-swap advertises it and **pi discovers it** — and the preset's
+`"context"` reuse check). pi's `modelOverrides[…].contextWindow = 131072` is a **redundant pin**: pi takes the
+advertised number, and a stale override replaces it and hides the real cap
+(§ parallel/TUNING_NOTES.md, correction 2026-10-29) — § llama-swap/strata-coder.
 
 ## Conversation cache (RAM, not VRAM)
 

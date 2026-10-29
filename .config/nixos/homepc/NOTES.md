@@ -784,7 +784,7 @@ Three knobs, three different layers, and only one of them is a launch flag. Read
   `podman exec -e PYTHONPATH=/opt/strata/terminal <ctr> /opt/strata/terminal/python/bin/python3 -c "…derive_config…"`
   printed `max_queue 3 / queue_timeout 90 / 29 tuned args intact`.
   Effect: `admission_limit = slots + max_queue = 7` — 4 decoding, 3 waiting, 429 past that.
-- **Context cap → five places have to agree** (lowered 131072 → **98304** on 2026-10-27 ~15:10 because 4 × 100k
+- **Context cap → four places have to agree, plus one redundant pi pin** (lowered 131072 → **98304** on 2026-10-27 ~15:10 because 4 × 100k
   conversations hit the RAM wall; rationale and measurements in `~/.config/strata/parallel/TUNING_NOTES.md`
   § the RAM wall). The engine arg is the only one the server *obeys*; the rest are either agreements or
   advertisements, and getting them wrong fails in different ways:
@@ -797,10 +797,17 @@ Three knobs, three different layers, and only one of them is a launch flag. Read
   4. nix `capabilities.context = 98304` on this entry — llama-swap advertises it as `context_window` / `n_ctx` in
      `/v1/models`; leaving it at 131072 makes the router promise a context the engine refuses. Needs a switch to
      regenerate the llama-swap config; check `curl -s localhost:8080/v1/models` → `context_window: 98304`.
-  5. `~/.pi/agent/models.json` → `modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304`. **pi
-     does not discover the engine's context** — unset means the documented default **128000**, which is why 101k
-     prompts were accepted happily before. With 98304 and pi's default `reserveTokens 16384`, auto-compaction
-     starts above 81,920 tokens. Not nix-managed (plain file, not a repo) and read at pi start, so a running
+  5. `~/.pi/agent/models.json` → `modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304` is
+     **insurance, not the mechanism — pi does discover the advertised number.** `curl -s localhost:8080/v1/models`
+     carries `context_window` / `context_length` / `meta.n_ctx` for **every** model, loaded or not, straight from
+     nix `capabilities.context`, and pi uses it: the solo `qwen3.8-flash-next-iq3_s` entry has **no pi override at
+     all** and pi still runs the full 262144 (checked 2026-10-29). The old "101k prompts accepted happily" was
+     101k < the then-advertised 131072, not a 128000 fallback — the **128000 default in
+     `docs/models-configuration.md` belongs to declared `models` entries**, not to models discovered over
+     `/v1/models`. `modelOverrides` *replaces* the discovered field ("other fields replace it"), so a stale pin
+     now actively hides the real cap: it is worth keeping only where pi must use **less** than the router
+     advertises, and worth deleting rather than letting drift. With 98304 and pi's default `reserveTokens 16384`,
+     auto-compaction starts above 81,920 tokens (245,760 on the solo tree). Read at pi start, so a running
      session keeps the old number.
   Checking the derived argv without touching the live engine:
   `podman exec -i -e PYTHONPATH=/opt/strata/terminal <ctr> /opt/strata/terminal/python/bin/python3 -c "…derive_config…"`
@@ -909,7 +916,8 @@ holding GPU memory. It shares the exclusive GPU group, so llama-swap will not ru
 - **`--max-context 131072` here, unlike the parallel tree's 98304.** Four places have to agree — preset
   `extra` (the layer that reaches argv), preset `"context"` (the reuse check only), `capabilities.context`
   below (llama-swap advertises `context_window` / `n_ctx`), and Pi's `modelOverrides[…].contextWindow` in
-  `~/.pi/agent/models.json` (Pi does not discover the engine's context; unset means 128000). The engine arg
+  `~/.pi/agent/models.json` — that last one is **optional**: pi discovers what llama-swap advertises, and a stale
+  pin replaces the discovered value and hides the real cap (§ llama-swap/strata-parallel item 5). The engine arg
   is the only one the server obeys; the rest are agreements or advertisements. § TUNING_NOTES.md § kv-resident
   has the budget arithmetic for why 131072 of *context* is fine while 131072 of *kv-residency* is not.
 - **`--pcie-frac 0.20`** instead of that tree's `0.00` — the streaming-headroom default, which is right for

@@ -305,16 +305,20 @@ lowered and the context capped, ~1-2 snapshots is the real capacity and LRU now 
 `--vram-reserve-later-mib` (raising it would drop CUDA1 below its 8192 profiled pairs; no CUDA1 warning has fired).
 
 **Two more places carry the same number, and neither is an engine arg:** llama-swap's
-`capabilities.context = 98304` in `configuration.nix` (it is advertised as `context_window`/`n_ctx`; it was still
-131072, so the router promised a context the engine would refuse — needs a nix switch), and pi's
-`modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304` (pi defaults to **128000** when unset,
-which is why 101k prompts went through; with 98304 + default `reserveTokens 16384` compaction starts at 81,920).
+`capabilities.context = 98304` in `configuration.nix` (advertised as `context_window` / `context_length` / `n_ctx`
+for **every** model, loaded or not; it was still 131072, so the router promised a context the engine would refuse —
+needs a nix switch), and pi's
+`modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304`.
 
-**Pi had to move with it.** `~/.pi/agent/models.json` -> `modelOverrides["qwen3.8-flash-next-iq3_s-parallel"].contextWindow = 98304`.
-Pi does not discover the engine's context: unset means the documented default **128000**, so capping only the engine
-would have Pi sending 110-120k prompts into a 98304 engine (400s). With `contextWindow 98304` and the default
-`reserveTokens 16384`, Pi auto-compacts above **81,920** tokens. Takes effect at the next pi start - this session
-still carries 128000, so a manual `/compact` may be needed after the restart.
+**Correction (2026-10-29): that pi pin is redundant — pi does discover the context.** It discovers it from
+llama-swap's advertised `context_window`, not from the engine. Proof: the solo `qwen3.8-flash-next-iq3_s` entry has
+**no** `contextWindow` override at all and the session runs the full 262144. What I read as "101k prompts went
+through" was 101k < the then-advertised 131072. The **128000 default in `docs/models-configuration.md`** belongs to
+`models` entries declared in `models.json`, not to models discovered over `/v1/models`. And `modelOverrides`
+*replaces* the discovered field, so a stale pin now **hides** the real cap: keep it only where pi must use less than
+the router advertises, otherwise delete it rather than let it drift. With 98304 and the default
+`reserveTokens 16384`, pi auto-compacts above **81,920** tokens (245,760 on the solo tree). Re-read at pi start, so
+a running session keeps whatever number it already had.
 
 Backups: `strata-iq3_s.json.bak-pre-ctx98k`, `strata/launch-presets/docker.json.bak-pre-ctx98k`,
 `~/.pi/agent/models.json.bak-pre-ctx98k`. Verified by dry-running `derive_config` against **both** bases (installed
