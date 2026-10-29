@@ -103,7 +103,59 @@ CUDA1 (vision, a second install on the card, bigger `--vram-reserve-later-mib`),
   else moved, so it is out at single-slot 262K. Re-test `--kv-resident 65536` if real sessions start going
   past ~150K (KV in VRAM costs ~13.7 KB per context token; 262K ≈ 3.6 GiB); `tune_knobs.py` treats
   anything under 49152 at 128K+ as never-pick ("22 % to 34 % slower").
-- **`--pcie-frac 0.00`** — still right: expert blobs come from pinned RAM (`0 blob reads from the file`).
+- **`--pcie-frac 0.00`** — still right, and now measured rather than assumed: a one-key standard-v1 A/B against
+  `0.20` moved nothing (§ `--pcie-frac` A/B below). Keep 0.00; the PCIe path was never the limiter here.
+
+## `--pcie-frac` A/B — 0.20 vs 0.00 (2026-10-29, standard-v1, engine 0.1.52)
+
+The cleanest A/B this tree has had: `2026-10-29-standard-homepc-2` (`--pcie-frac 0.20`, engine boot 12:05:14Z)
+vs `2026-10-29-standard-homepc-3` (`0.00`, boot 12:27:51Z). The configuration blocks differ in **exactly one key**
+(27 others identical), same corpus `e75eff8b…`, same template/sampling, capacity 1, context 262144, both
+`--no-start --skip-model-hash` (so both `nonconforming` for provenance only), **12/12 sanity**, 78 s each.
+`2026-10-29-standard-homepc-1` (also 0.20, same engine) is the replicate.
+
+| metric | 0.20 | 0.00 | Δ |
+|---|---|---|---|
+| prompt-4k tok/s | 2078.5 (2071–2081) | 2055.8 (2054–2076) | −1.1% |
+| prompt-16k tok/s | 3399.4 (3399–3406) | 3330.3 (3324–3332) | −2.0% |
+| prompt-4k decode | 122.9 (121–158) | 139.2 (130–155) | +13.2% |
+| prompt-16k decode | 136.6 (134–149) | 138.0 (132–160) | +1.1% |
+| short decode | 157.1 (149–161) | 150.4 (138–170) | −4.3% |
+| TTFT 4k / 16k | 1.985 / 4.843 s | 2.008 / 4.942 s | +1.1% / +2.0% |
+| total 4k / 16k | 6.14 / 8.58 s | 5.68 / 8.64 s | −7.5% / +0.7% |
+
+**Verdict: no measurable effect.** The same box, *identical* config, two runs (runs 1 vs 2 — same engine, same
+flags) spread **prompt tok/s ±0.5–2%, TTFT ±2%, decode ±15%** at n=3; 4k decode alone went 144.3 vs 122.9
+(15%). So the +13.2% at 4k decode here is the noise, not the frac. Use **±15% for decode medians** in
+`standard-v1` (n=3/case), not the ±8% that came out of the parallel suites.
+
+The knob is live but idle here — from `docker.engine.log`, per window:
+
+| | 0.20 (63 reqs) | 0.00 (35 reqs) |
+|---|---|---|
+| requests with PCIe / other-GPU expert reads | **63/63** | **0/35** |
+| those reads as % of routed lookups | med 0.30%, max 2.10% (282 reads med, 948 max) | 0 |
+| expert reads off the file tier per request | med 0.0 MB | med 111.7 MB |
+| OS storage reads per request | med 36.4 MB | med 115.5 MB |
+| decode expert-cache hit rate | med **91.20%** (max 96.2) | med **91.30%** (max 96.5) |
+
+and **nothing about the layout moved**: streamed ring 384 slots at chunk 8192, prompt path borrows 1984 vs 1978
+CUDA0 cache slots (3.66 GiB), split stages lend 3810 vs 3804 slots (7.31 vs 7.32 GiB), expert cache 4392 slots,
+759 MiB VRAM free, KV 32768/262144 + 1.80 GiB pinned — all identical. At capacity 1 `--pcie-frac` chooses only
+**where a miss is served**, not how much arena each part gets. It is a wash because residency already covers the
+working set: 60% of experts resident, ~91% hit, so the frac only ever had ~0.3% of lookups to move and the file
+tier serves them just as cheaply. Same conclusion the boot banner gave (`pcie_share ~0.000–0.011`; coder: 12.44 ms
+streamed of a 4500 ms request) — now with end-to-end numbers attached.
+
+Confounds, both pushing *against* 0.00 and it still tied: run 3 started 42 s after its engine boot (1 prior
+request) while run 2 started 4.4 min after (41 prior), so run 3 had the colder page cache — the worse state for a
+setting that pushes misses onto the file tier (its OS reads went 36 → 115 MB/req).
+
+Applied: `0.00` in the run config args (`strata-iq3_s.json`) **and** preset `extra` — both carriers, so the manual
+`run-iq3_s.sh` path and the launch path agree. Backup `strata-iq3_s.json.bak-pre-pcie0`. **Do not carry this result
+to the coder tree** (still 0.20): there four slots share a smaller arena and the working set can spill past
+residency, which is exactly when the frac would bind — and coder has never run `standard-v1`, only the parallel
+suites, so it needs its own one-key A/B first.
 
 ## Guardrails / watch
 

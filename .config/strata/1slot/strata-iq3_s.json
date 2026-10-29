@@ -38,7 +38,7 @@
   "--layer-split",
   "32",
   "--pcie-frac",
-  "0.20",
+  "0.00",
   "--pipeline-windows",
   "2",
   "--resident-experts",
