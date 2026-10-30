@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Payload for the scratch workspace (special:magic).
+# Hyprland runs this via `on_created_empty`, i.e. only when the workspace is
+# created while empty — toggling an existing scratch does NOT re-run it.
+
+exec kitty \
+    --class scratch \
+    --title "scratch" \
+    --session - <<EOF
+layout tall
+launch --title btop -- btop
+launch --title strata -- podman run --network host --rm -it ghcr.io/niko1221/strata:latest-cuda13 strata monitor --url http://127.0.0.1:5801
+launch --title strata-p3 -- podman run --network host --rm -it ghcr.io/niko1221/strata:latest-cuda13 strata monitor --url http://127.0.0.1:5802
+EOF

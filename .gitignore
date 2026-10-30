@@ -155,6 +155,20 @@ javier-campa-dotfiles/
 .nv/
 .cache/
 .local/
+
+# EXCEPTION — the scratch payload Hyprland runs via its on_created_empty workspace
+# rule (~/.config/hypr/hyprland.lua). `.local/` above buries the whole dir
+# (machine state: share/state/var/lib/...), and git will NOT descend into an
+# excluded dir, so the re-include is spelled in this ORDER on purpose: open the
+# dir, re-bury everything inside, then hand-pick the payload out again. Last
+# match wins — reorder at your own risk. Its `.bak` hand-snapshot stays buried
+# with every other such copy (the repo's convention: git history supersedes the
+# file copy); `rm ~/.local/bin/.dms-scratch.bak` if you want it gone.
+!.local/
+.local/**
+!.local/bin/
+!.local/bin/dms-scratch
+
 .cargo/
 .mozilla/
 .openjfx/
