@@ -1,0 +1,34 @@
+diff --git a/quickshell/Common/Theme.qml b/quickshell/Common/Theme.qml
+index d40f6b6..76705b5 100644
+--- a/quickshell/Common/Theme.qml
++++ b/quickshell/Common/Theme.qml
+@@ -1484,13 +1484,28 @@ Singleton {
+         generateSystemThemesFromCurrentTheme();
+     }
+ 
++    // An *empty* mode block ("light": {}) is how DMS says "this theme has nothing for that mode",
++    // and `||` cannot tell it from a present one: `{}` is truthy in JS, so the cross-mode fallback
++    // below never fires, every role resolves to undefined, each `property color` takes the
++    // undefined as no assignment at all, and the shell looks applied while painting nothing — which
++    // is what a dark-only theme from any registry looks like in a light-mode session. Guard the
++    // empty block by *length*, not by *presence*.
++    function modeColors(themeData, colorMode) {
++        const wanted = themeData[colorMode] || {};
++        if (Object.keys(wanted).length !== 0)
++            return wanted;
++        const other = colorMode === "light" ? "dark" : "light";
++        const fallback = themeData[other] || {};
++        return Object.keys(fallback).length ? fallback : {};
++    }
++
+     function resolveCustomTheme(themeData, colorMode) {
+         if (!themeData)
+             return StockThemes.getThemeByName("purple", colorMode === "light");
+ 
+         var baseColors = {};
+         if (themeData.dark || themeData.light) {
+-            baseColors = themeData[colorMode] || themeData.dark || themeData.light || {};
++            baseColors = modeColors(themeData, colorMode);
+         } else {
+             baseColors = themeData;
+         }

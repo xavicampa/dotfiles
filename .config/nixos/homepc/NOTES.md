@@ -234,6 +234,32 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   pairing. Drop it once upstream carries a registry name: look for `sourceName` in
   `core/internal/server/themes/types.go` of the new tag — and if upstream names it differently,
   re-anchor the QML half to that name too.
+- **Third local patch** (`./patches/dux-empty-mode-palette.patch`, added 2026-10-30; order
+  immaterial for it — it touches `Common/Theme.qml`, neither of the other two does):
+  `Theme.resolveCustomTheme` (`Common/Theme.qml:1493`) takes the mode block by `||`, and `{}` is
+  **truthy** in JS, so a theme shipping `"light": {}` — what an honest dark-only palette used to
+  look like — got *nothing* for the light mode: the cross-mode fallback never fired, every role
+  resolved to undefined, each `property color` took the undefined as no assignment at all, and the
+  shell looked applied while painting nothing (the symptom: "applying an omarchy theme changes the
+  wallpaper and nothing else"). The patch puts a `modeColors()` that guards the empty block by
+  `Object.keys().length` rather than by presence, so an **empty** block counts as **absent** and the
+  theme resolves its other mode's own palette. Live-proved end to end, in the running shell, with
+  its control: the *active* theme's own installed `theme.json` doctored (`light` emptied, `dark`
+  kept) → the shell's *own* `FileView` watcher (`onFileChanged → reload() → onLoaded →
+  parseAndLoadTheme()`) took it → the bar band sampled as **184726 px of the dark `surface`
+  `#232136`** while the session stayed **light**; the real file put back → the same band back to
+  **207893 px of `#e9e9eb`**. No setting write, no scratch dir, one file doctored and restored.
+  Worth the *why what first attempt proved nothing*: `settings set customThemeFile` writes the
+  setting and nothing else; only `switchTheme("custom")` (`:1415`) re-routes
+  `loadCustomThemeFromFile`, which is what re-points `customThemeFileView`.
+  The guard is what bites for a theme carrying **nothing** for a mode (the official registry's own
+  dark-only ones, anyone else's); this machine's registry ships **both** modes per theme since
+  `tool/build.py:synth_other_mode`, so nothing here needs it. Sibling gaps left
+  patched-by-nobody: the same `||` shape below in `resolveCustomTheme`'s variants branch
+  (`flavor[colorMode] || flavor.dark || …`), and in `ThemeBrowser.themePalette()`
+  (`(Theme.isLightMode ? theme.light : theme.dark) ?? theme.dark`), which shows a dark-only theme's
+  card swatches blank in a light-mode browser. Drop it once upstream guards the empty block: look
+  for `Object.keys` near `baseColors =` in `resolveCustomTheme`, of the new tag.
 - **2.0.0 renames that do *not* reach this config** (release notes: package names, binary
   names and systemd units are unchanged): `dms`, `dms.service`, `bin/dms-greeter` all stay,
   and both new attrs set `meta.mainProgram` (`dux-shell` → `dms`, `dux-greeter` →
