@@ -214,9 +214,13 @@ hl.window_rule({
 -- ─── DMS polkit prompt ─────────────────────────────────────────────────────
 -- The polkit agent on homepc is DMS's own (services.hyprpolkitagent is off
 -- here, see home.nix), and the prompt this build shows is an xdg toplevel, not a
--- layer surface — measured live with a pending `pkcheck -u` request:
---   class/initialClass com.danklinux.dms   title/initialTitle Authentication
---   size 460x220, floating true, pid = the quickshell (dms) process
+-- layer surface — measured live with a pending `pkexec true` request:
+--   class/initialClass dev.duxlabs.shell   title/initialTitle Authentication
+--   size 560x222, floating true, pid = the quickshell (dms) process
+-- The class is the 2.0.0 ("Dux Shell") app ID; DMS <= 1.6.3 said
+-- com.danklinux.dms. Match BOTH — this is exactly the rename that silently
+-- killed dim_around after the 2.0.0 bump, because a non-matching window rule is
+-- inert with no error anywhere (see NOTES.md § dms-shell, "2.0.0 renames").
 -- (Quickshell's PanelWindow namespace "dms:polkit-auth-surface" from
 -- dist/Modals/PolkitAuthSurfaceModal.qml never appears in `hyprctl layers` in
 -- 1.6.3, so an hl.layer_rule on that namespace would be inert — verified: while
@@ -229,7 +233,8 @@ hl.window_rule({
 -- untabbable that has to come from DMS's focus grab, not this rule.
 hl.window_rule({
     name         = "dms-polkit-dialog",
-    match        = { class = "com\\.danklinux\\.dms", title = "Authentication" },
+    match        = { class = "dev\\.duxlabs\\.shell|com\\.danklinux\\.dms",
+                     title = "Authentication" },
     dim_around   = true,
     stay_focused = true,
 })
