@@ -24,7 +24,8 @@ preset `extra`:
 ```
 
 > **Conversation-cache values superseded 2026-10-30** — the three `--conversation-cache-*` values above are
-> the old ones; the arm now running is **`mib 6144 / min-tokens 8192 / park-gain 16384`**. See
+> the old ones; the arm now running is **`mib 12288 / slots 10 / min-tokens 16384 / park-gain 12288`**
+> (= the `coder` tree's values, adopted as arm CC3 below). See
 > “Conversation cache: a 1024 MiB pool cannot hold one pi session” at the end of this file.
 --expert-profile /data/state/strata/profile-learned.bin (+ --expert-profile-save)
 ```
@@ -493,13 +494,64 @@ one sample each, suggestive only. RAM: min `MemAvailable` during a bench 13.1 Gi
 against 19.8 at idle, swap ≤ 2.3 GiB, `0 blob reads from the file` (page-locked expert tier untouched), decode
 not hurt.
 
-**Not settled: the pool still cannot hold three giants.** 6144 MiB ≈ 2.4 conversations of 100K tokens. In the
-CC1/CC2 windows my 2.2 GiB copy plus the bench's 3.22 + 2.11 GiB copies went over it, LRU took mine
-(`evictions=1..3`), and that turn read 95K cold. Next arm if two *real* long conversations collide: `cc=8192`
-(+ `ccslots=6`, because `slots` = 4 would then bind before the pool). RAM says yes — 13.9 GiB min at a 6 GiB
-pool leaves ~12 GiB at 8, above the 2560 floor. Do **not** fund it by lowering
-`--conversation-cache-min-free-mib` (that floor is the safety; the parallel tree already measured what happens
-when it is traded away).
+**Not settled at the time — resolved by arm CC3 below (the `coder` tree's values, adopted).** 6144 MiB ≈ 2.4
+conversations of 100K tokens. In the CC1/CC2 windows my 2.2 GiB copy plus the bench's 3.22 + 2.11 GiB copies
+went over it, LRU took mine (`evictions=1..3`), and that turn read 95K cold.
+
+### CC3 — the `coder` values, adopted: 12288 / slots 10 / min-tokens 16384 / park-gain 12288 (live)
+
+The operator asked for parity with `coder`, whose live preset is `--conversation-cache-mib 12288
+--conversation-cache-slots 10 --conversation-cache-min-tokens 16384 --conversation-cache-park-gain 12288
+--conversation-cache-min-free-mib 1536`. Four of the five were copied; **`min-free-mib 1536` was not** (why,
+below). Boot unchanged: `9216 of its 9216 profiled pairs`, free 1019/1139 MiB, GATE PASS.
+
+It fixed exactly the case 6144 could not, and `slots 10` is load-bearing rather than cosmetic — parked reached
+**4 slots**, which the engine default of 4 caps (pool is not the only ceiling at capacity 1):
+
+```
+strata serve: conversation cache: parked 171795 tokens in 729.8 ms; parked=4 bytes=11136249792 evictions=1 snapshot_bytes=3458584616
+strata serve: conversation cache: restored 150926 tokens (live) in 169.9 ms; parked=3 bytes=10301263400
+strata serve: prompt 151403 tokens = 150926 reused + 477 read in 1.4s (339.4 tok/s)
+```
+
+Same bench sequence at CC2 (6144/slots 4): my copy evicted → `95358 read in 21.6 s`. At CC3 it survived three
+giants and came back in **170 ms**. Pool peak **10.37 GiB in 4 slots**, evictions 1 (CC2: 5.20 GiB peak — the
+pool ceiling was the limit — evictions 3).
+
+| arm | pool peak | slots used | evict max | my session after the bench |
+|---|---|---|---|---|
+| CC2 6144 / min-tok 8192 / gain 16384 (slots default 4) | 5.20 GiB | 2 | 3 | `95358 read` cold, 21.6 s |
+| **CC3 12288 / slots 10 / 16384 / 12288** | **10.37 GiB** | **4** | 1 | `150926 reused + 477 read`, **169.9 ms** |
+
+**The price, measured — do not treat this as free.** Min `MemAvailable` under the bench **8.5 GiB** (CC3)
+against 13.1-13.9 (CC1/CC2), and the expert tier's file-tier reads woke up: `resident RAM: 25.06 GiB of experts
+in RAM, … 10-16 blob reads from the file` per window, where every earlier era on this tree printed **0**. That
+is still inside the notes' guardrail (“tens, not thousands”), but it is the page cache being squeezed by parked
+KV — the same resource the 26.8 GiB PLE table lives on — and the bench's cold-read control sat at **4,503.7**
+against the 4,798.6-4,848.9 band (−6 %; one sample, and see the trap below for why that number is now suspect).
+Judgement: accepted, because a switch costs 20-30 s and is constant on this arm, while a *fresh* prompt read is
+rare outside benches. If `blob reads from the file` climbs into the hundreds or MemAvailable dips under ~6 GiB
+in real use, drop `--conversation-cache-mib` to 8192 and keep the rest.
+
+**Why `min-free-mib 1536` was not copied:** that floor is what coder/parallel needed because parking was being
+*refused* there (`skip parking (physical RAM admission; need … plus 2560 MiB floor …)`); on this tree it has
+never bound — zero such skips in any era, and MemAvailable never went below 8.5 GiB. Copying it buys nothing
+here and removes the brake exactly when a 12 GiB pool is the thing pressing on RAM. Kept at the engine default
+**2560**; it will now refuse parking before it can cost the expert tier its page cache, which is the behaviour
+wanted on a single-slot tree whose prompt path is page-cache-bound.
+
+**Measurement trap this creates — read before comparing decode/prefill across cc arms.** Once the pool is big
+enough, `bench-1slot.py` stops measuring cold work: its own conversations park and come back
+(`prompt 83907 = 83889 reused + 18 read in 0.1s`, and stage D became `84673 reused + 5 read`). The second bench
+round in an era is therefore **not** a cold read. Filter prefill on `reused = 0` request lines (or restart the
+engine) or the arm comparison measures the cache, not the prompt path. This also means the CC3 “−6 % on D” is
+weaker evidence than it looks; the blob-read and MemAvailable lines are the reliable RAM signals.
+
+Applied (live, both carriers, via `./tune-arm.sh cc=12288 ccslots=10 ccmin=16384 gain=12288`):
+`--conversation-cache-mib 12288 --conversation-cache-slots 10 --conversation-cache-min-tokens 16384
+--conversation-cache-park-gain 12288`, `min-free-mib` left at the default 2560. The 6144/8192/16384 state
+(arm CC2) is in git as `2016ce30556cf1a2fee0cd3d5f18f8bbf08585ef`; the pre-sweep 1024/256/512 state is in
+`docker.json.bak-20261030-pre-cc6144` / `strata-iq3_s.json.bak-20261030-pre-cc6144`.
 
 Watch it with `./cc-counters.py [era …]`: per era it prints the arm's own cc flags off the boot line, request
 count, cold reads ≥4K with their seconds, budget refusals, parks (with the <8192-token ones called out), pool
@@ -519,7 +571,8 @@ Method traps found doing this — read before any A/B on this knob:
 
 Applied (live, both carriers): `--conversation-cache-mib 6144 --conversation-cache-min-tokens 8192
 --conversation-cache-park-gain 16384`; `slots` (4) and `min-free-mib` (2560) left at engine defaults — parked
-peaked at 3, so `slots` never binds at capacity 1.
+peaked at 3, so `slots` never binds at capacity 1. **(Superseded by CC3 above — 6144 was not the ceiling that
+mattered; `slots` 4 was the other one.)**
 
 ## Revert points
 

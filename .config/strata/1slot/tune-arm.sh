@@ -59,10 +59,14 @@ if vis != "keep":
 a, synced = r["args"], []
 for p in pairs:
     k, v = p.split("|", 1)
-    if k in a:
-        i = a.index(k)
-        if v: a[i + 1] = v
-        else: del a[i:i + 2]
+    if k.startswith("--conversation-cache-") or k in a:
+        if k in a:
+            i = a.index(k)
+            if v: a[i + 1] = v
+            else: del a[i:i + 2]
+        elif v:
+            i = max([a.index(x) + 2 for x in a if x.startswith("--conversation-cache-")], default=0)
+            a[i:i] = [k, v]          # new key: keep the cc flags together
         synced.append(k)
 r_changed = vis != "keep" or synced
 if r_changed:
