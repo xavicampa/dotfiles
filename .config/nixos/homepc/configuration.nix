@@ -274,7 +274,7 @@ in
       enable = true;
 
       # Dux Shell (renamed from dms-shell upstream at 2.0.0) + quickshell from unstable as a
-      # pair; local previewPath patch — NOTES.md § dms-shell
+      # pair; two local patches (previewPath, per-registry filter) — NOTES.md § dms-shell
       package = unstable.dux-shell.overrideAttrs (final: prev: {
         postPatch = (prev.postPatch or "") + ''
           # sourceRoot is core/; QML tree one up, fetched tree read-only
@@ -282,6 +282,7 @@ in
           [ -f ../quickshell/Modules/Settings/ThemeBrowser.qml ] || root=.
           chmod -R u+w "$root"
           patch -p1 -d "$root" -N --batch < ${./patches/dux-preview-path.patch}
+          patch -p1 -d "$root" -N --batch < ${./patches/dux-registry-filter.patch}
         '';
       });
       quickshell.package = unstable.quickshell;

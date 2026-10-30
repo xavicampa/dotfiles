@@ -219,6 +219,21 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   the tree is compiled into `bin/dms`, `tags = [ "withshell" ]`), so verify it took by the
   build log printing `patching file quickshell/Modules/Settings/ThemeBrowser.qml` — a failed
   hunk fails the build outright, since `patch -N --batch` exits non-zero on a reject.
+- **Second local patch** (`./patches/dux-registry-filter.patch`, added 2026-10-30; it applies after
+  the preview one, with its hunks 4–6 landing on a 6-line offset): Browse Themes merges every
+  configured registry into **one flat list** and the theme JSON carried no registry name at all
+  (`ThemeInfo.SourceDir` is the directory *inside* a registry, not the registry), so with `omarchy`
+  added there was no way to see only its 186 themes. The patch adds `Theme.SourceName` /
+  `ThemeInfo.sourceName` — `loadThemesFrom` takes the `registries.Source` now, and the name rides
+  into an installed `theme.json` as provenance — and puts a second `DFilterChips` row under
+  All/Installed/Available: one chip per registry, counts that respect the search and the status
+  chips, row hidden while only one registry is configured — plus a `store` badge on each card. Probed
+  against the live cache (`/tmp/dankdots-plugin-registry`): official 47, omarchy 186, none
+  mislabelled; Qt 6.12 `qmllint` on the patched QML is clean, and the package's `checkPhase` runs the
+  two touched Go packages, whose `TestUpdateMultiRegistry` the patch teaches about dedupe-vs-source
+  pairing. Drop it once upstream carries a registry name: look for `sourceName` in
+  `core/internal/server/themes/types.go` of the new tag — and if upstream names it differently,
+  re-anchor the QML half to that name too.
 - **2.0.0 renames that do *not* reach this config** (release notes: package names, binary
   names and systemd units are unchanged): `dms`, `dms.service`, `bin/dms-greeter` all stay,
   and both new attrs set `meta.mainProgram` (`dux-shell` → `dms`, `dux-greeter` →

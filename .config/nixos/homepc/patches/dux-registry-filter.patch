@@ -1,0 +1,290 @@
+diff --git a/core/internal/server/themes/list.go b/core/internal/server/themes/list.go
+index d5c6ce5..dbed39f 100644
+--- a/core/internal/server/themes/list.go
++++ b/core/internal/server/themes/list.go
+@@ -38,6 +38,7 @@ func HandleList(conn *ipc.ConnWriter, req ipc.Request) {
+ 			Description: t.Description,
+ 			PreviewPath: t.PreviewPath,
+ 			SourceDir:   t.SourceDir,
++			SourceName:  t.SourceName,
+ 			Installed:   installed,
+ 			FirstParty:  isFirstParty(t.Author),
+ 			WCAG:        t.WCAG,
+diff --git a/core/internal/server/themes/list_installed.go b/core/internal/server/themes/list_installed.go
+index 1fb6b46..e504c5e 100644
+--- a/core/internal/server/themes/list_installed.go
++++ b/core/internal/server/themes/list_installed.go
+@@ -213,6 +213,7 @@ func HandleListInstalled(conn *ipc.ConnWriter, req ipc.Request) {
+ 				Author:      theme.Author,
+ 				Description: theme.Description,
+ 				SourceDir:   id,
++				SourceName:  theme.SourceName,
+ 				FirstParty:  isFirstParty(theme.Author),
+ 				HasUpdate:   hasUpdate,
+ 			}
+@@ -236,6 +237,7 @@ func HandleListInstalled(conn *ipc.ConnWriter, req ipc.Request) {
+ 				Author:      installed.Author,
+ 				Description: installed.Description,
+ 				SourceDir:   id,
++				SourceName:  installed.SourceName,
+ 				FirstParty:  isFirstParty(installed.Author),
+ 			}
+ 			addVariantsInfo(&info, installed.Variants)
+diff --git a/core/internal/server/themes/search.go b/core/internal/server/themes/search.go
+index 40df518..b726eda 100644
+--- a/core/internal/server/themes/search.go
++++ b/core/internal/server/themes/search.go
+@@ -43,6 +43,7 @@ func HandleSearch(conn *ipc.ConnWriter, req ipc.Request) {
+ 			Version:     t.Version,
+ 			Author:      t.Author,
+ 			Description: t.Description,
++			SourceName:  t.SourceName,
+ 			Installed:   installed,
+ 			FirstParty:  isFirstParty(t.Author),
+ 			WCAG:        t.WCAG,
+diff --git a/core/internal/server/themes/types.go b/core/internal/server/themes/types.go
+index 98b65d9..becff86 100644
+--- a/core/internal/server/themes/types.go
++++ b/core/internal/server/themes/types.go
+@@ -48,6 +48,7 @@ type ThemeInfo struct {
+ 	Description string            `json:"description,omitempty"`
+ 	PreviewPath string            `json:"previewPath,omitempty"`
+ 	SourceDir   string            `json:"sourceDir,omitempty"`
++	SourceName  string            `json:"sourceName,omitempty"`
+ 	Installed   bool              `json:"installed,omitempty"`
+ 	FirstParty  bool              `json:"firstParty,omitempty"`
+ 	HasUpdate   bool              `json:"hasUpdate,omitempty"`
+diff --git a/core/internal/themes/registry.go b/core/internal/themes/registry.go
+index 6f3ad69..ba889e9 100644
+--- a/core/internal/themes/registry.go
++++ b/core/internal/themes/registry.go
+@@ -145,6 +145,10 @@ type Theme struct {
+ 	WCAG        *ThemeWCAG     `json:"wcag,omitempty"`
+ 	PreviewPath string         `json:"-"`
+ 	SourceDir   string         `json:"sourceDir,omitempty"`
++	// SourceName is the registries.json entry that provided this theme. Several registries are
++	// merged into one flat list, so a browser that wants to show only one of them needs the name;
++	// it rides along into the installed theme.json as provenance.
++	SourceName string `json:"sourceName,omitempty"`
+ }
+ 
+ type GitClient interface {
+@@ -261,8 +265,8 @@ func (r *Registry) updateOne(src registries.Source) error {
+ }
+ 
+ // A registry without a themes/ directory is a valid plugins-only registry.
+-func (r *Registry) loadThemesFrom(dir string) ([]Theme, error) {
+-	themesDir := filepath.Join(dir, "themes")
++func (r *Registry) loadThemesFrom(src registries.Source) ([]Theme, error) {
++	themesDir := filepath.Join(r.cacheDirFor(src), "themes")
+ 	entries, err := afero.ReadDir(r.fs, themesDir)
+ 	if err != nil {
+ 		if os.IsNotExist(err) {
+@@ -294,6 +298,7 @@ func (r *Registry) loadThemesFrom(dir string) ([]Theme, error) {
+ 			theme.ID = entry.Name()
+ 		}
+ 		theme.SourceDir = entry.Name()
++		theme.SourceName = src.Name
+ 		theme.WCAG = loadThemeWCAG(r.fs, themeDir)
+ 
+ 		previewPath := filepath.Join(themeDir, "preview.svg")
+@@ -333,7 +338,7 @@ func (r *Registry) Update() error {
+ 			errs = append(errs, fmt.Errorf("registry %s: %w", src.Name, err))
+ 			continue
+ 		}
+-		themes, err := r.loadThemesFrom(r.cacheDirFor(src))
++		themes, err := r.loadThemesFrom(src)
+ 		if err != nil {
+ 			errs = append(errs, fmt.Errorf("registry %s: %w", src.Name, err))
+ 			continue
+diff --git a/core/internal/themes/registry_test.go b/core/internal/themes/registry_test.go
+index b79e97a..ce79df9 100644
+--- a/core/internal/themes/registry_test.go
++++ b/core/internal/themes/registry_test.go
+@@ -82,6 +82,15 @@ func TestUpdateMultiRegistry(t *testing.T) {
+ 		}
+ 	}
+ 
++	// The merged list is flat, so each entry has to carry the registry it came from; the dedupe
++	// above means a duplicate ID keeps the winning registry's name too.
++	expectedSource := map[string]string{"shared": "official", "one": "official", "two": "extra"}
++	for _, theme := range r.themes {
++		if theme.SourceName != expectedSource[theme.ID] {
++			t.Fatalf("theme %q should come from registry %q, got %q", theme.ID, expectedSource[theme.ID], theme.SourceName)
++		}
++	}
++
+ 	if dir := r.GetThemeDir("two"); dir != base+"/extra/themes/two" {
+ 		t.Fatalf("expected theme dir under extra registry, got %q", dir)
+ 	}
+diff --git a/quickshell/Modules/Settings/ThemeBrowser.qml b/quickshell/Modules/Settings/ThemeBrowser.qml
+index d4ba2de..7a201d6 100644
+--- a/quickshell/Modules/Settings/ThemeBrowser.qml
++++ b/quickshell/Modules/Settings/ThemeBrowser.qml
+@@ -18,6 +18,90 @@ RegistryBrowserWindow {
+     property bool operationFailed: false
+     property var pendingThemes: ({})
+     property int filterIndex: 0
++    // Registry name (the registries.json entry) the cards must come from; "" keeps every registry.
++    property string registryFilter: ""
++
++    function themePassesStatus(theme) {
++        if (filterIndex === 1 && !theme.installed)
++            return false;
++        if (filterIndex === 2 && theme.installed)
++            return false;
++        return true;
++    }
++
++    function themePassesQuery(theme, query) {
++        if (query.length === 0)
++            return true;
++
++        const name = theme.name ? theme.name.toLowerCase() : "";
++        const description = theme.description ? theme.description.toLowerCase() : "";
++        const author = theme.author ? theme.author.toLowerCase() : "";
++        return name.indexOf(query) !== -1 || description.indexOf(query) !== -1 || author.indexOf(query) !== -1;
++    }
++
++    // One chip per registry that actually has themes, in registries.json order. Names are taken
++    // from the unfiltered list so a chip cannot vanish under an active search; the counts answer
++    // "how many would I see if I clicked this", so they respect the search and the status chips
++    // but deliberately not this chip.
++    readonly property var registryChips: {
++        const names = [];
++        for (var i = 0; i < allThemes.length; i++) {
++            const source = allThemes[i].sourceName || "";
++            if (source !== "" && names.indexOf(source) === -1)
++                names.push(source);
++        }
++
++        const counts = ({});
++        const query = searchQuery ? searchQuery.toLowerCase() : "";
++        let total = 0;
++        for (var j = 0; j < allThemes.length; j++) {
++            const theme = allThemes[j];
++            if (!themePassesStatus(theme) || !themePassesQuery(theme, query))
++                continue;
++            total++;
++            const source = theme.sourceName || "";
++            if (source !== "")
++                counts[source] = (counts[source] || 0) + 1;
++        }
++
++        const chips = [
++            {
++                label: I18n.tr("All registries", "theme browser registry filter chip"),
++                value: "",
++                count: total
++            }
++        ];
++        for (var k = 0; k < names.length; k++) {
++            chips.push({
++                label: names[k],
++                value: names[k],
++                count: counts[names[k]] || 0
++            });
++        }
++        return chips;
++    }
++
++    function registryChipIndex() {
++        const chips = registryChips;
++        for (var i = 0; i < chips.length; i++) {
++            if (chips[i].value === registryFilter)
++                return i;
++        }
++        return 0;
++    }
++
++    // A registry can drop out of registries.json (or fail to clone) while its name is still the
++    // active filter, which would leave an empty grid under an unselected chip.
++    function pruneRegistryFilter() {
++        if (registryFilter === "")
++            return;
++        for (var i = 0; i < allThemes.length; i++) {
++            if ((allThemes[i].sourceName || "") === registryFilter)
++                return;
++        }
++        registryFilter = "";
++        registryChipRow.currentIndex = 0;
++    }
+ 
+     function updateFilteredThemes() {
+         var filtered = [];
+@@ -25,22 +109,12 @@ RegistryBrowserWindow {
+ 
+         for (var i = 0; i < allThemes.length; i++) {
+             var theme = allThemes[i];
+-            if (filterIndex === 1 && !theme.installed)
++            if (!themePassesStatus(theme) || !themePassesQuery(theme, query))
+                 continue;
+-            if (filterIndex === 2 && theme.installed)
++            if (registryFilter !== "" && (theme.sourceName || "") !== registryFilter)
+                 continue;
+ 
+-            if (query.length === 0) {
+-                filtered.push(theme);
+-                continue;
+-            }
+-
+-            var name = theme.name ? theme.name.toLowerCase() : "";
+-            var description = theme.description ? theme.description.toLowerCase() : "";
+-            var author = theme.author ? theme.author.toLowerCase() : "";
+-
+-            if (name.indexOf(query) !== -1 || description.indexOf(query) !== -1 || author.indexOf(query) !== -1)
+-                filtered.push(theme);
++            filtered.push(theme);
+         }
+ 
+         filteredThemes = filtered;
+@@ -88,6 +162,14 @@ RegistryBrowserWindow {
+ 
+     function themeBadges(theme) {
+         const badges = PluginService.badgeModel(theme);
++        // More than one registry configured: the card has to say which one it came from.
++        if (registryChips.length > 1 && theme.sourceName) {
++            badges.push({
++                label: theme.sourceName,
++                icon: "store",
++                tone: "outline"
++            });
++        }
+         const variants = theme.variants || null;
+         const variantCount = variants ? (variants.type === "multi" ? (variants.accents?.length ?? 0) : (variants.options?.length ?? 0)) : 0;
+         if (variantCount > 0)
+@@ -211,6 +293,7 @@ RegistryBrowserWindow {
+                 return;
+             }
+             allThemes = response.result || [];
++            pruneRegistryFilter();
+             updateFilteredThemes();
+         });
+         DMSService.listInstalledThemes(response => {
+@@ -276,6 +359,7 @@ RegistryBrowserWindow {
+                 return;
+             isLoading = false;
+             allThemes = themes;
++            pruneRegistryFilter();
+             updateFilteredThemes();
+         }
+         function onInstalledThemesReceived(themes) {
+@@ -316,6 +400,18 @@ RegistryBrowserWindow {
+                     root.updateFilteredThemes();
+                 }
+             }
++            DFilterChips {
++                id: registryChipRow
++                width: parent.width
++                // A single configured registry needs no chip row: it can only ever say "all".
++                visible: root.registryChips.length > 1
++                model: root.registryChips
++                currentIndex: root.registryChipIndex()
++                onSelectionChanged: index => {
++                    root.registryFilter = root.registryChips[index]?.value ?? "";
++                    root.updateFilteredThemes();
++                }
++            }
+             StyledText {
+                 width: parent.width
+                 visible: root.operationMessage !== ""
