@@ -21,6 +21,11 @@ preset `extra`:
 --spec 4                  --spec-min-p 0.70 --trim-stage-weights
 --vram-reserve-mib 1024   --vram-reserve-later-mib 1024
 --conversation-cache-mib 1024 --conversation-cache-min-tokens 256 --conversation-cache-park-gain 512
+```
+
+> **Conversation-cache values superseded 2026-10-30** — the three `--conversation-cache-*` values above are
+> the old ones; the arm now running is **`mib 6144 / min-tokens 8192 / park-gain 16384`**. See
+> “Conversation cache: a 1024 MiB pool cannot hold one pi session” at the end of this file.
 --expert-profile /data/state/strata/profile-learned.bin (+ --expert-profile-save)
 ```
 
@@ -435,6 +440,87 @@ It is only valid in-era; across eras it measures traffic mix, not the config. To
 saved as `/tmp/gpuswap/<label>.era`. Revert point `docker.json.bak-20261030-pre-kvsweep`. Live arm after the
 sweep: `[0,1]`, split 30, `--kv-resident 32768`, `--pcie-frac 0.20`, `vision.gpu=false`.
 
+## Conversation cache: a 1024 MiB pool cannot hold one pi session — 6144 / 8192 / 16384 (2026-10-30 ~00:20-00:45, engine 0.1.54, **live**)
+
+Trigger: the operator's report that long prompts keep prefilling from 0. The engine named the reason 12
+times in one era — it wanted to park the conversation and the pool refused:
+
+```
+strata serve: conversation cache: skip parking (snapshot 2978 MiB exceeds available budget)
+strata serve: prompt 143208 tokens = 0 reused + 143208 read in 29891 ms (4791.0 tok/s), 3209 generated …
+```
+
+The pool was `--conversation-cache-mib 1024` (`slots` / `min-free-mib` at engine defaults 4 / 2560), and a
+snapshot on this arm costs **~20-24 KiB/token** (from `snapshot_bytes=`, not `bytes=` — see the traps below):
+84,678 tok → 1.98 GiB · 89,163 → 2.04 · 100,712 → 2.21 · 171,792 → 3.22. So **one 100K-token pi session
+(2.2 GiB) never fit the cache at all**: it could only ever hold 265-13,710-token fragments, while this arm's
+entire traffic is one 90-140K session. The knob was not mis-tuned, it was sized below the unit of work.
+
+Arms — every boot `9216 of its 9216 profiled pairs`, free 1019/1139 MiB, **GATE PASS**; `[0,1]/30`,
+kv 32768, frac 0.20, vision CPU throughout; switched with `./tune-arm.sh cc=… ccmin=… gain=…`, which now
+writes all five `--conversation-cache-*` keys in **both** carriers:
+
+| arm (mib / min-tokens / park-gain) | reqs | budget refusals | parks (of which < 8192 tok) | pool peak | evict max | `restored (live)` |
+|---|---|---|---|---|---|---|
+| CC0 1024/256/512 (was live) | 99 | **12** | 19 (**17**) | 0.97 GiB / 4 slots | 13 | **0** |
+| CC1 6144/256/512 | 18 | 0 | 6 (2) | 5.52 GiB / 3 slots | 3 | **0** |
+| **CC2 6144/8192/16384 (live)** | 32 | 0 | 7 (**0**) | 5.20 GiB / 2 slots | 3 | **2** |
+
+Three things this measures:
+
+1. **`mib` is the binding knob.** At 6144 the refusals vanish and the giants park:
+   `parked 172406 tokens in 1029.1 ms; bytes=5924111680 evictions=1 snapshot_bytes=3458529680`.
+   Parking costs **0.45-1.05 s for 84-172K tokens = 3-5 % of the 21-30 s cold re-read it prevents.**
+2. **A parked copy that survives pays ~200×:** `restored 102030 tokens (live) in 105.7 ms` →
+   `prompt 102065 tokens = 102030 reused + 35 read in 617 ms`, against the same session cold earlier in the
+   same era (`95358 read in 21.6 s`). Across the whole log, restores of >20K-token conversations cost 48-321 ms.
+3. **min-tokens / park-gain are what make room for it.** At 256/512 the pool spent GiB *and* time on
+   265-6,494-token side requests (17 of 19 parks, 110-130 ms each, `reused_kv_bytes=0` — they never paid) and
+   re-parked the hot session every turn (`dropped 1 superseded copy`), so the hot copy was still the LRU
+   victim: **CC1 had 0 refusals and still 0 restores.** With 8192/16384 no sub-8K park happens at all and
+   re-parks go partial/cheap (`parked 102030 tokens in 81.4 ms; reused_kv_bytes=1537263`). Accepted as a pair
+   — one mechanism (churn), **not separately attributed**.
+
+And the reason this is not a decode knob: **parking only happens on displacement.** A conversation that keeps
+its slot never parks — after the CC1 restart my session read `78590 = 0 reused` and parked nothing, and its
+next turn reused 79,241. The coder tree's “with one hot session the cache does nothing” holds here too; what
+this cache buys is the **switch** between pi sessions / subagents, and coming back after a reload.
+
+What it costs: bench per arm — CC1 A 191.1 / B 157.3 / C 140.9 / **D 4,611.4**, CC2 A 183.2 / B 180.9 /
+C 166.9 / **D 4,897.3** (keeper D control band 4,798.6-4,848.9). D is the only near-noise-free metric: it sat
+4 % low at CC1 and back in band at CC2, which is what fewer parked GiB competing for the page cache predicts —
+one sample each, suggestive only. RAM: min `MemAvailable` during a bench 13.1 GiB (CC1) / 13.9 GiB (CC2)
+against 19.8 at idle, swap ≤ 2.3 GiB, `0 blob reads from the file` (page-locked expert tier untouched), decode
+not hurt.
+
+**Not settled: the pool still cannot hold three giants.** 6144 MiB ≈ 2.4 conversations of 100K tokens. In the
+CC1/CC2 windows my 2.2 GiB copy plus the bench's 3.22 + 2.11 GiB copies went over it, LRU took mine
+(`evictions=1..3`), and that turn read 95K cold. Next arm if two *real* long conversations collide: `cc=8192`
+(+ `ccslots=6`, because `slots` = 4 would then bind before the pool). RAM says yes — 13.9 GiB min at a 6 GiB
+pool leaves ~12 GiB at 8, above the 2560 floor. Do **not** fund it by lowering
+`--conversation-cache-min-free-mib` (that floor is the safety; the parallel tree already measured what happens
+when it is traded away).
+
+Watch it with `./cc-counters.py [era …]`: per era it prints the arm's own cc flags off the boot line, request
+count, cold reads ≥4K with their seconds, budget refusals, parks (with the <8192-token ones called out), pool
+peak, evictions, and the `restored (live)` payoff line. Verdict rule: **five- or six-digit `restored (live)`
+counts = the cache is paying; refusals > 0 = pool too small; evictions climbing in an era that also shows a
+giant request with `0 reused` = pool too small for the conversations actually live.**
+
+Method traps found doing this — read before any A/B on this knob:
+- **Era bounds must come from `.tune/<label>.era`.** An unbounded `tail -n +<boot>` window makes the previous
+  arm swallow the next arm's traffic; it happened mid-analysis and produced a bogus “180 big restores happened
+  at mib=1024” statistic that was really my own CC2 era read backwards.
+- **Pack `iq3_s` is shared** by the 1slot, parallel (and 3slots) installs, so any cross-boot statistic grouped by
+  `--pack` mixes trees. Only in-era comparisons are attributable on this box.
+- On a park line `bytes=` is the **pool total**, `snapshot_bytes=` is that one conversation. The KiB/token
+  constant comes from `snapshot_bytes` (19.7-24.5 for 84-172K); small parks are overhead-dominated
+  (3,238 tok → 0.27 GiB ≈ 90 KiB/token), which is a second reason `min-tokens` pays.
+
+Applied (live, both carriers): `--conversation-cache-mib 6144 --conversation-cache-min-tokens 8192
+--conversation-cache-park-gain 16384`; `slots` (4) and `min-free-mib` (2560) left at engine defaults — parked
+peaked at 3, so `slots` never binds at capacity 1.
+
 ## Revert points
 
 | file | restores |
@@ -455,6 +541,10 @@ sweep: `[0,1]`, split 30, `--kv-resident 32768`, `--pcie-frac 0.20`, `vision.gpu
 | `strata/launch-presets/docker.json.bak-20261030-pre-kvsweep` | the preset before the kv-resident sweep (`32768`, split 30, frac 0.20) — same values as the accepted arm |
 | `strata/launch-presets/docker.json.bak-20261030-pre-pcie020` | the preset with `--pcie-frac 0.00` |
 | `strata-iq3_s.json.bak-20261030-syncsplit` | the run config with `--layer-split 32` (pre-sync) |
-| `~/.config/strata/1slot/tune-arm.sh` | **the durable arm runner**: edit → stop → reload → boot archive → **gate** → bench → in-era KV table. `./tune-arm.sh <label> [split=N] [kv=N] [frac=X] [mtp=on|off] [vision=gpu|cpu] [--no-bench]`, `ROUNDS=2` for two rounds; artifacts in `.tune/` |
+| `~/.config/strata/1slot/tune-arm.sh` | **the durable arm runner**: edit → stop → reload → boot archive → **gate** → bench → in-era KV table. `./tune-arm.sh <label> [split=N] [kv=N] [frac=X] [mtp=on|off] [vision=gpu|cpu] [cc=MIB] [ccslots=N] [ccmin=N] [gain=N] [minfree=N] [--no-bench]`, `ROUNDS=2` for two rounds; artifacts in `.tune/` |
+| `~/.config/strata/1slot/cc-counters.py` | the conversation-cache instrument: per-era refusals / parks / pool peak / evictions / `restored (live)`, labelled from the boot's own argv |
+| `strata/launch-presets/docker.json.bak-20261030-pre-cc6144`, `strata-iq3_s.json.bak-20261030-pre-cc6144` | the conversation cache at **1024 / 256 / 512** (arm CC0, the pre-sweep state) |
+| `tune-arm.sh.bak-20261030-pre-cc` | the runner before it learned the five `cc` knobs (and before it called `cc-counters.py`) |
+| `.tune/CC0-baseline.counters.txt`, `.tune/CC{1,2}.{era,boot.txt}` | baseline counters snapshot + the two arms' era line numbers and boot archives |
 | `/tmp/gpuswap/{arm.sh,arm2.sh,arm3.sh}` | the throwaway predecessors (superseded by `tune-arm.sh`) |
 | `/tmp/gpuswap/fractab.py` | pools per-request decode/prefill samples across eras, labelled from each boot's effective argv |

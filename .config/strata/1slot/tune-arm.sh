@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # tune-arm.sh — one arm, switched identically: edit -> stop -> reload -> boot archive -> gate -> bench.
 #
-#   ./tune-arm.sh <label> [split=N] [kv=N] [frac=X] [mtp=on|off] [vision=gpu|cpu] [--no-bench]
+#   ./tune-arm.sh <label> [split=N] [kv=N] [frac=X] [mtp=on|off] [vision=gpu|cpu]
+#                          [cc=MIB] [ccslots=N] [ccmin=N] [gain=N] [minfree=N] [--no-bench]
+#
+# cc = --conversation-cache-mib (RAM pool for parked conversations; 0 = off), ccslots = -slots,
+# ccmin = -min-tokens, gain = -park-gain, minfree = -min-free-mib. These five are kept in step in
+# BOTH carriers (preset extra and the run config args) - see TUNING_NOTES.md "merge order".
 #   ROUNDS=2 ./tune-arm.sh ...        # bench rounds per boot (default 1)
 #
 # Anything you do not pass stays as-is. Artifacts land in <tree>/.tune/ (boot.txt, bench.txt, era line no.).
@@ -27,6 +32,11 @@ for a in "$@"; do
     mtp=on)   PAIRS+=("STRATA_MTP_STAGE0|1");;
     mtp=off)  PAIRS+=("STRATA_MTP_STAGE0|");;
     vision=*) VISION=${a#vision=};;
+    cc=*)      PAIRS+=("--conversation-cache-mib|${a#cc=}");;
+    ccslots=*) PAIRS+=("--conversation-cache-slots|${a#ccslots=}");;
+    ccmin=*)   PAIRS+=("--conversation-cache-min-tokens|${a#ccmin=}");;
+    gain=*)    PAIRS+=("--conversation-cache-park-gain|${a#gain=}");;
+    minfree=*) PAIRS+=("--conversation-cache-min-free-mib|${a#minfree=}");;
     --no-bench) BENCH=0;;
     *) echo "unknown arg: $a" >&2; exit 2;;
   esac
@@ -41,13 +51,29 @@ for p in pairs:
     if v: d["extra"][k] = v
     else: d["extra"].pop(k, None)
 json.dump(d, open(P, "w"), indent=2, sort_keys=True); open(P, "a").write("\n")
+r = json.load(open(R))
 if vis != "keep":
-    r = json.load(open(R)); r["vision"]["gpu"] = (vis == "gpu")
+    r["vision"]["gpu"] = (vis == "gpu")
+# conversation-cache flags live in the run config args too; the preset wins on the merge, but the
+# manual run-iq3_s.sh path reads the run config alone, so mirror the value there (notes: "both carriers").
+a, synced = r["args"], []
+for p in pairs:
+    k, v = p.split("|", 1)
+    if k in a:
+        i = a.index(k)
+        if v: a[i + 1] = v
+        else: del a[i:i + 2]
+        synced.append(k)
+r_changed = vis != "keep" or synced
+if r_changed:
     json.dump(r, open(R, "w"), indent=1); open(R, "a").write("\n")
 print("  split=%s kv=%s frac=%s mtp_stage0=%s vision.gpu=%s" % (
     d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac"),
-    d["extra"].get("STRATA_MTP_STAGE0", "(absent)"),
-    json.load(open(R))["vision"]["gpu"]))
+    d["extra"].get("STRATA_MTP_STAGE0", "(absent)"), r["vision"]["gpu"]))
+print("  cc: " + " ".join("%s=%s" % (k.replace("--conversation-cache-", ""),
+      d["extra"].get(k, "(default)")) for k in ("--conversation-cache-mib", "--conversation-cache-slots",
+      "--conversation-cache-min-tokens", "--conversation-cache-park-gain", "--conversation-cache-min-free-mib")))
+if synced: print("  also synced in run config args:", ",".join(synced))
 PY
 
 echo "--- stop/reload ---"
@@ -74,6 +100,11 @@ print("  stage1 %s/%s  free %s/%s  GATE %s%s" % (p.group(3) if p else "?", p.gro
 sys.exit(0 if ok else 1)
 PY
 
+cc_counters() {
+  echo "--- conversation cache counters (this era) ---"
+  python3 "$TREE/cc-counters.py" "$N" | tail -n +2
+}
+cc_counters
 if [ "$BENCH" = 0 ]; then echo "--- bench skipped (--no-bench) ---"; exit 0; fi
 echo "--- bench ($ROUNDS round(s)) ---"
 cd "$TREE" && python3 bench-1slot.py "$ROUNDS" 2>&1 | tee "$OUT/$LABEL.bench.txt" | grep -aE "^ +[ABCD] |memory during"
@@ -97,3 +128,4 @@ for lo, hi, lab in ((1500, 40000, "<40K"), (40000, 110000, "40-110K"), (110000, 
         lab, len(b), st.median(r[1] for r in b), min(r[1] for r in b), st.median(r[3] for r in b), max(r[3] for r in b)))
 PY
 timeout 180 python3 /home/javi/.config/strata/parallel/erastats.py --pack iq3_s 2>&1 | sed -n '1,3p'
+cc_counters
