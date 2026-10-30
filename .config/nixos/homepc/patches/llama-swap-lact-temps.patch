@@ -1,0 +1,137 @@
+diff --git a/internal/perf/monitor_unix.go b/internal/perf/monitor_unix.go
+index a12fa1d..1c54891 100644
+--- a/internal/perf/monitor_unix.go
++++ b/internal/perf/monitor_unix.go
+@@ -397,6 +397,54 @@ type lactTempEntry struct {
+ 	Current *float64 `json:"current"`
+ }
+ 
++// lactGpuTemp picks the core temperature out of a LACT sensor map. LACT names AMD
++// sensors "edge"/"junction" and NVIDIA sensors "GPU"/"GPU Hotspot"; the fallback must
++// not pick a memory or hotspot sensor at random just because map iteration order is
++// not stable.
++func lactGpuTemp(temps map[string]lactTempEntry) int {
++	for _, key := range []string{"edge", "junction", "GPU"} {
++		if t, ok := temps[key]; ok && t.Current != nil && *t.Current > 0 {
++			return int(*t.Current)
++		}
++	}
++
++	for name, t := range temps {
++		lower := strings.ToLower(name)
++		if strings.Contains(lower, "vram") || strings.Contains(lower, "hotspot") || strings.Contains(lower, "mem") {
++			continue
++		}
++		if t.Current != nil && *t.Current > 0 {
++			return int(*t.Current)
++		}
++	}
++
++	return 0
++}
++
++// lactVramTemp picks the VRAM temperature out of a LACT sensor map. AMD uses "mem",
++// NVIDIA an aggregate "VRAM" sensor, but the NVIDIA driver only exposes that aggregate
++// when NVAPI reports a VRAM thermal channel - cards without one (Blackwell GDDR7) only
++// report per-chip sensors such as "VRAM Chip B0", so fall back to the hottest of those.
++func lactVramTemp(temps map[string]lactTempEntry) int {
++	for _, key := range []string{"mem", "VRAM"} {
++		if t, ok := temps[key]; ok && t.Current != nil && *t.Current > 0 {
++			return int(*t.Current)
++		}
++	}
++
++	var hottest float64
++	for name, t := range temps {
++		if !strings.Contains(strings.ToLower(name), "vram") {
++			continue
++		}
++		if t.Current != nil && *t.Current > hottest {
++			hottest = *t.Current
++		}
++	}
++
++	return int(hottest)
++}
++
+ func lactSendRequest(conn net.Conn, req lactRequest) (json.RawMessage, error) {
+ 	data, err := json.Marshal(req)
+ 	if err != nil {
+@@ -486,28 +534,8 @@ func lactGetDeviceStats(conn net.Conn, id string, name string, index int) (GpuSt
+ 		powerDraw = *stats.Power.Current
+ 	}
+ 
+-	var tempC int
+-	if t, ok := stats.Temps["edge"]; ok && t.Current != nil {
+-		tempC = int(*t.Current)
+-	} else if t, ok := stats.Temps["junction"]; ok && t.Current != nil {
+-		tempC = int(*t.Current)
+-	} else {
+-		for _, t := range stats.Temps {
+-			if t.Current != nil {
+-				tempC = int(*t.Current)
+-				break
+-			}
+-		}
+-	}
+-
+-	var vramTempC int
+-	// nvidia uses "VRAM", amd "mem"
+-	for _, key := range []string{"mem", "VRAM"} {
+-		if t, ok := stats.Temps[key]; ok && t.Current != nil && *t.Current > 0 {
+-			vramTempC = int(*t.Current)
+-			break
+-		}
+-	}
++	tempC := lactGpuTemp(stats.Temps)
++	vramTempC := lactVramTemp(stats.Temps)
+ 
+ 	return GpuStat{
+ 		Timestamp:   time.Now(),
+diff --git a/internal/perf/monitor_unix_test.go b/internal/perf/monitor_unix_test.go
+index 4cda12c..5119b1e 100644
+--- a/internal/perf/monitor_unix_test.go
++++ b/internal/perf/monitor_unix_test.go
+@@ -79,3 +79,42 @@ func TestParseRocmSmiLine_InvalidLines(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestLactTempSelection(t *testing.T) {
++	// LACT sensor names as reported for an RTX 3090 Ti (NVAPI exposes an aggregate
++	// VRAM channel) and an RTX 5070 Ti (Blackwell: only per-chip VRAM sensors).
++	ptr := func(v float64) *float64 { return &v }
++
++	nvidiaAmpere := map[string]lactTempEntry{
++		"GPU":          {Current: ptr(55)},
++		"GPU Hotspot":  {Current: ptr(65)},
++		"VRAM":         {Current: ptr(54)},
++		"VRAM Chip A0": {Current: ptr(54)},
++		"VRAM Chip B1": {Current: ptr(50)},
++	}
++	nvidiaBlackwell := map[string]lactTempEntry{
++		"GPU":          {Current: ptr(51)},
++		"GPU Hotspot":  {Current: ptr(54)},
++		"VRAM Chip A0": {Current: ptr(62)},
++		"VRAM Chip B0": {Current: ptr(64)},
++		"VRAM Chip D0": {Current: ptr(60)},
++	}
++	amd := map[string]lactTempEntry{
++		"edge":     {Current: ptr(38)},
++		"junction": {Current: ptr(41)},
++		"mem":      {Current: ptr(39)},
++	}
++
++	// map iteration order is not stable, so repeat to catch order-dependent picks
++	for i := 0; i < 50; i++ {
++		assert.Equal(t, 55, lactGpuTemp(nvidiaAmpere))
++		assert.Equal(t, 54, lactVramTemp(nvidiaAmpere))
++		assert.Equal(t, 51, lactGpuTemp(nvidiaBlackwell))
++		assert.Equal(t, 64, lactVramTemp(nvidiaBlackwell))
++		assert.Equal(t, 38, lactGpuTemp(amd))
++		assert.Equal(t, 39, lactVramTemp(amd))
++	}
++
++	assert.Equal(t, 0, lactGpuTemp(map[string]lactTempEntry{}))
++	assert.Equal(t, 0, lactVramTemp(map[string]lactTempEntry{}))
++}

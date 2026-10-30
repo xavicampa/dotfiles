@@ -417,6 +417,40 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
     aliases right now, but keep them visible if a backend gets them back),
     `globalTTL = 0` (nothing is evicted by a timer; the group swaps on demand).
 
+### llama-swap/lact-temps — local patch (wired 2026-10-30, llama-swap 262)
+
+GPU stats for the Performance page and the `llamaswap_gpu_*` gauges come from **LACT, not
+`nvidia-smi`**: `getGpuStats` (`internal/perf/monitor_unix.go`) probes LACT first, and `hardware.lact`
+puts the socket at `/run/lactd.sock`, so that probe wins. Falling back to `nvidia-smi` is not a
+workaround either — `temperature.memory` is `N/A` for both cards and llama-swap's query
+(`index,name,uuid,temperature.gpu,utilization.gpu,…`) does not even ask for it, so the nvidia-smi path
+reports **no** VRAM temperature at all.
+
+262's LACT probe reads two literal keys out of LACT's `temps` map — `"mem"` (AMD) and `"VRAM"` — and
+leaves `VramTempC = 0` when neither is present. LACT builds those names from NVAPI
+(`lact-daemon/src/server/gpu_controller/nvidia.rs`): the aggregate `VRAM` entry only exists when the
+driver exposes a VRAM thermal *channel*. Live dump, `lact cli -g <n> stats`:
+
+- 3090 Ti: `GPU`, `GPU Hotspot`, **`VRAM`**, `VRAM Chip A0…F1` — VRAM chart worked.
+- 5070 Ti (Blackwell/GDDR7): `GPU`, `GPU Hotspot`, `VRAM Chip A0…D1` — **no `VRAM`** → chart pinned at 0.
+
+The same probe picks `TempC` from a bare map iteration when `edge`/`junction` are missing (they are, on
+NVIDIA), so the "GPU Temperature" series alternated between core, hotspot and VRAM-chip sensors —
+`llamaswap_gpu_temperature_celsius` for the 3090 Ti read 56 and then 61 seconds apart.
+
+`homepc/patches/llama-swap-lact-temps.patch` (applied in `postPatch`) adds `lactGpuTemp` /
+`lactVramTemp`: core temperature prefers `edge`/`junction`/`GPU` and never falls back to a
+`vram`/`hotspot`/`mem`-named sensor; VRAM temperature keeps the aggregate keys and otherwise takes the
+**hottest** `*VRAM*` sensor, which is the real signal on GDDR7. Tests cover both sensor-name sets. Recheck
+on every bump — `patch --fuzz=0` fails the build rather than half-applying. Upstream master (`4af269a`)
+still has the same two-key lookup; the probe rewrite in mostlygeek/llama-swap#1264 only makes
+unreported values `nil` instead of `0`, it does not add a per-chip fallback.
+
+The override also sets `checkFlags = [ "-skip=^TestServer_APILogEvents_NoHistory$" ]`: that upstream
+test is flaky/racy in v262 — it failed 10/10 locally on a **pristine** v262 checkout (`go test
+./internal/server -count=10`) and once in the nix build, so without the skip the patched package never
+builds here. The rest of the suite, including the new `internal/perf` tests, still runs.
+
 ### llama-swap/strata — `qwen3.8-flash-next-iq3_s`
 
 - The key doubles as the podman name via `${MODEL_ID}` — legal under podman's

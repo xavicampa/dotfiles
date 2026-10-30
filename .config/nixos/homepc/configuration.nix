@@ -414,7 +414,15 @@ in
   # llama-swap: :8080 front door, swaps one podman backend per model — NOTES.md § llama-swap
   services.llama-swap = {
     enable = true;
-    package = unstable.llama-swap; # >= 225 for `capabilities`
+    # >= 225 for `capabilities`; local LACT sensor-name patch — NOTES.md § llama-swap/lact-temps
+    package = unstable.llama-swap.overrideAttrs (final: prev: {
+      postPatch = (prev.postPatch or "") + ''
+        chmod -R u+w .
+        patch -p1 -N --batch --fuzz=0 < ${./patches/llama-swap-lact-temps.patch}
+      '';
+      # upstream test flake (v262): log-history vs live-stream race, fails on unpatched 262 too — NOTES.md § llama-swap/lact-temps
+      checkFlags = [ "-skip=^TestServer_APILogEvents_NoHistory$" ];
+    });
     openFirewall = true; # opens 8080; backends (5800+) stay closed
     listenAddress = "0.0.0.0"; # LAN clients already use homepc:8080
     port = 8080;
