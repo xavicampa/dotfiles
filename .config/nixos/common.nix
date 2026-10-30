@@ -67,6 +67,15 @@ in
       pkgs.apple-cursor
     ] ++ [
       pkgs.unrar
+      # The `adw-gtk3`/`adw-gtk3-dark` pair DMS's own `scripts/gtk.sh` copies into
+      # ~/.local/share/themes (with a .dms-copy src+sha256 marker) and what
+      # Common/Theme.qml `refreshGtkTheme` then selects per mode as `gtk-theme` —
+      # Chromium and GTK3 apps latch on that key. With no system copy of the theme
+      # (both $XDG_DATA_DIRS share/themes roots empty) `gtk.sh patch` exits 2, i.e.
+      # *nothing patched*, the select never runs, and those apps keep their own looks
+      # however the shell's mode flips. Appended dead last, not reordered into the
+      # main list: the system-path re-hash warning above.
+      pkgs.adw-gtk3
     ];
   };
 

@@ -299,6 +299,152 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   build on the modules past 26.11 (§ dms-shell). `CavaService.qml` still gates the process on the
   widget actually asking for it, and `DMS_DISABLE_CAVA=1` disables it.
 
+- **The app-side theming halves — the `gtk-theme` wire (wired 2026-10-30, no new patch).**
+  The shell paints its own chrome off the theme JSON per mode (capture-proven), paints
+  Hyprland's borders/glow/group bars off the theme's `primary` through the generated
+  `~/.config/hypr/dms/colors.lua` (the accent is **mode-invariant by matugen's own design** —
+  monolith holds `#9ccfd8` in *both* mode schemes, so flipping modes changes those borders
+  **nothing**, which alone reads as "the window chrome didn't switch"), and — the part that
+  was **silent** here — was meant to paint **other people's windows** through two wires of
+  its own:
+  - `Common/Theme.qml` **`refreshGtkTheme`** writes dconf `org.gnome.desktop.interface`
+    `gtk-theme` = `adw-gtk3` in light / `adw-gtk3-dark` in dark, and its own comment there
+    names who obeys: *"toolkit-following apps (Chromium without a portal) latch on it"*.
+  - `Services/PortalService.qml` **`setSystemColorScheme`** writes the same schema's
+    `color-scheme` = `default` light (or `prefer-light` when the portal sits dark) /
+    `prefer-dark` dark, for portal-following apps — and **that half was never a patch
+    candidate: it is the `SettingsData.syncModeWithPortal` setting, on here since ever**, and
+    measured publishing on every flip (`dconf color-scheme` read `'prefer-dark'` right after
+    `dms ipc theme dark`, `'default'` through light).
+    **And the shell's own mode here is auto, on since ever** — read straight off the daemon's
+    own socket (`/run/user/1000/dms-<pid>.sock`, which *greets* every connection with a
+    `{"apiVersion":38,"capabilities":[… "theme.auto" …}` hello before it will take a
+    `{"id":1,"method":"<full.dotted.method>","params":{}}` line — `dms ipc` itself never
+    reaches these: its `call` path goes to **the shell's** IPC socket, and `theme` is not one of
+    the targets that `qs ipc show` lists, so `dms ipc call theme auto.getState '{}'` answers
+    **"Function not found."** from the *shell*, while the *daemon* serves the method fine):
+    `{"config":{"enabled":true,"mode":"location","startHour":18,"startMinute":0,"endHour":6,
+    "endMinute":0,"useIPLocation":true,"elevationTwilight":-6,"elevationDaylight":3},
+    "isLight":false,"nextTransition":"2026-10-31T08:02:36+01:00"}` — sunset measured 16:03:30,
+    and **the session sitting dark is the auto-correct state at 16:3x, not an accident of the
+    test flips**. **`PortalService.canSyncColorScheme` returns false while auto is on**, so
+    *portal* transitions never drive the shell here: the `color-scheme` DMS publishes rides
+    DMS's **own** location clock, and no other publisher's value moves it.
+
+  **Neither GTK3 wire could run, for exactly one reason:** `refreshGtkTheme` is called *only*
+  when `patchGtk3colors` exits **0**, and `scripts/gtk.sh` patches the theme **in place**,
+  which needs **a user-writable copy of `adw-gtk3{,-dark}`** under `~/.local/share/themes` —
+  `ensure_user_adw_gtk3` copies from `get_system_adw_gtk3_root` (walked over
+  `$XDG_DATA_DIRS`-derived `…/share/themes` roots) into `$XDG_DATA_HOME/themes/adw-gtk3{,-dark}`
+  with a `.dms-copy` `src=`+`sha256=` marker — and the **colour work that actually repaints
+  other windows is the `patch` mode's `BEGIN DMS OVERRIDE … END DMS OVERRIDE`
+  `@define-color` blocks re-sed into the copy's own stylesheets** (`gtk.css` for the light
+  pick, `gtk-dark.css` for the dark), backing them up as `.dms-backup` first. Measured after
+  one dark flip: `adw-gtk3-dark/gtk-3.0/gtk.css` **and** `adw-gtk3-dark/gtk-3.0/gtk-dark.css`
+  carry **one** OVERRIDE block each, while `adw-gtk3/gtk-3.0/gtk.css` carries **none** *yet*
+  (the next light-mode `patch` writes its own).
+  **The `@import url("dank-colors.css");` first-line is a different, user-level route —
+  `~/.config/gtk-{3,4}.0/gtk.css` — which nothing here has ever taken**: **no user-level
+  `gtk.css` exists** under `~/.config/gtk-3.0` or `~/.config/gtk-4.0` at all (both hold
+  matugen's own `dank-colors.css`, written fresh every matugen run — 827 B gtk-3.0, 2 KiB
+  gtk-4.0 — plus `settings.ini` (`[Settings]` + `gtk-icon-theme-name=macOS-White`, 43 B),
+  **unimported and inert**), and `inject_dank_import`'s own comment is the contract: *gtk.css
+  is DMS-managed if it is our symlink or carries our import line*, with the `else`-branch
+  **creating** it outright (`echo "$DANK_IMPORT" > "$gtk_css"`), while the script's `remove`
+  path (`remove_gtk3_colors`) `remove_dank_import`s that same user-level file. So *those*
+  *copies* carry **zero** import lines, on purpose. **With no system copy to copy
+  from** — both `$XDG_DATA_DIRS` `share/themes` roots **empty**, no `~/.themes`, no
+  `~/.local/share/themes` — `gtk.sh patch` exits **2 = "nothing patched", silent**, so
+  `refreshGtkTheme` never runs, the `gtk-theme` key is **never written**, and
+  `~/.config/dconf/user` held **no `gtk-theme` key at all** as the fingerprint. The symptom
+  reads as *"light and dark stopped working"*: every window outside the shell keeps its own
+  look however the shell's mode flips, while the shell's own chrome follows it perfectly.
+
+  **Wired by: `pkgs.adw-gtk3`** ("Unofficial GTK 3 port of libadwaita", **6.5**, present in
+  the pinned 26.05 input at `pkgs/by-name/ad/adw-gtk3/package.nix`; **one package ships both
+  variants**) — appended **dead last** of `environment.systemPackages` in `common.nix`, dead
+  last rather than reordered into the main list, per the system-path `buildEnv` re-hash
+  warning written up there. Then **DMS's own button**, Settings → Themes → Apps → *Apply GTK
+  colors* (`Modules/Settings/ThemeAppsTab.qml:74 → Theme.applyGtkColors()` →
+  `gtk.sh <configDir> apply <isLight>`; that tab carries **no IPC route**, so only the user
+  pressing it 2026-10-30 could do it) **made the copies**: both
+  `~/.local/share/themes/{adw-gtk3,adw-gtk3-dark}/` at once, each `gtk-3.0/`+`gtk-4.0/`+
+  `index.theme`, each `.dms-copy` carrying `src=/run/current-system/sw/share/themes/…` +
+  `sha256=…` verbatim, and the `.dms-backup` pairs from the next `patch`.
+
+  **The next mode flip did the rest, through the mode's own IPC verbs** — `dms ipc theme`
+  carries **`dark`, `light`, `getMode`, `toggle`**, which is the way to set the mode without
+  touching the UI — matugen regenerated, `gtk.sh patch` **found the copies**, **exited 0**,
+  `refreshGtkTheme()` ran, and **`dconf gtk-theme` read `'adw-gtk3-dark'`** in the dark beat.
+  **GTK3 mirrors dconf live all by itself**, through its own `GtkSettings` GSettings backend:
+  a **running** nautilus (GTK3, the *Files* window) **repainted fully dark with no restart**
+  in that same flip — dark sidebar, dark headerbar, dark path bar, sampled by capture — and
+  the shell and the borders darkened in the same beat. **There is no XSETTINGS owner here**
+  (Hyprland provides none) **and none is needed for GTK3**.
+
+  **Chromium is the exception and it is not fixable from `~/.config/nixos` or from the
+  registry.** *Latched at startup* — proven, twice, against a running window: it ignored
+  `gtk-theme → 'adw-gtk3-dark'` written to dconf while it ran, and it then ignored a
+  **transient `pkgs.xsettingsd` (1.0.2) run out of `nix-shell`, never installed**, owning
+  XSETTINGS as `Net/ThemeName "adw-gtk3"` (`xsettingsd -c /tmp/shot/xset.conf`, alive as one
+  pid), then a rewrite of that conf to `"adw-gtk3-dark"` + `pkill -HUP xsettingsd` (the
+  ArchWiki live-reload recipe) — Chrome stayed light through **both** live wires. Its
+  `~/.config/google-chrome/Default/Preferences` holds **no** color-scheme / dark-mode /
+  theme pref at all — the only theme-shaped keys are
+  `should_read_incoming_syncing_theme_prefs=false` and
+  `syncing_theme_prefs_migrated_to_non_syncing=true` — and its own
+  `chrome://settings/appearance` deep-link opens into a Google **"Who's using Chrome?"**
+  interstitial before it shows anything. So: **Chrome repaints per mode only when Chrome
+  restarts after the key flips** — the key *does* now flip itself, per mode — and the shape of
+  a keybind that also relaunches it (`dms ipc theme toggle; pkill chrome; (google-chrome &)`,
+  `~/.config/hypr/dms/binds-user.lua` is the user's own hand-written binds file and the place
+  such a line would live) is **the user's to love**; nothing here or in the registry changes
+  that. Browser truth for the profile record: `xdg-mime query default text/html` →
+  **`google-chrome.desktop`**, and `~/.mozilla` holds **no firefox profile at all** (only
+  `native-messaging-hosts/com.1password.1password.json`), so DMS's generated
+  `~/.config/dms/firefox.css` — Material chrome CSS, freshly carrying the *light* scheme,
+  `--md-sys-color-on-primary: #1b1b1d` and friends — is **linked into nothing**, and no
+  `userChrome.css` exists under `~/.mozilla`/`~/.var/app`/`~/.config` at all (`~/.var/app`
+  does not exist).
+
+  **Probe hygiene from that live test, so the record stays the machine's own state:** the
+  hand-written `color-scheme 'no-preference'` + `gtk-application-prefer-dark-theme false`,
+  and later `'prefer-dark'` + `true`, and the `gtk-theme 'adw-gtk3-dark'` probe were all
+  **reverted** (`dconf reset …/gtk-theme` → the key unset again; and note the *reset* not the
+  *write* — there was **no value** there to restore, ever); **`gtk-application-prefer-dark-
+  theme` carries no key again** (nothing here has ever written it, and **neither** of the
+  two live wires moves Chrome is that key — the probe pair moved *no*thing outside the shell
+  at the time); the probe-launched gedit (a GTK3 text editor, from `environment.systemPack-
+  ages`) was closed again — and mind the `pkill -f 'gedit'` self-match: the pattern matches
+  **the calling shell's own cmdline**, the call killed itself at exit **143** before reaching
+  later steps; use `pkill -x gedit`. The xsettingsd probe's nix-shell died with the call.
+
+  **Drop tests / future-module notes.** Past 26.05 the *options* move as the § above already
+  records; the **wires** to re-anchor on 2.0.0-ist tips: `refreshGtkTheme`'s
+  `GSettings.setCmd(schema, key, isLight ? "Adwaita" : "HighContrastInverse")` **reset-then-
+  apply pair** — the `HighContrastInverse` value is the tell, per the code's own comment it's
+  a *same-polarity built-in intermediate* the toolkit-followers latch on — and
+  `PortalService.setSystemColorScheme`'s `preferLight ? "prefer-light" : "default"` ternary
+  (`'prefer-light'` is **not** a classic GNOME schema value; the `gtk` portal impl is
+  1.15.3 old here, and an unknown string maps to no-preference, i.e. light — worth re-reading
+  the impl's mapping before chasing that value). `Common/GSettings.js` is the shape the
+  writes ride: `setCmd` = `GSETTINGS_BACKEND`-guarded `dconf write <path> "'<value>'"` `||
+  gsettings set …` with `getCmd` reading-and-stripping quotes — **a bool key must be passed
+  bare** (`"true"`, not `"'true'"`, or dconf rejects the type and the `gsettings` fallback
+  misparses it). **`scripts/gtk.sh`'s copy/marker/inject contract above** is what a future
+  DMS may rename — re-read `ensure_user_adw_gtk3`/`inject_dank_import` before trusting the
+  copies' `.dms-copy` `sha256=` markers to *auto-refresh* on a system-theme change (they do:
+  a changed store hash refreshes the copy, by design).
+  **`home-manager` has carried a `services.xsettingsd` module the whole time**
+  (`~/.nix-defexpr/channels/home-manager/modules/services/xsettingsd.nix`: `settings` an
+  `attrsOf (oneOf [bool int str])` with the `"Net/ThemeName"` example, `configFile` an
+  `internal`+`readOnly` `pkgs.writeText` (**a store path — nothing at runtime can `sed` it**,
+  so no per-mode rewrite rides that module), the unit `After=graphical-session-pre.target`,
+  `PartOf=graphical-session.target`, `Restart=on-abort`, `ExecStart` baking the store conf
+  in with `-c`) — **not enabled here**, and **it would not help Chrome anyway** (proven two
+  wires up); its right shape is only for X11/XSETTINGS-following apps, of which this machine
+  has none.
+
 ## hyprland
 
 Hyprland **0.56+** is needed for DMS compositor blur (`ext-background-effect-v1`).
