@@ -181,6 +181,16 @@ interface ModelOverride {
   maxTokens?: number;
   thinkingFormat?: "qwen-chat-template" | null;
   supportsReasoningEffort?: boolean;
+  /**
+   * Maps pi's thinking levels to the model's reasoning_effort values; null
+   * marks a level unsupported. Declares which levels the model actually
+   * supports (e.g. Qwen3.8: only low/medium/xhigh), so /thinking offers only
+   * meaningful ones. Values are sent verbatim where the thinking format
+   * supports them; for qwen-chat-template they declare the selectable levels.
+   */
+  thinkingLevelMap?: Partial<
+    Record<"off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max", string | null>
+  >;
 }
 
 /** VRAM tier: minimum VRAM (GiB) needed to comfortably run the model. */
@@ -338,6 +348,9 @@ function buildModels(provider: ProviderConfig, data: any[]): ProviderModelConfig
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow,
         maxTokens,
+        ...(override.thinkingLevelMap !== undefined && {
+          thinkingLevelMap: override.thinkingLevelMap,
+        }),
         compat: {
           supportsDeveloperRole: true,
           supportsReasoningEffort: override.supportsReasoningEffort ?? false,
