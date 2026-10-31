@@ -491,9 +491,11 @@ in
         # slots = -e PARALLEL below (env beats the preset and is written back into it); the
         # queue bound has no launch flag/env, so max_queue + queue_timeout sit as top-level
         # keys in ~/.config/strata/parallel/strata-iq3_s.json, which derive_config copies.
-        # Context cap (98304 since 2026-10-27) is NOT an env knob here: the number the engine obeys is
-        # --max-context in the preset extra + the run config, "context" below only carries the reuse test, and
-        # capabilities.context below is what gets advertised - keep them and pi's contextWindow in step.
+        # Context cap is NOT an env knob here: the number the engine obeys is --max-context in the preset extra
+        # + the run config, "context" below only carries the reuse test, and capabilities.context below is what
+        # gets advertised - keep them and pi's contextWindow in step. 131072 with PARALLEL=3 since 2026-10-31;
+        # the 98304 cap (2026-10-27) was the fix for the RAM wall in parallel/TUNING_NOTES.md - dropping the
+        # slot count is what pays for going back up, so re-check parked-snapshot pressure if PARALLEL rises again.
         "qwen3.8-flash-next-iq3_s-parallel" = {
           # swap.max=0 keeps the anon arena resident; no comments inside cmd — NOTES.md § llama-swap/strata
           cmd = ''
@@ -513,7 +515,7 @@ in
             -e XDG_CONFIG_HOME=/data/install
             -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
-            -e PARALLEL=4
+            -e PARALLEL=3
             -e PORT=''${PORT}
             -e STRATA_PF_FUSED=1
             -e STRATA_ADAPT_LAG=2
@@ -527,10 +529,10 @@ in
           # without this Strata under-reports to capability discovery
           capabilities = {
             # llama-swap advertises this as context_window / n_ctx to clients, so it must equal the engine's
-            # --max-context in the parallel tree (98304 since 2026-10-27 ~15:10, and Pi's
-            # modelOverrides[...].contextWindow in ~/.pi/agent/models.json). Cap rationale:
+            # --max-context in the parallel tree (131072 since 2026-10-31, with -e PARALLEL=3 above; pi discovers
+            # this value and holds no modelOverrides contextWindow for this model). Cap rationale:
             # ~/.config/strata/parallel/TUNING_NOTES.md § the RAM wall.
-            context = 98304;
+            context = 131072;
             "in" = [ "text" "image" ];
             out = [ "text" ];
             tools = true;
@@ -668,7 +670,7 @@ in
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
       # preload = the boot default (no default_model key in v262); keep it on the model that serves — NOTES.md § llama-swap
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
     };
   };
 

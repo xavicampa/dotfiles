@@ -671,3 +671,52 @@ it: the stack's gain is already banked at batch 4.
   so a grep on pack name alone can measure the other tree's boot. Update the grep if `--batch` moves.
 - The cold-read report now parses the **live log from the era line** (bounded by nothing, since no reload has happened
   yet in this run) — a boot archive written at reload time cannot contain the probe that runs after it.
+
+## ctx 131072 + PARALLEL=3 (2026-10-31, **LIVE**, eras 179547 ctx@batch4 interim · 179781 preload@batch3 · 179912 accepted)
+
+The profile layer was written back too: `strata/profiles/launch-docker.json` `overrides.parallel 4 -> 3` — this is the
+"env beats the preset and is written back into it" behaviour, so the profile now agrees with nix instead of fighting it.
+
+Requested: 128K context on this arm, three slots instead of four. **The slot count is not a preset knob**: nix's
+`-e PARALLEL=4` for this model is what sets it ("env beats the preset and is written back into it"), and the
+advertised context is a second, separate truth. So this changed **five places**, and the engine obeys only two of them:
+
+| layer | was | now | note |
+|---|---|---|---|
+| nix `-e PARALLEL` (`configuration.nix` ~516) | 4 | **3** | authoritative for `--batch`; needed `nixos-rebuild switch` |
+| nix `capabilities.context` (~533) | 98304 | **131072** | what llama-swap advertises as `context_window` / `n_ctx` |
+| preset `extra["--max-context"]` | 98304 | **131072** | the layer that wins in argv |
+| preset `"context"` | 98304 | **131072** | never reaches argv; it is the reuse-test half — mismatch it and setup rewrites the run config |
+| run-config `args` `--max-context` | 98304 | **131072** | kept in step (write the value at `index+1`, never over the flag) |
+| nix `hooks.on_startup.preload` | coder-iq1_m (stale from the tree switch) | **`qwen3.8-flash-next-iq3_s-parallel`** | boot default = the model that serves |
+
+Backups: `20261031-pre-ctx128k-batch3-run.json.bak`, `…-preset.json.bak`.
+
+**Why dropping a slot pays for the context** — the measured deltas, all one boot apart:
+
+| line | ctx 98304 / 4 slots (B2) | ctx 131072 / **4** slots (interim) | **ctx 131072 / 3 slots (accepted)** |
+|---|---|---|---|
+| CUDA1 profiled pairs | 8192 of 8192 | 8192 of 8192 | **8192 of 8192** |
+| experts resident | 54 % | 54 % | **55 %** |
+| slot sessions CUDA0 | 4 × 0.36 GiB | 4 × 0.40 GiB | **3 × 0.40 GiB**, 11.10 GiB free |
+| slot sessions CUDA1 | 4 × 0.20 GiB | 4 × 0.22 GiB | **3 × 0.22 GiB**, 19.27 GiB free |
+| KV pinned RAM | 20480 of 98304, 0.77 GiB | 20480 of 131072, 1.03 GiB | **20480 of 131072, 1.03 GiB** |
+| free at boot | 1177 / 1106 | 1179 / **972** | **1179 / 1262** |
+
+The interim column is the warning label: **at 128K a 4th slot costs CUDA1 ~290 MiB** (1106 → 972), which is the RAM/VRAM
+wall from § the RAM wall in miniature. With 3 slots CUDA1 ends up **156 MiB better** than the old 4-slot/98304 arm, and
+CUDA0 gains 78 more expert slots (residency 54 → 55 %). KV resident cells did not move, so decode speed is unaffected;
+what moved is pinned RAM (+0.26 GiB) and per-slot session size.
+
+**Verified with a real cold 118,591-token prompt** (direct to the engine port, 500 KB of unique text):
+`prompt 118591 tokens = 0 reused + 118591 read in 25592 ms (4634.0 tok/s)`, `KV streaming: 83.06% … hit VRAM`,
+no `below 512 MiB`, no `WARNING`/`ERROR`, MemAvailable 12760 → 11355 MiB, evictions 0. So the prompt path is
+*cheaper* per token at 118K than at 14K (4634 vs ~3290 tok/s) — the big-context path is not the weak spot.
+Watch item instead: parked snapshots at this size are ~1.3-1.7 GiB each (`parked 52809 tokens bytes=1697473808`),
+so the 6144 MiB / 6-slot cache holds **two** 100K+ conversations at most; the 1536 MiB admission floor is what keeps
+that from touching swap.
+
+**Client side:** llama-swap now advertises `context_window: 131072` for `qwen3.8-flash-next-iq3_s-parallel`
+(verified over `/v1/models`). pi has **no** `contextWindow` override for this model, so it discovers that number and
+auto-compacts above **131072 − 16384 = 114,688** tokens. A *running* pi session keeps whatever it read at start —
+this session still believes 98304 until it is restarted.
