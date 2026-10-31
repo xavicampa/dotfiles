@@ -100,7 +100,7 @@ in {
     pkgs.imagemagick
     # pkgs.inetutils
     pkgs.kitty-themes
-    pkgs.marksman
+    # pkgs.marksman
     pkgs.fastfetch
     # unstable.gemini-cli
     # pkgs.kiro
