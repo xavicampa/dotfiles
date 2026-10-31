@@ -485,17 +485,22 @@ in
 
         # Strata - batch engine (only batched tree now; the 3slots fork was removed 2026-10-26 —
         # restore recipe in parallel/TUNING_NOTES.md § Removed: 3slots). Renamed 2026-10-27: tree
-        # 5slot/ -> parallel/, key -parallel5 -> -parallel; the slot count is out of the name
-        # because -e PARALLEL below is what sets it.
+        # 5slot/ -> parallel/, key -parallel5 -> -parallel; the slot count is out of the name because it is a
+        # config-file value (the preset's "parallel"), not part of the id.
         # Serving knobs and where they live — NOTES.md § llama-swap/strata-parallel:
-        # slots = -e PARALLEL below (env beats the preset and is written back into it); the
-        # queue bound has no launch flag/env, so max_queue + queue_timeout sit as top-level
+        # slots: steered from the config files, NOT from env (the `-e PARALLEL=4` guard was removed 2026-10-31).
+        # The chain: preset "parallel" -> `strata launch` settings -> profiles/launch-docker.json overrides.parallel
+        # -> cfg["parallel"] -> the engine's --batch (launch/runner.py:1479 + serve/server.py parallel_args). Verified
+        # with PARALLEL unset: store.load("docker") -> parallel=3. One guard is lost: if a preset rewrite ever leaves
+        # "parallel": null, the fallback is fit_parallel(main_vram_gb) = 3 on a 24 GB card but 1 on a 16 GB card, so
+        # read the boot line for `--batch` after any preset regeneration (cf. the 0.1.55 regeneration).
+        # The queue bound has no launch flag/env, so max_queue + queue_timeout sit as top-level
         # keys in ~/.config/strata/parallel/strata-iq3_s.json, which derive_config copies.
         # Context cap is NOT an env knob here: the number the engine obeys is --max-context in the preset extra
         # + the run config, "context" below only carries the reuse test, and capabilities.context below is what
-        # gets advertised - keep them and pi's contextWindow in step. 131072 with PARALLEL=3 since 2026-10-31;
-        # the 98304 cap (2026-10-27) was the fix for the RAM wall in parallel/TUNING_NOTES.md - dropping the
-        # slot count is what pays for going back up, so re-check parked-snapshot pressure if PARALLEL rises again.
+        # gets advertised - keep them and pi's contextWindow in step. 131072 with 3 slots (preset "parallel": 3)
+        # since 2026-10-31; the 98304 cap (2026-10-27) was the fix for the RAM wall in parallel/TUNING_NOTES.md - the
+        # lower slot count is what pays for going back up, so re-check parked-snapshot pressure if slots rise again.
         "qwen3.8-flash-next-iq3_s-parallel" = {
           # swap.max=0 keeps the anon arena resident; no comments inside cmd — NOTES.md § llama-swap/strata
           cmd = ''
@@ -515,7 +520,6 @@ in
             -e XDG_CONFIG_HOME=/data/install
             -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
-            -e PARALLEL=3
             -e PORT=''${PORT}
             -e STRATA_PF_FUSED=1
             -e STRATA_ADAPT_LAG=2
@@ -529,7 +533,7 @@ in
           # without this Strata under-reports to capability discovery
           capabilities = {
             # llama-swap advertises this as context_window / n_ctx to clients, so it must equal the engine's
-            # --max-context in the parallel tree (131072 since 2026-10-31, with -e PARALLEL=3 above; pi discovers
+            # --max-context in the parallel tree (131072 since 2026-10-31, with the preset's "parallel": 3; pi discovers
             # this value and holds no modelOverrides contextWindow for this model). Cap rationale:
             # ~/.config/strata/parallel/TUNING_NOTES.md § the RAM wall.
             context = 131072;
@@ -567,7 +571,6 @@ in
             -e MODEL_PATH=/data/gguf/coder-IQ1_M
             -e MODEL=IQ1_M
             -e FAMILY=coder
-            -e PARALLEL=3
             -e PORT=''${PORT}
             -e STRATA_PF_FUSED=1
             -e STRATA_ADAPT_LAG=2

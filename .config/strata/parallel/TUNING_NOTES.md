@@ -720,3 +720,32 @@ that from touching swap.
 (verified over `/v1/models`). pi has **no** `contextWindow` override for this model, so it discovers that number and
 auto-compacts above **131072 − 16384 = 114,688** tokens. A *running* pi session keeps whatever it read at start —
 this session still believes 98304 until it is restarted.
+
+## The slot count is steered from the config files now — `-e PARALLEL` removed from nix (2026-10-31, **LIVE**, era 180366)
+
+`-e PARALLEL` is gone from both strata entries in `configuration.nix` (iq3_s parallel and coder). **The preset is the
+steering place: `"parallel": 3` in `strata/launch-presets/docker.json`.**
+
+Why this is safe, read off the code rather than guessed (engine package 0.1.55):
+
+    entrypoint.sh:194   -e PARALLEL=N  ->  CLI `--parallel N`          (absent: no CLI flag at all)
+    serve/server.py:9107 CLI flag      ->  cfg["parallel"] = N         (only when the flag was given)
+    launch/cmd.py:238    CLI flag      ->  settings.parallel           (else the preset's value stands)
+    launch/runner.py:1479 profile overrides.parallel = settings.parallel  (else four_card / catalog fit)
+    serve/server.py:3309 parallel_args(cfg): cfg["parallel"] -> "--batch N"   (skipped if --batch/--slots already set)
+
+So the env was never a separate source of truth — it was an **override of the preset that got written back into the
+profile**, which is why `profiles/launch-docker.json` `overrides.parallel` silently moved 4 → 3 when the env changed.
+Verified with the env stripped inside the container: `store.load("docker")` → `parallel = 3`, and the boot after the
+rebuild still says `--batch: 3 slot sessions`, `8192 of its 8192 profiled pairs`, `55% resident`, free `1179 / 1262 MiB`,
+`overrides: {host, port, parallel: 3}` written back from the preset path, and the 0.2.9 parallel stack env still
+auto-on (`CKPT_POOL=1 GDN_TC=1 QSA_SLOTS=1`). No `usually holds` card-fit notice fired.
+
+**What the env was protecting against (now a check, not a guard):** if `settings.parallel` is falsy the fallback is
+`fit_parallel(main_vram_gb)` with `PARALLEL_BY_VRAM = ((32.0, 4), (24.0, 3), (20.0, 2), (0.0, 1))` — on this box that
+is **3 for a 24.5 GB card but 1 for a 16.3 GB card**, i.e. card-dependent, not deterministic. This tree's preset *was*
+regenerated once (0.1.55), and that is exactly when a `"parallel": null` could appear. So after any preset
+regeneration: read the boot line for `--batch N` (and `overrides.parallel`) before trusting the arm.
+
+The **coder entry lost `-e PARALLEL=3` in the same change** and was not booted to check it (it is not the serving
+tree); its preset already has `parallel: 3`, so `--batch 3` is expected — confirm on its next start.
