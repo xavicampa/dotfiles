@@ -749,3 +749,155 @@ regeneration: read the boot line for `--batch N` (and `overrides.parallel`) befo
 
 The **coder entry lost `-e PARALLEL=3` in the same change** and was not booted to check it (it is not the serving
 tree); its preset already has `parallel: 3`, so `--batch 3` is expected — confirm on its next start.
+
+## Bench of the live keeper as-is — `--batch 3` + ctx 131072 + 0.2.9 stack on (2026-10-31, boot 12:37 local, bench 12:39-12:40)
+
+No preset/run-config change in this run: the point was to measure what is live today.
+Artifact: `.tune/keeper-b3-ctx128k.csv` (`bench-util.py --levels 1 2 3 --rounds 4 --max-tokens 400`,
+engine port **5803** + engine id `qwen3.8-flash-next-iq3_s`, container `qwen3.8-flash-next-iq3_s-parallel`).
+
+**Era / clock trap found here:** the engine log stamps are **UTC**, `podman inspect` `.Created`/`.State.StartedAt`
+are local. The 12:37:14 CET container boot is era `180693` at `2026-10-31 11:37:18` — exactly one hour apart, which
+looks like a stale era if you compare them naively. The newest `iq3_s` era *was* the live boot.
+
+Boot gate (all pass; the boot line is the merged truth and carries `--batch 3`, preset-steered):
+
+```
+engine started: … --layer-split 32 --max-context 131072 --pcie-frac 0.00 --kv-resident 20480 … --batch 3
+--batch: 3 slot sessions on CUDA0 (0.40 GiB each); 11.10 GiB free   /   CUDA1 (0.22 GiB each); 19.27 GiB free
+layer split: CUDA1 runs layers 32-47, expert cache 8192 slots (16.52 GiB), 8192 of its 8192 profiled pairs; slot 0 verified
+layer split: 55% of the experts resident, the prompt path's streamed ring 384 slots
+1179 MiB of VRAM free with everything loaded   /   CUDA1: 1262 MiB of VRAM free with everything loaded
+```
+
+No `LOW` / `WARNING` / `not enough room`. `--pipeline-windows 2 is off: not with --batch slots` (expected under
+`--batch`). Compute apps as expected: engine 14,780 MiB on the 5070 Ti + 21,614 MiB on the 3090 Ti, and
+`strata-vision` 1,336 MiB on the 3090 Ti only.
+
+| streams | agg tok/s | med/stream | per-stream runs | med/max TTFT | GPU0 (5070 Ti) | GPU1 (3090 Ti) | engine CPU (all threads) |
+|---:|---:|---:|---|---|---|---|---|
+| 1 | **149.8** | 149.8 | 96, 146, 153, 155 | 0.00 / 0.01 s | util 58% max 73%, 113 W | util 34% max 45%, 180 W | mean 14.77 max 16.33 |
+| 2 | 156.9 | 78.7 | 73-82 ×8 | 0.00 / 0.00 s | util 57% max 100%, 115 W | util 37% max 42%, 172 W | mean 15.45 max 16.42 |
+| 3 | **180.8** | 60.6 | 58-63 ×12 | 0.00 / 0.01 s | util 55% max 66%, 113 W | util 41% max 83%, 190 W | mean 15.46 max 16.36 |
+
+Engine-side truth, same era (`erastats.py --pack iq3_s`, n=42 incl. this session): **accept 82.0 %,
+`drafts/step 5.56`, `yield gen/fed 1.434`**, long-request `gen>=400` med **125.6 tok/s** (n=9), decode expert-cache
+hit rate under load 69.8-86.3 %, `KV streaming` 95.5-97.2 % of block reads hit VRAM. MemAvailable 12,770 → 12,224 MiB
+across the bench, no evictions. Drafting and KV residency are healthy.
+
+### Readings
+
+- **The fan-out ceiling is ~181 tok/s at 3 streams — dropping the 4th slot cost nothing aggregate.** Same-era-family
+  comparison: this morning's batch-4 + nine-settings-ON arms measured 179.0 / 182.9 / 183.4 at **4** concurrent
+  (§ 0.2.9 A/B), pre-0.2.9 batch-3/4/5 all topped out at 166-167 (§ Measured: batch 5). So `--batch 3` + 0.2.9 sits at
+  the same ceiling with **60.6 tok/s per client at 3 concurrent** instead of 41.7 at 4 — and it bought the 128K context.
+  The box is still saturated at ~166-183 regardless of slot count; the 0.2.9 gain (+8-11 %) is banked at 3 slots too.
+- **Solo 149.8 is inside the drift band** (130.2-146.6 across that A/B; ±11 % for identical fixed configs). n=1 boot,
+  so no claim either way — do not read it as an improvement over the 4-slot arm.
+- **Neither GPU is the limiter at this width**: util 55-58 % (5070 Ti) and 34-41 % (3090 Ti), 113 W / 180-190 W, while
+  the engine's all-thread CPU sits at **14.8-15.5 cores against a 15-worker pool** at every level. The feed path is at
+  its ceiling while the cards idle — that, not VRAM or split, is what caps aggregate here. Worth knowing before any
+  further slot/`--expert-cache` experiment: more slots will not move ~181.
+- Not measured (so this is not a control): the ~14K-token unique-nonce **cold read**. `bench-util.py` prompts are ~30
+  tokens, so the ±1 %-stable instrument is absent — this table prices decode and fan-out only.
+
+### Would a 4th slot raise aggregate? — probed on the warm 3-slot boot (2026-10-31 12:44, same era 180693)
+
+No config change: on a `--batch 3` engine a 4th concurrent client is still admitted (`max_queue 3`), so
+`--levels 4` measures **demand**, not a 4th batch row. Interleaved in one era to beat the drift band
+(`--levels 3 4 3 4 --rounds 2 --max-tokens 400`, artifact `.tune/keeper-b3-l34-interleave.csv`):
+
+| level | agg (runs) | med/stream | GPU0 / GPU1 util | engine CPU |
+|---|---|---|---|---|
+| 3 | **170.7 / 184.1** | 57.1 / 61.9 | 52-53 % / 38-41 % | 15.15-15.55 cores |
+| 4 | **164.9 / 172.9** | 57.2 / 59.7 | 53-54 % / 39 % | 15.36-15.54 cores |
+
+(All 16 streams per level completed — the queue worked; the `med/stream` at level 4 is dragged by the queued
+client whose wait is inside its own wall time: runs 41-43 vs 56-62 for the three that held slots. `agg` is
+chunks/s as always in this script, which is why only same-run comparisons are meaningful.)
+
+**Reading: a 4th *client* buys nothing** — 3 slots already cap the window at 3 rows, so extra concurrency only
+queues. Whether a 4th **slot** (a 4th batch row) would help is *not* settled by this probe; the instruments that
+decide it are the window lines, and they say the throughput variable is rows/window, not window cost:
+
+```
+strata batch: 226 windows, avg 5.29 rows, 27.25 ms/window = run 24.24 (CUDA0 GPU-reach wait 9.40 + CPU experts 5.40)
+              + commit 1.12 + emit 1.70 + adapt wait 0.18
+strata verify: captured the batch window over slots 0,0,1,1,2,2      ← 3 slots × 2 draft positions = 6-row ceiling
+```
+
+`avg 5.14-5.39 rows` of a **6-row** ceiling and `ms/window` flat at 27.2-27.9 across levels ⇒ a 4th slot raises the
+ceiling 6 → 8; the gain is exactly `Δrows / ms/window` if `ms/window` holds. The `run` cost is dominated by
+per-window fixed components (GPU-reach wait on the 5070 Ti ~9.4 ms, CPU experts 5.0-7.5 ms, commit+emit ~2.8 ms),
+which is why it might.
+
+Prior data (different ctx/boots, so indicative only): pre-0.2.9 batch-5 legs gained **+3.3 %** going 3→4 rows
+(161.3 → 166.7) and **0** for the 5th (166.3); this morning's batch-4 + 0.2.9 arms hit 179.0-183.4 at level 4, which
+**overlaps** today's 3-slot 170.7-184.1. So the honest prior is **+0 to +5 %, n≥2 boots/arm required** (±11 % drift).
+
+Known cost at this context (measured § ctx 131072 + PARALLEL=3): a 4th slot costs CUDA1 **~290 MiB**
+(1262 → 972 free — still above the 512 floor), residency 55 → 54 %, +0.26 GiB pinned RAM, and per-client speed at
+4 concurrent drops 60.6 → ~42 tok/s. The § batch-4 product rule (≤3 concurrent sessions) also returns.
+
+**To test it properly:** preset `"parallel": 3 → 4` + the reload dance. Two gotchas found while preparing:
+`tune-arm.sh` has no `parallel=` knob (its arms are run-config `env` only) **and its era grep pins
+`engine started: … --batch 4$`, which no longer matches the live `--batch 3` arm** — patch the grep (with a `.bak`)
+or the runner will not find the era. Expect `4 slot sessions on CUDA0 (0.40 GiB each)` and ~1179 / 972 MiB free.
+
+## A/B: `parallel: 3` vs `parallel: 4` at ctx 131072 (2026-10-31 12:50-13:05, boots A4 · B3 · C4 · D3)
+
+The probe above left the question open, so this is the real arm test. **One knob**: `"parallel"` in
+`strata/launch-presets/docker.json`, everything else byte-identical; switched identically each time
+(python-set the key → `podman stop -t 120` → `sleep 2` → reload curl on the **proxy id** → gate → bench), each
+switch inside one tool call (pi is served by this arm). Reload `38.2-40.7 s` every time.
+Bench per boot: `bench-util.py --levels 3 4 --rounds 3 --max-tokens 400`, engine port 5803 + engine id.
+Artifacts: `.tune/{A4,B3,C4,D3}.{era,csv,boot.txt}`; preset backup `…docker.json.bak-20261031-pre-batch4-ab`.
+Order was **4, 3, 4, 3** (interleaved). Boot lines:
+
+| | batch 3 (B3, D3) | batch 4 (A4, C4) |
+|---|---|---|
+| slot sessions | 3 × 0.40 GiB CUDA0 / 3 × 0.22 CUDA1 | 4 × 0.40 / 4 × 0.22 |
+| CUDA0 expert cache | **5204 slots (9.60 GiB)** | **4985 slots (9.19 GiB)**, −4.2 % |
+| experts resident | 55 % | 54 % |
+| CUDA1 pairs | 8192 of 8192 | 8192 of 8192 |
+| free at boot | 1179 / **1262** MiB | 1179 / **972** MiB |
+| **min free at a window capture** | **1063 / 989 / 1039** MiB | **856 / 732** MiB |
+
+Both arms healthy: no `LOW` / `WARNING` / `not enough room`; 972 and 732 are both above the 512 floor.
+
+### Aggregate — the 4th slot wins **only at 4 real clients**
+
+| level (concurrent streams) | parallel 3 | parallel 4 | verdict |
+|---|---|---|---|
+| 3 | 178.1 · 174.0 (+170.7 · 184.1 from era 180692) → **~176** | 175.1 · 175.5 → **175.3** | **tie** |
+| 4 | 167.0 · 160.3 (+164.9 · 172.9) → **~166** | 182.7 · 184.0 → **183.4** | **+10.5 %, no overlap** (p4 min 182.7 > p3 max 172.9) |
+
+Per-client at level 4: `parallel 4` gives all four clients **46.1 / 46.4** tok/s-equivalent; `parallel 3` is bimodal —
+three slot-holders at 54-61 and the **queued fourth at 39.6-42**, wall/round 9.58-9.98 s vs 8.70-8.76 s.
+Per-client at level 3: 58.5-59.5 vs 58.7-58.9 — tie.
+
+### Mechanism (window accounting, medians per arm)
+
+| arm | avg rows/window | ms/window | **rows/s** | CPU-experts/row | GPU-reach-wait/row |
+|---|---|---|---|---|---|
+| batch 3 (3 boots) | 5.23 of a 6-row ceiling | 27.96 | **190** | 0.214 ms | 1.069 ms |
+| batch 4 (2 boots) | 6.09 of an 8-row ceiling | 32.87 | **185** | 0.215 ms | 1.212 ms |
+
+**The engine does not generate faster with a 4th slot — rows/s is the same (190 vs 185, −2.6 %).** `ms/window` grows
+almost exactly with rows, so the batch width itself is throughput-neutral. The whole +10.5 % is **queue avoidance**:
+with 3 slots the 4th client waits, then burns engine time on its prefill and a mid-round slot handoff. A 4th slot does
+not add speed, it stops the engine from paying admission costs — and it costs 4.2 % of the CUDA0 expert cache,
+330 MiB of CUDA1 headroom, and ~250-300 MiB of window-capture margin.
+
+### Verdict: **keep `parallel: 3`** (preset left on it; D3 is the live boot)
+
+- The gain needs **≥4 genuinely concurrent clients**. This box's own product rule (§ batch 4 + queue back-pressure)
+  caps pi-subagents at ≤3 concurrent sessions, so the +10.5 % is unreachable in normal use; at the ≤3 width that is
+  actually used, `parallel 4` is a tie on agg and on per-client speed while being measurably thinner on VRAM.
+- The thin margin is not cosmetic: the 4-slot arm's worst window capture sat at **732 MiB free** with ~400-token
+  generations on ~30-token prompts. Context growth (this arm's whole point is 128K) eats exactly that pool, and
+  § the RAM wall is about 4 concurrent long conversations — the same regime `parallel: 4` invites.
+- If 4+ concurrency ever becomes real (e.g. a second client class, or the subagent rule is raised), re-run this A/B
+  with `--levels 4 5` and watch the window-capture minimum; the decision line is 512 MiB there, not the aggregate.
+- Runner state: `tune-arm.sh` is still pinned to `--batch 4$` in its era grep and has no `parallel=` arm — the A/B was
+  run by hand with identical steps. Either patch both before the next arm, or keep hand-running this knob.

@@ -16,7 +16,19 @@ n=$(grep -an "engine started:.*pack /data/Strata-data/packs/coder-iq1_m" "$L" | 
 tail -n +$n "$L" | grep -aE "<pattern>"
 ```
 
-Pick the pack path for the tree (`coder-iq1_m`, `iq3_s`); `engine started:` carries the **effective** command line — read it first, it is the merged truth (preset `extra` + env + run config).
+Pick the pack path for the tree (`coder-iq1_m`, `iq3_s`); `engine started:` carries the **effective** command line — read it first, it is the merged truth (preset `extra` + env + run config). Pin the era by that command line when the knob under test is in it (e.g. end the grep with `--batch 3$`) — but keep it a range like `--batch [0-9]+$` if the knob is *what you are changing*, and assert afterwards that the matched line carries the value the preset now holds:
+
+```bash
+sed -n "${n}p" "$L" | grep -oE -- '--batch [0-9]+'      # boot argv == the arm you think you booted?
+```
+
+A grep pinned to a stale value (`--batch 4$` after the arm moved to 3) silently returns the **previous** era — every
+stat below it then describes a different boot. The runner had that bug; `slots=` now drives both the preset and the grep.
+
+**Timestamps are not comparable across sources.** The engine log's `engine started:` stamp is **UTC**; `podman inspect`
+`.Created` / `.State.StartedAt` are **local**. A container that restarted 3 s ago can look "an hour old" next to the log
+(+0100 CET). To tell whether a boot line belongs to the current era, compare the **log line number** (era start line,
+from the grep above) to the file's length, or convert: `date -u -d "$(podman inspect -f '{{.State.StartedAt}}' $C)"`.
 
 ## Boot lines that decide an arm
 

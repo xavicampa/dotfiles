@@ -6,13 +6,15 @@
 #     config's `env` map to the engine child (child_env, line ~3759) BEFORE parallel_stack_env/
 #     gdn_stack_env, both of which setdefault. So an `env` entry in strata-iq3_s.json
 #     wins over the 0.2.9 defaults and needs NO nixos-rebuild — only this script's stop+reload.
-#   * the 1slot tree uses the SAME pack (packs/iq3_s) and the same native GGUF, so the era grep also
-#     pins --batch 4, which only this tree's arm carries. If that arg moves, update the grep.
+#   * the 1slot tree uses the SAME pack (packs/iq3_s) and the same native GGUF, so the era grep pins --batch N,
+#     which only this tree's arm carries. N is now read from the preset (slots=), NOT hardcoded — a grep pinned to
+#     an old value returns the PREVIOUS era and every stat after it describes a different boot (that bug lived
+#     here until 2026-10-31; it pinned `--batch 4$` after the arm had moved to 3).
 #     (TUNING_NOTES.md said "no env layer": that was verified on 0.1.54. Re-verified here on 0.1.55.)
 #   * the container name is the PROXY id (…-parallel): the reload curl uses it. The bench uses
 #     the ENGINE id qwen3.8-flash-next-iq3_s on the ENGINE port from `-e PORT` (5803).
 #
-#   ./tune-arm.sh <label> [gdn=on|off] [par=on|off] [env=NAME=VAL,...] [split=N] [kv=N] [frac=X] [--no-bench]
+#   ./tune-arm.sh <label> [gdn=on|off] [par=on|off] [env=NAME=VAL,...] [split=N] [kv=N] [frac=X] [slots=N] [--no-bench]
 #
 #   gdn=off  -> env STRATA_GDN_TC=0 STRATA_GDN_CONVL2=0        (pre-0.2.9 Gated DeltaNet prompt path)
 #   gdn=on   -> those two removed, wrapper re-applies 1 / 2
@@ -21,6 +23,10 @@
 #   env=NAME=VAL,...  extra config env (e.g. env=STRATA_COALESCE_PREFILL=1)
 #   env-clear -> drop every 0.2.9-stack key from the config
 #   levels=1,3  which concurrency levels to bench (default "1 3"; this arm's queue is 3 slots)
+#   slots=N    preset top-level `parallel` (== engine --batch): the KV slots, i.e. the batch-row ceiling
+#              (N slots x 2 draft positions). A/B'd 2026-10-31: rows/s is flat (~185-190) across 3 and 4, so a 4th
+#              slot buys NO engine speed — only queue avoidance (+10.5% agg at 4 real clients), for CUDA1 -290 MiB,
+#              -4.2% CUDA0 expert cache and ~250-300 MiB less window-capture margin. Bench `--levels 3 4` with it.
 #   probe=TOKENS  also send a unique long prompt of ~TOKENS tokens per round (GDN/prefill arms: the
 #                 bench prompts are ~30 tokens, which is fixed overhead and shows nothing; the vendor
 #                 numbers are at 4K-32K). Judge from the era's cold reads, which the runner prints.
@@ -41,7 +47,7 @@ mkdir -p "$OUT"
 [ -n "${PORT:-}" ] || { echo "PORT not readable from podman inspect of $C" >&2; exit 2; }
 
 LABEL=${1:?label required}; shift || true
-BENCH=1; PAIRS=(); ENVSET=(); ENVDEL=(); CLEAR=0; LEVELS="1 4"; PROBE=0
+BENCH=1; PAIRS=(); ENVSET=(); ENVDEL=(); CLEAR=0; LEVELS="1 4"; PROBE=0; SLOTS=""
 GDN=(STRATA_GDN_TC STRATA_GDN_CONVL2)
 PAR=(STRATA_CKPT_POOL STRATA_CKPT_POOL_READY STRATA_SLOT_CKPT_MOVE STRATA_SLOT_COPY_DIRECT \
      STRATA_SLOT_COPY_BATCHSYNC STRATA_BATCH_GDN_GROUPS STRATA_BATCH_ATTN_ROWS STRATA_BATCH_SELF_COMMIT STRATA_QSA_SLOTS)
@@ -57,14 +63,15 @@ for a in "$@"; do
     kv=*)     PAIRS+=("--kv-resident|${a#kv=}");;
     frac=*)   PAIRS+=("--pcie-frac|${a#frac=}");;
     levels=*) LEVELS=${a#levels=};;
+    slots=*)  SLOTS=${a#slots=};;
     probe=*)  PROBE=${a#probe=};;
     --no-bench) BENCH=0;;
     *) echo "unknown arg: $a" >&2; exit 2;;
   esac
 done
 
-python3 - "$P" "$R" $(printf '%s\n' "${PAIRS[@]+"${PAIRS[@]}"}") -- $(printf '%s\n' "${ENVSET[@]+"${ENVSET[@]}"}") -- $(printf '%s\n' "${ENVDEL[@]+"${ENVDEL[@]}"}") "$CLEAR" <<'PY'
-import json, sys
+SLOTS="$SLOTS" python3 - "$P" "$R" $(printf '%s\n' "${PAIRS[@]+"${PAIRS[@]}"}") -- $(printf '%s\n' "${ENVSET[@]+"${ENVSET[@]}"}") -- $(printf '%s\n' "${ENVDEL[@]+"${ENVDEL[@]}"}") "$CLEAR" <<'PY'
+import json, os, sys
 P, R = sys.argv[1:3]
 rest = sys.argv[3:]
 cuts = [i for i, x in enumerate(rest) if x == "--"]
@@ -78,6 +85,8 @@ d = json.load(open(P))
 for p in pairs:
     k, v = p.split("|", 1)
     d["extra"][k] = v
+if os.environ.get("SLOTS"):
+    d["parallel"] = int(os.environ["SLOTS"])   # top-level, NOT extra: serve --parallel / --max-queue follow it
 json.dump(d, open(P, "w"), indent=2, sort_keys=True); open(P, "a").write("\n")
 
 r = json.load(open(R))
@@ -95,7 +104,7 @@ if env:
 else:
     r.pop("env", None)
 json.dump(r, open(R, "w"), indent=1); open(R, "a").write("\n")
-print("  preset: split=%s kv=%s frac=%s" % (d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac")))
+print("  preset: split=%s kv=%s frac=%s parallel(slots)=%s" % (d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac"), d.get("parallel")))
 print("  run-config env (%d): %s" % (len(env), " ".join("%s=%s" % i for i in sorted(env.items())) or "(none - 0.2.9 defaults win)"))
 PY
 
@@ -105,7 +114,12 @@ curl -s -m 190 http://localhost:8080/v1/chat/completions -H 'Content-Type: appli
   -d "{\"model\":\"$C\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" \
   -o /dev/null -w 'reload=%{http_code} t=%{time_total}\n'
 
-N=$(grep -an "engine started:.*pack /data/Strata-data/packs/iq3_s.*--batch 4$" "$L" | tail -1 | cut -d: -f1)
+# Any --batch, then assert the matched boot carries the value the preset now holds (see the header note).
+EXP=$(python3 -c "import json;print(json.load(open('$P')).get('parallel',''))" 2>/dev/null)
+N=$(grep -an "engine started:.*pack /data/Strata-data/packs/iq3_s.*--batch [0-9]\+$" "$L" | tail -1 | cut -d: -f1)
+ACT=$(sed -n "${N}p" "$L" | grep -oE -- '--batch [0-9]+' | grep -oE '[0-9]+')
+echo "  era line $N boots --batch ${ACT:-?} (preset parallel=$EXP)"
+[ -z "$EXP" ] || [ "$EXP" = "${ACT:-}" ] || { echo "  ERA MISMATCH: boot argv says ${ACT:-?}, preset says $EXP — the grep matched an older boot. STOP." >&2; exit 1; }
 echo "$N" > "$OUT/$LABEL.era"
 tail -n +$N "$L" > "$OUT/$LABEL.boot.txt"
 sed 's/^\[strata\] [0-9 :-]*//' "$OUT/$LABEL.boot.txt" | grep -aE "layer split: CUDA1 runs|of the experts resident|MiB of VRAM free with everything loaded|strata-vision|prompt experts|file tier \(Linux defaults|KV streaming: [0-9]+ of" | cut -c1-190
@@ -176,4 +190,21 @@ python3 /home/javi/.config/strata/parallel/bench-util.py \
 
 echo "--- engine-side stats for this era ---"
 timeout 180 python3 /home/javi/.config/strata/parallel/erastats.py --pack iq3_s 2>&1 | sed -n '1,4p'
+echo "--- window accounting + window-capture margin for this era (the slot-knob instruments) ---"
+python3 - "$L" "$N" <<'PY'
+import re, sys, statistics as st
+L, n = sys.argv[1], int(sys.argv[2])
+lines = open(L, errors="replace").readlines()[n:]
+w = [m for m in (re.search(r"strata batch: (\d+) windows, avg ([\d.]+) rows, ([\d.]+) ms/window = run [\d.]+ \(CUDA0 GPU-reach wait ([\d.]+) \+ CPU experts ([\d.]+)", l) for l in lines) if m]
+if w:
+    rows, ms = st.median([float(x.group(2)) for x in w]), st.median([float(x.group(3)) for x in w])
+    print("  rows %s ms/window %s -> rows/s %.0f | GPU-reach %s ms  CPU-experts %s ms (rows/s, not rows/window,"
+          " is what a slot adds or costs)" % (rows, ms, 1000 * rows / ms,
+          st.median([float(x.group(4)) for x in w]), st.median([float(x.group(5)) for x in w])))
+else:
+    print("  no window lines yet in this era")
+cap = [int(c.group(1)) for c in (re.search(r"capturing the \d+-token window \((\d+) MiB", l) for l in lines) if c]
+if cap:
+    print("  window capture: n=%d min %d MiB free (floor 512; this pool is what context growth eats)" % (len(cap), min(cap)))
+PY
 nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv,noheader
