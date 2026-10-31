@@ -927,3 +927,162 @@ no request in flight. Compare with a fixed prompt (the probe script) instead.
 Restart reloads the model, which **cuts this session mid-generation** — this box is usually serving the
 agent that is doing the tuning. Restart when the current turn can afford it, and verify the checklist above
 before doing more work.
+
+---
+
+# 2026-10-31 — 0.2.9 (engine 0.1.55, cuda13) on this arm: the env layer exists, and a hygiene regression
+
+Measured era-line **174294** (archived `.tune/coder-029-hygiene.boot.txt`, reload `200 t=33.8 s`).
+
+## 1. `serve/server.py` in 0.1.55 **has** a config `env` map — the 0.1.54 finding is stale
+
+§ "Which cards a launch uses / placement" said the run config has no env layer. True for 0.1.54,
+**false for 0.1.55**. In `/opt/strata/terminal/serve/server.py`:
+
+- `child_env(cfg)` — line ~3759: `for k, v in (cfg.get("env") or {}).items(): env[str(k)] = str(v)`
+  ("engine settings the config carries"), and it runs **before** `parallel_stack_env(env, cfg)` / `gdn_stack_env(env, cfg)`;
+  both of those use `env.setdefault(...)` → **a value in the run config's `env` wins over the 0.2.9 defaults.**
+- `PARALLEL_STACK_ENV` (line 3675, the nine: `CKPT_POOL`, `CKPT_POOL_READY`, `SLOT_CKPT_MOVE`, `SLOT_COPY_DIRECT`,
+  `SLOT_COPY_BATCHSYNC`, `BATCH_GDN_GROUPS`, `BATCH_ATTN_ROWS`, `BATCH_SELF_COMMIT`, `QSA_SLOTS`) is applied when
+  `parallel_slots(cfg) >= 2` and the engine is a **CUDA/HIP Qwen** one on Linux → **auto-on here** (`--batch 3`).
+- `GDN_STACK_CUDA = {"STRATA_GDN_TC": "1", "STRATA_GDN_CONVL2": "2"}` is applied when arch is `qwen4exp` on Linux
+  → **auto-on here**. The engine gates TC at run time (compute capability ≥8, one SM per value head, shared memory).
+
+**Consequence: every 0.2.9 speed knob on this arm is tunable in
+`~/.config/strata/coder/strata-coder-iq1_m.json` → `"env": {...}`, no `nixos-rebuild switch`.**
+Verify the arm actually took from the **engine child process**, not `podman inspect` (which shows only the image
+env + the service's `-e`):
+
+```
+podman exec qwen3.8-flash-next-coder-iq1_m-parallel sh -c \
+ 'for p in $(ls /proc | grep -E "^[0-9]+$"); do grep -qa components/engine /proc/$p/cmdline 2>/dev/null && \
+   tr "\0" "\n" < /proc/$p/environ | grep -E "STRATA_(GDN|CKPT|QSA|BATCH_|SLOT_|SELF)"; done'
+```
+
+The runner for this is `~/.config/strata/coder/tune-arm.sh` (written this pass; mirrors 1slot's:
+edit → stop → sleep 2 → reload curl → boot archive → gate → bench). It differs in two ways that are easy to get wrong:
+the **container name is the proxy id** `qwen3.8-flash-next-coder-iq1_m-parallel` (the reload curl must use it), while
+the bench targets the **engine** id `qwen3.8-flash-next-coder-iq1_m` on the `-e PORT` port (**5801**, read from inspect
+— never hardcoded).
+
+## 2. Regression the bump brought in, and the fix (hygiene, not a measurement)
+
+The 0.1.55 regeneration left the tree's run config without `vision.cuda_device`, `max_queue`, `queue_timeout` —
+exactly what § "Applying changes" standing rule says to restore after an engine bump. Visible on `nvidia-smi`:
+
+- before (era 174074): CUDA1 **564 MiB** free, window captures fell to **466 MiB** (under rule 4's ~512 floor),
+  and `--query-compute-apps` carried a **222 MiB vision row on index 0** (the 5070 Ti).
+- after restoring `vision: {..., "cuda_device": 1}` + `max_queue 3` + `queue_timeout 90` (era 174294):
+
+```
+layer split: CUDA1 runs layers 31-47, expert cache 4352 slots (8.78 GiB), 4352 of its 4352 profiled pairs; slot 0 verified
+layer split: 100% of the experts resident, the prompt path's streamed ring 384 slots
+1398 MiB of VRAM free with everything loaded
+CUDA1: 777 MiB of VRAM free with everything loaded
+```
+
+`--query-compute-apps` after: the tower is one **1336 MiB row on `GPU-a1f70b5b` = index 1 = the 3090 Ti**, no row on
+index 0. Δ ≈ 215 MiB ≈ the 222 MiB vision row — this is why CUDA1 sat at 564 instead of the accepted 779.
+
+**Not restored, deliberately: `user_args`.** The last copy of it (`.bak-pre-kvres86016`) carries `--kv-resident 114688`;
+`user_args` sits **above** the preset in the merge, so pasting it back would have silently overridden the live
+86016 and changed the arm. The boot's argv confirms the preset's values are the live ones (86016 / spec-min-p 0.70 /
+reserve 1024). If you need hand-set knobs, write them into the preset `extra`, not `user_args`.
+
+## 3. What 0.2.9 changes actually apply to this box
+
+| release item | applies here? | where it shows up |
+|---|---|---|
+| Gated DeltaNet on tensor cores (`GDN_TC=1`, `GDN_CONVL2=2`), Qwen + Linux CUDA | **yes, auto-on** | prompt/prefill only. Vendor: +4.4% at 4K, +5.5-5.7% longer; decode unchanged |
+| The nine parallel-request settings (`--parallel`/`--batch ≥2`, Linux NVIDIA) | **yes, auto-on** (`--batch 3`) | fan-out throughput. Vendor: c=8 → 1.45×, **c=1 → +5.3%**, "no solo cost" |
+| Prompt experts on int8 fused kernels (`STRATA_PF_FUSED=1`) | already ours (`-e STRATA_PF_FUSED=1`) | boot: `prompt experts on the fused int8 kernels (STRATA_PF_FUSED=1, #136)` |
+| layer-major prefill (`STRATA_PREFILL_LAYER_MAJOR`, gate `STRATA_DEFAULTS=026`) | yes, on | boot: `layer-major prefill is on for this layer split ... super-chunk of up to 32768 tokens` |
+| Arc / Strix Halo / AMD / DeepSeek / 1-bit UD sets | no | — |
+| Off unless you turn it on: `STRATA_PAR_COUNTERS`, `STRATA_COALESCE_PREFILL`, `STRATA_CRASH_BT` | available | `PAR_COUNTERS`/`BATCH_TELEMETRY` are **measurement**, not arms |
+
+## 4. A/B plan (coder/iq1_m, one knob per arm, everything else byte-identical)
+
+Baseline **B** = era 174294 as it now runs (0.2.9 all-on, hygiene restored). n≥4 per arm, `31 33 31 33`-style interleave,
+±11% decode drift, cold prompt read is the control.
+
+1. **P = parallel stack off** — `./tune-arm.sh par-off par=off` (nine vars → 0). Decides the fan-out question at
+   `--batch 3`: compare the **levels 2-3 aggregate** (and, later, a c=3 concurrent sweep) + the single-stream med.
+   Expect: fan-out worse if the vendor claim holds; solo ≈ unchanged. Reject if `WARNING: a decode window`, or if
+   acceptance (`accept`, `drafts/step`) moves — the stack touches slot state, not the drafter.
+2. **G = GDN off** — `./tune-arm.sh gdn-off gdn=off`. Decides the prompt question. Judge on **cold prompt read only**
+   (±1% control): expect B −4..6% on G for prompts ≥2K; decode med must stay inside noise.
+3. Only if B beats P by >15%: bisect the nine (off **one at a time**, `env=STRATA_X=0`) — 9 reloads, pool samples by
+   the engine child env, and re-gate every boot. Do not bisect for anything inside ±11%.
+4. Then, and only then, `env=STRATA_COALESCE_PREFILL=1` as an add-on arm against B (prefill path; same GDN metric).
+
+Do **not** re-sweep `--pcie-frac 0.20`, `--kv-resident`, the `gpus [1,0]` order or `--batch-groups` for this: all settled
+above; the 0.2.9 stack does not change what binds there (last stage is pair-capped at 4352/4352).
+
+Gate every arm before benching: `4352 of its 4352 profiled pairs`, both stages ≥512 MiB free, no `LOW`/`WARNING`.
+CUDA1 sits at 777 MiB, so a bench at `--levels 3` with long contexts is the worst case for that card — watch
+`--query-compute-apps` and the `capturing the N-token window (... MiB free)` lines during arm P especially.
+
+## 0.2.9 A/B on this arm — measured 2026-10-31 (11 boots: eras 174074 B0 · 174294 B · 174660 P · 174973 G · 175294 B2
+· 175595 P2 · 175883 G2* (invalid, two knobs) · 176176 G3 · 176467 B4 · 176769 C1 · 177065 B5 accepted)
+
+**Accepted arm: 0.2.9 with no env override** (the nine + `GDN_TC`/`GDN_CONVL2` all auto-on), preset untouched,
+run config `env` absent. Boot of the accepted boot (era B5, `.tune/B5-accepted.boot.txt`):
+
+```
+layer split: CUDA1 runs layers 31-47, expert cache 4352 slots (8.78 GiB), 4352 of its 4352 profiled pairs; slot 0 verified
+layer split: 100% of the experts resident, the prompt path's streamed ring 384 slots
+1398 MiB of VRAM free with everything loaded
+CUDA1: 777 MiB of VRAM free with everything loaded
+```
+
+### Result 1 — the nine parallel settings: **keep ON, +7 % of sustained fan-out, no solo effect**
+
+`bench-util.py --levels 1 3 --rounds 3 --max-tokens 400`, engine port + engine id, arms alternated:
+
+| arm | level 3 `agg tok/s` | level 1 `med/stream` |
+|---|---|---|
+| stack ON (G 169.8, B 168.7, B2 168.0, G3 169.0, B4 167.6, C1 168.2) | **167.6-169.8, n=6 boots** | 160.2-171.3 (drift band) |
+| stack OFF (P 156.9, P2 156.4) | **156.4-156.9, n=2 boots** | 159.8-170.4 |
+
+Fan-out: **+7.0..7.9 %** for the stack, consistent across boots and above the ±11 % single-median drift because it is
+the **aggregate** over 9 simultaneous 400-token streams, not one median. Solo: no effect (the vendor's "+5.3% at c=1"
+did not reproduce). Health identical on both arms — `4352/4352` pairs, 1398/777 MiB free, 100 % resident, no
+`LOW`/`WARNING`, acceptance 82.5-90.5 %, `drafts/step 5.3-10.5`. So the stack costs nothing and buys fan-out:
+**accepted, and the bisect was not run** (the unit already won; 9 reloads for a sub-15 % split of a winner is not worth it).
+
+### Result 2 — the Gated DeltaNet tensor-core path: **no material effect here. Do not re-test.**
+
+Judged on the stable control (cold prompt read, `reused = 0`), band-filtered to one prompt size:
+
+| prompt | GDN off (`GDN_TC=0 GDN_CONVL2=0`) | GDN on | delta |
+|---|---|---|---|
+| ~3.6K | 2124, 2128 | 2083, 2148 | −1 % |
+| ~14.2K | 3109, 3146, 3164 (med 3146) | 3103, 3183, 3226 (med 3204) | +1.5 % |
+
+Inside ±1.5 % in both directions — the release's "+4.4 % at 4K, +5.5-5.7 % longer" (RTX PRO 5000 / RTX A4000) **does not
+reproduce** on this box (3090 Ti + 5070 Ti, iq1_m pruned pack, split 31). The engine logs no line for the TC kernel, and
+the run-time gate is "compute capability 8 or more, **one SM per value head, shared memory**" — plausibly the clause that
+fails here (both cards clear capability). Settled as **reachable effect ≈ 0**: leave the default on, spend no reload on it,
+and do not expect a prompt win from 0.2.9.
+
+`STRATA_COALESCE_PREFILL=1` (the release's "off unless you turn it on" switch for the prefill path, and the one item that
+matches this workload — long conversation prompts): 14.2K cold read 3127/3264/3155 (med 3155) vs B4's 3183 → **tie**.
+Not enabled. `STRATA_PAR_COUNTERS` / `STRATA_CRASH_BT` are telemetry/diagnostics, not arms.
+
+### Method notes (these cost the most time this pass)
+
+- **`bench-util.py`'s prompts are ~30 tokens** — fixed overhead, they cannot show any prefill/prompt claim. For
+  prompt-path knobs use a **unique long prompt** per round (`tune-arm.sh probe=<tokens>`, nonce in the text so the
+  conversation cache cannot reuse it) and read the rate from the engine log, not from wall time.
+- **A boot archive taken at reload time cannot contain the bench.** The runner's cold-read report read
+  `.tune/<label>.boot.txt` (written before the bench) and printed nothing. Parse the **live log from the era line**
+  for bench-era requests; keep the archive only as the boot gate artifact.
+- **Era bounding: take the next era line, not the last one.** `max(x for x in eras if x > n)` measured one era across
+  three boots and invented a P-era 860 tok/s row that belonged to the G era.
+- **This session's own requests live in every era.** Filter the control to one size band (12-18K) **and** `reused = 0`,
+  else a 90K conversation read at 3543 tok/s lands in the pool and decides the winner.
+- **The runner's env audit is what caught an invalid arm**: G2 carried 11 keys (`par=off` was never cleared) —
+  two knobs at once. Read the `run-config env (n):` line and the engine child's `/proc` env after every arm;
+  `podman inspect` cannot see config `env` at all.
+- Discard the first probe round at each boot (first one came out 860-1860 tok/s at 3.6K, 4.7 s at 14K).
+- Reload cost on this arm: **24.6-28.9 s** every time, all seven boots — cheaper than 1slot's 36-40 s.
