@@ -1069,6 +1069,10 @@ and do not expect a prompt win from 0.2.9.
 matches this workload — long conversation prompts): 14.2K cold read 3127/3264/3155 (med 3155) vs B4's 3183 → **tie**.
 Not enabled. `STRATA_PAR_COUNTERS` / `STRATA_CRASH_BT` are telemetry/diagnostics, not arms.
 
+Re-run on the **iq3_s / parallel tree** the same day (see `../parallel/TUNING_NOTES.md`): the nine are worth
+**+8-11 %** fan-out there too (165.2-165.6 vs 179.0-183.4 at 4 concurrent) and GDN TC is **+1.5-2.5 %** on 14K prompts —
+so both 0.2.9 defaults stay on in both trees.
+
 ### Method notes (these cost the most time this pass)
 
 - **`bench-util.py`'s prompts are ~30 tokens** — fixed overhead, they cannot show any prefill/prompt claim. For

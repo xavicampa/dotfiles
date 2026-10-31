@@ -599,3 +599,75 @@ Readings:
 Config edits must go in **both** `strata-iq3_s.json` and `strata/launch-presets/docker.json`; the launcher
 regenerates `state/strata/launch/docker.json` from the preset, so preset `extra` entries are authoritative
 (boolean flags as `"--flag": "on"`). Restart is required for changes to go live.
+
+## 0.2.9 (engine 0.1.55) A/B on iq3_s — measured 2026-10-31 (eras 177246 live-before · 177506 B · 177896 G · 178293 P*
+· 178677 P2 · 179053 B2 accepted; P* invalid — 11 keys, two knobs)
+
+**Accepted arm: no `env` key in `strata-iq3_s.json`** — i.e. 0.2.9's defaults, the nine parallel settings **on** and
+`STRATA_GDN_TC=1`/`STRATA_GDN_CONVL2=2` **on**. Live boot after acceptance (`.tune/B2-all-on.era`):
+
+```
+layer split: CUDA1 runs layers 32-47, expert cache 8192 slots (16.52 GiB), 8192 of its 8192 profiled pairs; slot 0 verified
+layer split: 54% of the experts resident, the prompt path's streamed ring 384 slots
+1177 MiB of VRAM free with everything loaded
+CUDA1: 1106 MiB of VRAM free with everything loaded
+```
+
+Identical across every arm of this A/B — `8192/8192` pairs, 1177/1106 MiB free, 54 % resident, no `LOW`/`WARNING`,
+acceptance 83.7-86.1 %, `drafts/step 6.1-7.2`. So all three stacks are free of VRAM/residency cost on this arm.
+(Note line "expect ~650 CUDA0 / ~700 CUDA1" is stale: with 0.1.55 + these args the boots report 1177/1106, and the
+`strata verify` capture windows only fall to 1098.)
+
+**Hygiene check (the coder tree needed this): this tree was NOT damaged by the 0.1.55 regeneration** — `max_queue 3`,
+`queue_timeout 90`, `vision.cuda_device 1` all still in `strata-iq3_s.json`, and the preset has no `user_args` key at all
+(schema here is `extra`, not `args`), so there is no stale-args copy to trip over. Compute apps confirm the split: the
+engine's 21.8 GiB row on the 3090 Ti, its 14.8 GiB row on the 5070 Ti, and **vision's 1336 MiB row on the 3090 Ti only**.
+
+### The nine parallel settings: **+8-11 % fan-out at 4 concurrent, nothing at 1** — keep on
+
+`bench-util.py --levels 1 4 --rounds 3 --max-tokens 400` on the engine port (5803) + engine id, arms alternated:
+
+| arm | level 4 `agg tok/s` (12 streams of 400) | level 1 `med/stream` |
+|---|---|---|
+| nine ON (B 182.9, G 183.4, B2 179.0) | **179.0-183.4, n=3 boots** | 130.2-146.6 (drift band) |
+| nine OFF (P 165.2, P2 165.6) | **165.2-165.6, n=2 boots** | 142.8-148.6 |
+
+**+8.1 to +11.0 %** for the stack at full batch, no overlap between arms, and it reproduces the coder tree's +7 %
+(see `../coder/TUNING_NOTES.md`) on a different quant and a different batch width. Solo (level 1) again shows nothing
+reliable — the boot-to-boot band (130-149) is wider than any arm effect. Judge fan-out only on `agg`.
+
+### Gated DeltaNet (`STRATA_GDN_TC`/`GDN_CONVL2`): **keep ON here, +1.5-2.5 % on 14K prompts**
+
+Judged on cold reads only (`reused = 0`, band 10-20K, unique nonce prompts so the conversation cache cannot reuse them):
+
+| arm | 14.1-14.3K cold read tok/s | med |
+|---|---|---|
+| GDN ON (B, B2, P2) | 3249, 3285, 3287 | **3285** |
+| GDN OFF (G, P) | 3200, 3236 | 3218 |
+
+Same sign as the coder tree (+1.5 %), so the upstream note that "GDN TC does not pay on iq3_s" (their 1slot tree)
+**does not hold on this box**: on 3090 Ti + 5070 Ti the tensor-core path is worth ~2 % on long prompts and costs
+nothing at decode. If a future release flips the default off, put `STRATA_GDN_TC=1`/`STRATA_GDN_CONVL2=2` in the run
+config `env` to keep it. Both effects are small enough that this is a keep-the-default call, not a sweep-worthy knob —
+do not re-measure unless the engine package changes.
+
+### Not tested (open, with the arithmetic so it stays cheap to decide)
+
+`--batch 5` was **not** re-tested under 0.2.9, and it is not a one-knob change: this preset has no `extra.--batch`;
+the engine's `--batch 4` is derived from the preset's `parallel: 4`, which also drives serve `--parallel 4
+--max-queue 3`. Raising it moves queue/back-pressure at the same time (the § "batch 4 + queue back-pressure" product
+rule is ≤ 3 concurrent sessions), and while CUDA1's cache is profile-capped at 8192 pairs (its free space cannot become
+experts), a 5th slot session costs CUDA0 ~0.36 GiB out of 1177 MiB of margin. Nothing in the 0.2.9 numbers argues for
+it: the stack's gain is already banked at batch 4.
+
+### Method for this tree
+
+- **`./tune-arm.sh <label> [gdn=on|off] [par=on|off] [env=…] [env-clear] [probe=TOKENS] [levels=…]`** is new here
+  (copy of the coder runner). Same reload dance, gate before benching, and it prints the engine child's `/proc` env.
+  Reload cost on this arm: **37.8-38.7 s** (vs 24.6-28.9 s for coder/iq1_m).
+- **Arms are stateful**: `par=off` does not clear `gdn=off`. The run printed `run-config env (11)` for arm P and made it
+  a two-knob arm; `P2 gdn=on par=off` is the valid one. Always read the `run-config env (n):` line before benching.
+- **The era grep must pin `--batch 4`**: the 1slot tree uses the *same* pack (`packs/iq3_s`) and the same native GGUF,
+  so a grep on pack name alone can measure the other tree's boot. Update the grep if `--batch` moves.
+- The cold-read report now parses the **live log from the era line** (bounded by nothing, since no reload has happened
+  yet in this run) — a boot archive written at reload time cannot contain the probe that runs after it.
