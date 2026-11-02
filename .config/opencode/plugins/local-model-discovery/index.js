@@ -1,20 +1,21 @@
 /**
  * Auto-discover models from a local OpenAI-compatible API.
  *
- * Ported to the OpenCode 2.x (V2) plugin API:
- *  - the default export is a plugin definition with an `id` and a `setup(ctx)`
- *    function. The V1 shape (`export default async (ctx) => ({ hooks })`) is
- *    rejected at load time by V2 with
- *    "Plugin must export a default definition with an id and an effect or setup
- *    function" / SchemaError(Expected object at ["default"]);
- *  - models are published through `ctx.provider.transform(...)` instead of
- *    mutating a config object from a V1 `config` hook.
+ * Written for the OpenCode 2.2 (V2) plugin API:
+ *  - the default export is `Plugin.define({ id, setup(ctx) })`, imported from
+ *    the host-provided `@opencode/plugin` module. The SDK is served by the
+ *    OpenCode server itself; the old `@opencode-ai/plugin/v2/promise` alpha
+ *    specifier does not resolve and fails the whole plugin load ("Cannot find
+ *    package '@opencode-ai/plugin'") before any discovery runs;
+ *  - models are published through `ctx.provider.transform(...)` and
+ *    `ctx.provider.reload()`.
  *
  * OpenCode ships built-in discovery for Ollama, LM Studio and vLLM only.
- * llama.cpp / llama-swap are not auto-discovered, so this plugin reads
- * `${baseURL}/models` and publishes the result as the provider's catalog.
+ * llama.cpp / llama-swap / Splash (MLX) are not auto-discovered, so this
+ * plugin reads `${baseURL}/models` and publishes the result as the
+ * provider's catalog.
  */
-import { define } from "@opencode-ai/plugin/v2/promise";
+import { Plugin } from "@opencode/plugin";
 
 const DEFAULT_PROVIDER_ID = "llamacpp";
 const DEFAULT_BASE_URL = "http://localhost:8080/v1";
@@ -62,35 +63,54 @@ function extractContextSize(model) {
   return DEFAULT_CONTEXT;
 }
 
-/** Read the input modalities advertised by a llama.cpp-style model record. */
+/** Read the input modalities advertised by a local model record. */
 function extractInputTypes(model) {
-  const modalities = model?.architecture?.input_modalities;
+  // llama.cpp nests modalities under `architecture`; Splash (MLX), llama-swap
+  // and vLLM report them at the top level, sometimes only via a `vision` flag.
+  const modalities =
+    model?.architecture?.input_modalities ?? model?.input_modalities;
   if (Array.isArray(modalities) && modalities.length > 0) {
     return modalities.filter((m) => m === "text" || m === "image");
   }
+  if (model?.vision === true) return ["text", "image"];
   return ["text"];
 }
 
-/** Turn one /v1/models entry into an OpenCode V2 model definition. */
+/**
+ * Map a local model's advertised reasoning to the V2 `compatibility` block.
+ * Splash (MLX OpenAI-compatible) advertises reasoning via a top-level
+ * `reasoning: { thinks: true, ... }` record and streams it in
+ * `delta.reasoning_content`, so point the OpenAI-Chat reasoning field there.
+ * Returns undefined for models that do not advertise reasoning.
+ */
+function extractCompatibility(model) {
+  if (model?.reasoning && model.reasoning.thinks === true) {
+    return { reasoningField: "reasoning_content" };
+  }
+  return undefined;
+}
+
+/** Turn one /v1/models entry into an OpenCode V2 model record. */
 function toModelInfo(providerID, providerPackage, raw) {
   const context = extractContextSize(raw);
+  const compatibility = extractCompatibility(raw);
   return {
     id: raw.id,
     modelID: raw.id,
     providerID,
     name: raw.name ?? raw.id,
-    api: {
-      id: "openai-completions",
-      type: "aisdk",
-      package: providerPackage,
-      settings: {},
-    },
+    // `package` is only set when we resolved the provider's own SDK package.
+    // Omitting it lets OpenCode inherit the provider's package (e.g.
+    // `@opencode/ai/providers/openai-compatible`), which is what actually
+    // exports `model(modelID, settings)`. Hardcoding the legacy
+    // `@ai-sdk/openai-compatible` here breaks model initialisation.
+    ...(providerPackage !== undefined && { package: providerPackage }),
     capabilities: {
       tools: true,
       input: extractInputTypes(raw),
       output: ["text"],
     },
-    request: { headers: {}, body: {} },
+    ...(compatibility !== undefined && { compatibility }),
     variants: [],
     time: { released: 0 },
     cost: [],
@@ -120,30 +140,45 @@ async function discoverModels(baseURL, providerID, providerPackage) {
     .map((model) => toModelInfo(providerID, providerPackage, model));
 }
 
-export default define({
+export default Plugin.define({
   id: "local-model-discovery",
 
   async setup(ctx) {
     const providerID = ctx.options?.providerId ?? DEFAULT_PROVIDER_ID;
 
-    // The provider itself stays declared in opencode.json; this plugin only
-    // fills in its model inventory. Read the endpoint from the provider so a
-    // non-default baseURL keeps working.
-    let provider;
+    // Explicit endpoint override from the plugin options in opencode.json:
+    //   { "package": "./plugins/local-model-discovery",
+    //     "options": { "baseUrl": "http://host:port/v1" } }
+    // This is the reliable way to target a non-default endpoint. At plugin
+    // setup time a provider declared in opencode.json is not yet in the
+    // runtime registry, so `ctx.provider.get()` throws "Provider not found"
+    // and the config-declared baseURL is not readable yet.
+    const optionBaseURL =
+      typeof ctx.options?.baseUrl === "string" && ctx.options.baseUrl.length > 0
+        ? ctx.options.baseUrl
+        : undefined;
+
+    // Best effort: if the provider is already registered (later reloads),
+    // read its endpoint and SDK package. ctx.provider.get() returns
+    // `{ location, data: ProviderInfo }`; the endpoint and package live on
+    // the data record.
+    let info;
     try {
-      provider = await ctx.provider.get({ providerID });
+      const provider = await ctx.provider.get({ providerID });
+      info = provider?.data ?? provider;
     } catch {
-      provider = undefined;
+      info = undefined;
     }
 
     const baseURL =
-      provider?.settings?.baseURL ??
-      provider?.api?.settings?.baseURL ??
+      optionBaseURL ??
+      info?.settings?.baseURL ??
+      info?.options?.baseURL ??
       DEFAULT_BASE_URL;
-    const providerPackage =
-      provider?.package ??
-      provider?.api?.package ??
-      "@ai-sdk/openai-compatible";
+    // When the provider's package can't be read, leave it undefined so the
+    // model record omits `package` and OpenCode inherits the provider's own
+    // SDK package (the one that exports `model(modelID, settings)`).
+    const providerPackage = info?.package ?? info?.api?.package;
 
     let models;
     try {
