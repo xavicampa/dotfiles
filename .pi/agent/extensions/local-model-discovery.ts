@@ -285,11 +285,36 @@ function extractContextSize(model: Record<string, unknown>): number {
   return 128000;
 }
 
-function extractLocalInputTypes(architecture: Record<string, unknown>): ("text" | "image")[] {
-  const modalities = (architecture as any)?.input_modalities as string[] | undefined;
-  if (Array.isArray(modalities) && modalities.length > 0) {
-    return modalities.filter((m: string) => m === "text" || m === "image") as ("text" | "image")[];
+/**
+ * Read which modalities a local model accepts.
+ *
+ * Two spellings exist in the wild and the old code only knew the first:
+ *  - llama.cpp / vLLM nest them in `architecture.input_modalities`.
+ *  - llama-swap builds its listing from profile config and never emits
+ *    `architecture` at all: `input_modalities` and a `vision` boolean sit at
+ *    the TOP level of the /v1/models entry (same place its `context_length`
+ *    lives — see extractContextSize).
+ * Read both before falling back, or every llama-swap model silently lands on
+ * ["text"] and Pi stops sending images to a server that would have accepted
+ * them — the failure is invisible in the TUI, images just never arrive.
+ *
+ * Modalities Pi's model record cannot express ("pdf", "audio", "video") are
+ * dropped, but a list that filters down to nothing must not be mistaken for
+ * "no modalities": keep looking, and only the last resort returns ["text"].
+ */
+function extractLocalInputTypes(model: Record<string, unknown>): ("text" | "image")[] {
+  const anyModel = model as any;
+  for (const modalities of [anyModel?.architecture?.input_modalities, anyModel?.input_modalities] as (string[] | undefined)[]) {
+    if (!Array.isArray(modalities)) continue;
+    const known = modalities.filter((m: string) => m === "text" || m === "image");
+    if (known.length === 0) continue;
+    // An "image"-only list is not a usable chat model; text is always implied.
+    return known.includes("image") ? ["text", "image"] : ["text"];
   }
+
+  // No modality list: llama-swap's boolean, where present.
+  if (anyModel?.vision === true || anyModel?.capabilities?.vision === true) return ["text", "image"];
+
   return ["text"];
 }
 
@@ -344,7 +369,7 @@ function buildModels(provider: ProviderConfig, data: any[]): ProviderModelConfig
         id: model.id,
         name: model.name ?? model.id,
         reasoning: override.reasoning ?? true,
-        input: extractLocalInputTypes(model.architecture ?? {}),
+        input: extractLocalInputTypes(model),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow,
         maxTokens,
