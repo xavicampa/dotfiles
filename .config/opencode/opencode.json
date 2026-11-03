@@ -147,9 +147,9 @@
         }
       }
     },
-    "llamacpp": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "llama.cpp",
+    "local": {
+      "npm": "@opencode/ai/providers/openai-compatible",
+      "name": "Local",
       "options": {
         "baseURL": "http://localhost:8080/v1"
       }
