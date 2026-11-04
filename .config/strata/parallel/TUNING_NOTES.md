@@ -1023,3 +1023,95 @@ Backup: `strata-iq3_s.json.bak-20261104-pre-visioncpu512`.
 
 **Method trap found on the way:** sending the same image + same text twice makes the second read `prompt_ms 47 ms`
 (prefix cache), which looks like a 20x vision speedup. Nonce the text on every vision latency probe.
+
+## 2026-11-04 — `--layer-split 31` (re-test), `--kv-resident 16384`, `--pcie-frac 0.20`: **all three keep the keeper**
+
+Requested: squeeze more out of this arm with `--pcie-frac 0.20` and other split / `--kv-resident` values. Six
+boots, one knob each, `./tune-arm.sh` with `ROUNDS=3 'levels=1 3'`, arms interleaved with a keeper control after
+every arm boot. Backups: `strata/launch-presets/docker.json.bak-20261104-pre-split-kv-sweep`,
+`strata-iq3_s.json.bak-20261104-pre-split-kv-sweep`. Artifacts `.tune/q1104-{sp31-a,ctl-a,sp31-b,ctl-b,kv16-a,frac020-a,restore-k}.*`.
+Eras: 200421 sp31-a · 200703 ctl-a · 201028 sp31-b · 201345 ctl-b · 201661 kv16-a · 201991 frac020-a · 202324 restore (live).
+Reload 38.7 s every boot. pi is served by this arm, so every boot was a synchronous stop → proxy curl inside one
+tool call, and the benches were issued from tool calls (no self-traffic in flight); this session's own requests do
+live in every era and are excluded from the decode columns below (bench-util's own streams only).
+
+### split 31: the 2026-10-25 rejection is **void** — it fits now — and it is still only a lateral move
+
+The old rejection (§ The layer-split experiment) priced 17 layers against CUDA1's room *while the vision tower sat on
+the 3090 Ti*. Since the vision-on-CPU keeper that room is 1.25 GiB bigger, and the boot says so:
+
+```
+layer split: CUDA1 runs layers 31-47, expert cache 8704 slots (17.55 GiB), 8704 of its 8704 profiled pairs; slot 0 verified
+layer split: 57% of the experts resident          (keeper: 55%)
+expert cache 5333 slots, 9.81 GiB                 (keeper: 5204 slots, 9.60 GiB)
+1179 MiB of VRAM free with everything loaded      (keeper: 1179 — unchanged)
+CUDA1: 1323 MiB of VRAM free                      (keeper: 2603)
+```
+
+So: **`8704 of its 8704`, gate clean**, residency 55 → 57 %, CUDA0's expert cache +129 slots (+2.5 %), and CUDA0's
+auto sizing reports 11.31 GiB free instead of 11.10 — i.e. the vision move *did* convert into expert slots, which
+also means § Guardrails' "CUDA1's cache is profile-capped … its free VRAM cannot be spent on experts" is true only
+**at split 32**. At split 32 it holds exactly its 8192 profiled pairs; drop a layer onto it and it takes them.
+
+Decode is a **tie**, in spite of the mechanism working:
+
+| boot | L1 per-stream (first-of-level discarded) | L1 usable med | L3 agg / med-stream | rows | ms/window | CUDA0 GPU-reach | CPU-experts |
+|---|---|---|---|---|---|---|---|
+| sp31-a | 96 · **158** | 158 | 173.5 / 58.9 | 5.20-5.27 | 27.46-27.63 | 9.18-9.26 | **4.54-4.60** |
+| ctl-a | 106 · 142 · 156 | 149 | 175.1 / 58.4 | 5.22 | 27.76 | 9.43 | 5.05 |
+| sp31-b | 111 · 147 · 162 | 154.5 | **180.6** / 60.2 | 5.27 | **27.44** | **9.20** | **4.78** |
+| ctl-b | 111 · 149 · 162 | 155.5 | 176.1 / 59.0 | 5.25 | 27.47 | 9.47 | 5.28 |
+| kv16-a (clamped = control, see below) | 110 · 150 · 151 | 150.5 | 176.7 / 59.2 | 5.25 | 28.27 | 9.56 | 5.89 |
+| frac020-a | 107 · 133 · 157 | 145 | 178.0 / 59.6 | 5.25 | 27.65 | 9.45 | 5.63 |
+
+Adjacent pairs flip sign: pair A sp31 158 vs ctl 149 (+6 %), pair B 154.5 vs 155.5 (−0.6 %); L3 aggregate +0.8 %
+across both pairs. The two mechanism terms do move — **CPU-experts 5.05-5.28 → 4.54-4.78 ms (−7…−10 %)**, GPU-reach
+−2.7 % — but `ms/window` (27.44-27.63 vs 27.47-27.76) and `rows/s` (188-192) are flat, so the saving is absorbed by
+the other window components and never reaches the token rate. Note `CPU-experts` itself drifts (5.05-5.89 across four
+*identical* control-equivalent boots), so those percentages are the weakest instrument in the table; `ms/window` is
+the one that matters and it did not move.
+
+**Reject, and it is not a close call:** the price is CUDA1 free **2603 → 1323 MiB**, i.e. 1.28 GiB of the 3090 Ti's
+working memory (long-context KV growth, later window graphs) for a residency gain that measured as nothing. Hard
+rule 4 is on the table here. Re-test it only if something else gives that GiB back — the pair counts make split 30
+the cliff: 9216 pairs = **18.58 GiB > 18.51 GiB room**, so 30 is `8192 of its 9216` on the 6.6 GB/s link.
+
+### `--kv-resident` cannot go below 20480 — the engine floors it, silently
+
+`kv=16384` lands in the preset and in the argv (`--kv-resident 16384` is on the boot line) but the boot prints:
+
+```
+KV streaming: 20480 of 131072 cells per QSA layer in VRAM, the K/V in 1.03 GiB of pinned RAM
+expert cache 5204 slots, 9.60 GiB · 1179 / 2603 MiB free · 55% resident · 8192 of its 8192 pairs
+```
+
+**byte-identical to the keeper** — the floor the § Guardrails line names as a recommendation is enforced. So the
+"free 0.7 GiB of slot sessions → +390 CUDA0 expert slots" idea is unreachable on this pack from this flag, and the
+up direction was already measured negative (§ The layer-split experiment: kvres 32768 → CUDA0 cache 5,278).
+**`--kv-resident 20480` is not a choice on this tree, it is the value the engine clamps to.** Any CUDA0 expert-cache
+growth has to come from physical GiB on that card (vision off the GPU is the lever that worked) or from `--batch`.
+
+### `--pcie-frac 0.20`: nothing to stage. Keep 0.00.
+
+Identical boot (`5204 slots`, 1179/2603, 55 %, 8192/8192) and identical decode/fan-out (L3 178.0). The reason is in
+the per-request tier counters, present in **every** era of this sweep:
+
+```
+strata serve: expert tiers: GPU 124837 hits this request; since the start RAM 32786 blobs, files 0 blobs 29387.5 MB read (the GGUF in place)
+strata generate: resident RAM mode: 27.78 GiB of experts in RAM (page-locked) … adaptive swaps … (no file reads)
+```
+
+`files 0 blobs` everywhere: with `--resident-experts on` the miss tier is page-locked RAM, there is no file tier for
+a PCIe staging pool to prefetch into, exactly as § Other measured decisions predicted. This is the same tie the
+`1slot` tree measured across 0.00/0.20/0.40/0.60, now confirmed on this pack. **Do not re-sweep it** unless
+`--resident-experts` comes off. (It also means the § 2026-11-03 open question "`[1,0]/38 + pcie-frac 0.20` would
+isolate the role-swap failure" is dead on other grounds — 17 layers = 17.55 GiB can never fit the 16.3 GiB 5070 Ti.)
+
+### Where the headroom actually is, after this sweep
+`ms/window` sits at 27.4-28.3 with `run ≈ 24.2` made of `CUDA0 GPU-reach 9.2-9.6 + CPU experts 4.5-5.9 + commit 1.1 +
+emit 1.7 + adapt 0.1`, at 5.2-5.3 rows of a 6-row ceiling, while both cards idle (util 55/38 %) and the engine's
+thread pool is saturated (14.8-15.5 of 15 workers, § Bench of the live keeper as-is). Split, kv-resident and
+pcie-frac are now all closed — the remaining multiplier is the **draft yield** (`yield gen/fed 1.40-1.50`,
+`accept 77-84 %`): `--spec 4 --spec-min-p 0.70` has never been swept on this tree (the coder tree measured
+`--spec-min-p 0.5` = −33 %, which only proves the *down* direction is bad). A `spec=6` / `spec-min-p=0.80` arm would
+need a runner arg for those two keys (`PAIRS` currently knows only split/kv/frac/slots).
