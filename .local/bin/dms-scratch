@@ -9,6 +9,6 @@ exec kitty \
     --session - <<EOF
 layout tall
 launch --title btop -- btop
-launch --title strata -- podman run --network host --rm -it ghcr.io/niko1221/strata:latest-cuda13 strata monitor --url http://127.0.0.1:5801
-launch --title strata-p3 -- podman run --network host --rm -it ghcr.io/niko1221/strata:latest-cuda13 strata monitor --url http://127.0.0.1:5802
+launch --title strata -- podman run --network host --rm -it ghcr.io/niko1221/strata:latest-cuda13 strata monitor --url http://127.0.0.1:5800
+launch --title strata-p3 -- podman run --network host --rm -it ghcr.io/niko1221/strata:latest-cuda13 strata monitor --url http://127.0.0.1:5801
 EOF
