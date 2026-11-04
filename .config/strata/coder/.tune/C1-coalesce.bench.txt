@@ -1,0 +1,14 @@
+sampling engine (container qwen3.8-flash-next-coder-iq1_m-parallel) every 0.5s
+url=http://127.0.0.1:5801 model=qwen3.8-flash-next-coder-iq1_m max_tokens=400 rounds=3
+streams  agg tok/s med/stream min/stream  med TTFT  max TTFT  wall s
+      1      170.3      170.3      150.4      0.00      0.01    2.35
+        per-stream runs: 150, 170, 170
+        GPU0: util mean 35% max 41% power 102W max 111 mem 15266 MiB
+        GPU1: util mean 60% max 67% power 205W max 222 mem 22911 MiB
+        engine CPU mean 0.99 max 1.06 cores (all threads)
+      3      168.2       56.3       50.6      0.01      0.01    7.13
+        per-stream runs: 51, 51, 52, 56, 56, 57, 57, 57, 58
+        GPU0: util mean 34% max 41% power 92W max 96 mem 15283 MiB
+        GPU1: util mean 62% max 89% power 208W max 219 mem 22973 MiB
+        engine CPU mean 0.98 max 1.04 cores (all threads)
+rows -> /home/javi/.config/strata/coder/.tune/C1-coalesce.csv

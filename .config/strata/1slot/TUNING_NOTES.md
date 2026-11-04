@@ -597,6 +597,58 @@ mattered; `slots` 4 was the other one.)**
 | `~/.config/strata/1slot/tune-arm.sh` | **the durable arm runner**: edit → stop → reload → boot archive → **gate** → bench → in-era KV table. `./tune-arm.sh <label> [split=N] [kv=N] [frac=X] [mtp=on|off] [vision=gpu|cpu] [cc=MIB] [ccslots=N] [ccmin=N] [gain=N] [minfree=N] [--no-bench]`, `ROUNDS=2` for two rounds; artifacts in `.tune/` |
 | `~/.config/strata/1slot/cc-counters.py` | the conversation-cache instrument: per-era refusals / parks / pool peak / evictions / `restored (live)`, labelled from the boot's own argv |
 | `strata/launch-presets/docker.json.bak-20261030-pre-cc6144`, `strata-iq3_s.json.bak-20261030-pre-cc6144` | the conversation cache at **1024 / 256 / 512** (arm CC0, the pre-sweep state) |
+| `strata/launch-presets/docker.json.bak-20261030-pre-cc8192`, `strata-iq3_s.json.bak-20261030-pre-cc8192` | the conversation cache at **12288** (arm CC3, the values adopted from `coder`) — the state before the 8192 step below |
+
+## Applied 2026-10-30 (no label): `--conversation-cache-mib 12288 → 8192`, the rest kept
+
+Taken as the RAM step the CC3 section names, not as a new arm (no boot/bench): the trigger in that section had
+already fired in real use, and the pool was not paying. Signals at the time of the edit — `cc-counters.py` over
+the three last eras (bounds off `.tune/<label>.era`; in-era only): pool peak **11.94-11.98 GiB in 10/10 slots**,
+evictions max **50**, `restored (live)` **0** in all three, while the era cold-read lists carried **111,127**- and
+**106,895**-token requests, and the sampler's own history sat min `MemAvailable` **4.3 GiB** (now ~7.1, against
+19.8 at idle / 8.5 under bench) with swap ~**3.0 GiB** used since 2026-10-29 10:14Z where the guardrail wants it
+flat. Price if a giant does not fit: that section's own numbers — refused/evicted re-read **21.6 s** for 95K tokens
+against **169.9 ms** restored; the park is 0.45-1.05 s = 3-5 % of the cold read it prevents; at 8192 the pool
+holds ~3.4 conversations of 100K (2.2 GiB each) and a 4th is LRU's victim.
+
+Applied to **both** carriers by file edit (no `tune-arm.sh` run, so no arm artifacts and no mid-session reload —
+see "When pi is served by the arm under test"), verified with `jq`: preset
+`extra["--conversation-cache-mib"] = "8192"` (`strata/launch-presets/docker.json`) and run-config `args` pair
+`"--conversation-cache-mib", "8192"` (`strata-iq3_s.json`). Kept untouched in both: `--conversation-cache-slots 10`,
+`--conversation-cache-min-tokens 16384`, `--conversation-cache-park-gain 12288`; **`min-free-mib` was not added**
+and stays at the engine default **2560** — the coder tree's 1536 floor never binds here and would remove the brake
+exactly when a pool presses on RAM (CC3 § why it was not copied).
+
+Restart-only for this tree: no `nixos-rebuild switch` and no `-e` env change (the `STRATA_SPLIT_RING=384` copy in
+`~/.config/nixos/homepc/configuration.nix` is untouched). Not live until the model swaps — and the swap will cut
+the engine answering this session, so the next turn here reads cold.
+
+Watch: `./cc-counters.py` (verdict rule unchanged) + `strata-toksample`'s CSV for `MemAvailable`/swap.
+If giants start mattering again, the same section's judgement re-applies: back to **12288** off the two
+`bak-20261030-pre-cc8192` copies above.
+
+### Made live the same evening (2026-10-30 ~21:09Z, engine 0.1.54, boot line 172603 of `docker.engine.log`)
+
+Stop + load in one shot, no `nixos-rebuild switch`: `podman stop -t 120 qwen3.8-flash-next-iq3_s`, then one
+4-token chat completion to `:8080/v1/chat/completions` naming the model, which is what makes llama-swap swap it
+back in. The `cmdStop` script (`${strataLogStop}/bin/strata-log-stop`) was **not** resolvable from disk, so the
+stop was plain `podman stop -t 120` — no `strata-log-archive` snapshot of the CC3 run was taken; the engine log
+**appended** (172603 follows the CC3 eras at 162052-172444) rather than truncating, so those era line numbers are
+still valid for `cc-counters.py`. Boot carried `--conversation-cache-mib 8192` with `slots 10 / min-tokens 16384 /
+park-gain 12288` and no `min-free-mib`, and passed the gate unchanged: `9216 of its 9216 profiled pairs; slot 0
+verified`, `61% of the experts resident`, `streamed ring 384 slots`, `lend sizing: borrows 3834 slots … 3834 of
+them keep their experts in RAM too` (K==N, no WARNING), CUDA0 cache 5797 slots, `1019 MiB of VRAM free with
+everything loaded`, window captures 1073-1103 MiB, `nvidia-smi` 924 / 1,020 MiB free — all ≥ 512, no `LOW` /
+`WARNING` / `decode window`.
+
+The cost was paid by the session that asked for it: `prompt 76842 tokens = 0 reused + 76842 read in 18212 ms
+(4219.2 tok/s)` — that is the 18 s class of cold re-read the CC3 section prices against a **169.9 ms** restore, and
+4,219 tok/s sits below the 4,798.6-4,848.9 cold-read control band, as expected for a first read after a restart
+(the PLE page cache is cold too); one sample, do not read it as a prefill regression from the cc step.
+`MemAvailable` 7.1 → **20.6 GiB** immediately after boot — most of that is the old run's 11.9 GiB pool vanishing at
+restart; the durable ceiling change is 12288 → 8192, so judge steady state from the CSV against ~4 GiB better than
+the pre-edit figures, not from this number. First era (`172603..`): 3 requests, 0 parks, 0 refusals, 0 evictions —
+too early to judge; `skip parking (65 tokens, below the 16384 minimum)` is the `min-tokens` filter working.
 | `tune-arm.sh.bak-20261030-pre-cc` | the runner before it learned the five `cc` knobs (and before it called `cc-counters.py`) |
 | `.tune/CC0-baseline.counters.txt`, `.tune/CC{1,2}.{era,boot.txt}` | baseline counters snapshot + the two arms' era line numbers and boot archives |
 | `/tmp/gpuswap/{arm.sh,arm2.sh,arm3.sh}` | the throwaway predecessors (superseded by `tune-arm.sh`) |

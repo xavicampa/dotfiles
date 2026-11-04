@@ -901,3 +901,125 @@ not add speed, it stops the engine from paying admission costs — and it costs 
   with `--levels 4 5` and watch the window-capture minimum; the decision line is 512 MiB there, not the aggregate.
 - Runner state: `tune-arm.sh` is still pinned to `--batch 4$` in its era grep and has no `parallel=` arm — the A/B was
   run by hand with identical steps. Either patch both before the next arm, or keep hand-running this knob.
+
+---
+
+## 2026-11-03 — vision on the CPU, then the `gpus: [1,0]` split ladder to 21 (arms A/V, 5 boots each)
+
+Requested: get the vision tower off the GPUs and give the 3090 Ti more experts. Both happened; **neither is a win**,
+and the reason the second one fails to win also **partly overturns § the `[1,0]` role swap is poison on this pack**.
+
+Arms (each boot = edit → `podman stop -t 120` → one proxy-id request on 8080 → gate → bench, all in one tool call;
+the box serves this session, so no self-traffic was in flight during any measurement):
+
+| arm | files | gpus | `--layer-split` | `--pcie-frac` | reserve MiB (0/later) | `vision.gpu` |
+|---|---|---|---|---|---|---|
+| **V** (keeper) | `*.bak-20261103-pre-gpuorder-swap` | `[0,1]` | 32 | 0.00 | 1280 / 1024 | true |
+| **A** | `.tune/arm-A-{strata,preset}.json` | `[1,0]` | 21 | 0.20 | 1024 / 1280 | **false** |
+
+### Vision on the CPU: works, costs nothing on the boot, unmeasured on real images
+
+`"vision": {"gpu": false}` in the run config is the only knob — the preset keeps `--vision`, `strata-vision` still
+starts, and it simply gets no CUDA context. Verified on the `[1,0]/17` boot: `nvidia-smi --query-compute-apps` shows
+**one row (the engine) per card, no tower row**, and a real `image_url` request answers (`prompt 74 tokens in 710 ms`,
+0.9 s round trip). The freed VRAM is what funded the ladder below (+1.23 GiB of auto-sized expert cache on the 3090 Ti).
+**Not** measured: a real screenshot at `vision.max_tokens 1024` on CPU — 1slot's CPU-vision keeper runs 512 for that reason.
+
+### The ladder: every step is +1 layer = +512 slots on the 3090 Ti, and it stops at 21
+
+`--layer-split` 16 → 21, `[1,0]` throughout (boot files `.tune/visioncpu-s{17,18,19,20,21}.boot.txt`):
+
+| split | 3090 Ti (stage 0) cache | …of its span | 5070 Ti (stage 1 = layers + head + 3 slot drafters) | overall resident | free MiB 0 / 1 |
+|---|---|---|---|---|---|
+| 16 | 8,192 / 14.33 GiB | 8192/8192 | 4,181 / 16,384 pairs (26 %) | 50 % | 1628 / 781 |
+| 17 | 8,704 / 15.37 | ✓ | 4,228 / 15,872 (27 %) | 53 % | 1827 / 783 |
+| 18 | 9,216 / 16.48 | ✓ | 4,287 / 15,360 (28 %) | 55 % | 4157 / 779 |
+| 19 | 9,728 / 17.52 | ✓ | 4,338 / 14,848 (29 %) | 57 % | 3015 / 779 |
+| 20 | 10,240 / 18.46 | ✓ | 4,435 / 14,336 (31 %) | 60 % | 1835 / 781 |
+| **21** | **10,720 / 19.22** | ✓ 100 % | **4,451 / 13,824 (32 %)** | **62 %** | **969 / 785** |
+
+Every boot passed the gate (min window capture 755-771 MiB, no `LOW` / `WARNING` / `not enough room`, `lend sizing`
+ring K == N with `STRATA_SPLIT_RING=384`). **22 is off the cliff**: a step costs ~1.2 GiB there (922 MiB experts +
+~180 MiB dense weights + ~120 MiB of per-slot KV — the slot sessions on CUDA0 grew 0.23 → 0.27 GiB each as the span
+grew) against 969 MiB reported free, and the card is down to 1.3 GiB physical. Beyond 21 the money has to come from
+`--max-context`, `--batch`, or the vision tower — not from more split.
+
+**Stage 1 does not move.** It is capacity-capped, not demand-capped: it settles at ~4,300-4,450 slots whatever its
+span, so shrinking the span from 32 to 27 layers only lifts its ratio 26 → 32 %. Fully resident needs span ≈ 8 layers
+(split ~39-40) — that is the `[1,0]/38` arm § the role swap already rejected at −33…−42 % decode.
+
+### A/B — 5 boots per arm, time-adjacent pairs
+
+Level-1 (single stream) median tok/s per boot, `bench-util.py --max-tokens 400`:
+
+| pair in time | A | V | winner |
+|---|---|---|---|
+| A1 / V1 (rounds 2) | **109.0** | **121.2** | V +11 % |
+| A2 / V2 (rounds 2) | 118.8 | 129.9 | V +9 % |
+| A3 / V3 (rounds 3) | 137.5 | 134.8 | A +2.0 % |
+| A4 / V4 (rounds 3) | 136.1 | 134.9 | A +0.9 % |
+
+Fan-out (agg tok/s): level 2 — A 154.4 / 151.9 vs V 151.3 / 149.0 (**A +2 %**); level 3 — A 177.3 / 172.2 vs
+V 170.2 / 174.4 (**A +1.5 %**, overlapping; per-stream 57.8-60.0 vs 57.7-58.8 = tie, ceiling ~172-177 as always).
+Cold read (the ±1 % control; unique ~3.5k-token probes, `max_tokens 1`): A5 **1678 / 1873**, V5 **1686 / 2021 tok/s** — identical.
+`erastats.py --pack iq3_s` on the live V5 boot: `accept 74.6 %`, `drafts/step 3.94`, `yield gen/fed 1.543`.
+
+**Verdict: `parallel: 3` / `[0,1]` / split 32 stays the keeper (it is the live boot).** A is a lateral move:
++7 points of overall residency and 2.5 GiB more experts on the 3090 Ti bought **nothing measurable** at 1-3 streams,
+while giving up 210-480 MiB of window-capture margin and leaving the head+drafter stage at 32 % of its pairs.
+
+### What this overturns, and the confound that has to be settled before anyone re-litigates it
+
+§ the role swap rejected `[1,0]` on the last stage **not** holding its span. At split 21 that stage holds **32 %** of
+its profiled pairs — far hungrier than at split 38 — and there is **no decode or cold-read penalty at all**. So the
+"last stage must be fully resident" mechanism is **not** what killed `[1,0]/38`.
+
+Arm A is a **bundle**, not a knob: it also changed `--pcie-frac 0.00 → 0.20` and swapped the reserves (1280/1024 →
+1024/1280), and the earlier `[1,0]/38` rejection ran at `pcie-frac 0.00`. `--pcie-frac` sizes the VRAM staging pool
+for exactly the starved stage, so it is the prime suspect for why starvation stopped hurting. **If this matters
+enough to chase, the single-knob arm is `[1,0]/38 + pcie-frac 0.20` (everything else = keeper)** — that isolates it;
+`[1,0]/21` is not the test.
+
+### Method, since the drift ate two of the four pairs
+
+Level-1 medians drift **+26 % within one config** over a long window (A1 109.0 → A3 137.5, identical config), which
+is larger than every effect here and flipped sign between the early and late pairs. Only **time-adjacent** pairs are
+comparable, and four of them still do not separate ±10 %: `--levels 1 --rounds 3` pairs are cheap (~36 s reload +
+~25 s bench), so run **≥6 adjacent pairs** for anything under ~10 %, or interleave within one call.
+
+## 2026-11-03 — vision on the CPU at 512 image tokens: **new keeper** (1.25 GiB back, latency unchanged)
+
+Knob is in the run config only — `strata-iq3_s.json`: `"vision": {"gpu": false, "max_tokens": 512}`. The preset keeps
+`--vision` and the mmproj; `strata-vision` still starts, it just gets no CUDA context.
+
+**Boot cost: zero, and it pays.** Same expert caches as the old keeper (5,204 slots on CUDA0; 8,192 of its 8,192
+profiled pairs on CUDA1), same min window capture (1163 vs 1159-1163 MiB), no `LOW` / `WARNING`. The 3090 Ti goes
+from **1,346 → 2,603 MiB free** — the tower is a separate process holding **1,252 MiB** on the card named by
+`vision.cuda_device` (still the physical nvidia-smi index, not the engine's stage) when `gpu: true`, and no row at all
+when `gpu: false`.
+
+**Image latency, isolated by holding the token budget at 512 across both boots** (same 1280x720 dashboard PNG, unique
+nonce in the text so the KV prefix does not hit, `max_tokens 8`):
+
+| boot | prompt_ms | wall s |
+|---|---|---|
+| `vision.gpu true`, 512 | 1504 · 866 · 872 | 1.74 · 0.98 · 0.98 |
+| **`vision.gpu false`, 512** | 1109 · 846 · 838 | **4.33** · 0.94 · 0.92 |
+
+Steady state is the **same either way** (0.92-0.98 s for a full-HD screenshot) — the tower encode is billed inside
+`prompt_ms`, it is not a separate stall, and moving it to the CPU does not make it slower here. The one real cost is the
+**first image after each boot on the CPU: ~3.2 s extra** (4.33 s wall against 1.11 s of engine time). If that ever
+matters, it is a warm-up problem, not a throughput problem.
+
+**512 image tokens is enough at this density**: every string on the 1280x720 mock — including 20 px text — came back
+verbatim (`137 tok/s`, `22362 MiB`, `STAGE 1 THIN`, `cold read 1686 tok/s`), at `prompt_tokens 570` vs `1005` at 1024.
+Not tested: dense terminal/text screenshots. If small-text OCR starts dropping, raise `vision.max_tokens` back toward
+1024 **before** putting the tower back on the GPU — the token budget, not the placement, is what buys detail.
+
+**Keeper now: `gpus [0,1]` · `--layer-split 32` · `--pcie-frac 0.00` · reserves 1280/1024 · `vision.gpu false` ·
+`vision.max_tokens 512`** — live boot `.tune/K3-keeper-visioncpu512.boot.txt`, arm files `.tune/arm-A-*` / `.tune/arm-V-*`
+(the V files are the *old* keeper, pre-vision-CPU; the current one adds the two `vision` keys).
+Backup: `strata-iq3_s.json.bak-20261104-pre-visioncpu512`.
+
+**Method trap found on the way:** sending the same image + same text twice makes the second read `prompt_ms 47 ms`
+(prefix cache), which looks like a 20x vision speedup. Nonce the text on every vision latency probe.

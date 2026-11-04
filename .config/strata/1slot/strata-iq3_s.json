@@ -26,7 +26,7 @@
   "--adapt-swaps",
   "160",
   "--conversation-cache-mib",
-  "12288",
+  "8192",
   "--conversation-cache-min-tokens",
   "16384",
   "--conversation-cache-park-gain",
