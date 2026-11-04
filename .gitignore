@@ -176,6 +176,8 @@ javier-campa-dotfiles/
 .pi/agent/logs/
 .pi/agent/models-store.json
 .pi/agent/pi-crash.log
+.pi/agent/pi-subagents/
+.pi/agent/pi-web-access/
 .pi/agent/**/*.bak
 .pi/agent/**/*.disabled
 .config/maya/*.log
