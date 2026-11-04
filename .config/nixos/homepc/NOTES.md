@@ -1105,7 +1105,21 @@ through the page cache — RAM where they fit, NVMe otherwise). Image from
   written at setup time with it. The vision tower runs on GPU 0 beside the model
   (`in: [text, image]`); tools = OpenAI + Anthropic tool calls.
 
-### llama-swap/strata-coder — `qwen3.8-flash-next-coder-iq1_m-parallel` (wired 2026-10-28)
+### llama-swap/strata-coder — `qwen3.8-flash-next-coder-iq1_m-parallel` (wired 2026-10-28, REMOVED 2026-11-04)
+
+> **Removed 2026-11-04 — kept here as the wiring record, not as a live backend.** Dropped because the fan-out
+> ceiling on this box is the window, not the pack: coder wins solo (159.8-171.3 vs 130-149) but at level 3 its
+> aggregate is *behind* iq3_s (167.6-169.8 vs 176.9-184.1, per-client 50.6-56.7 vs 57.1-61.9), and its VRAM shape
+> (1398/777 MiB free, slot sessions 0.82/0.58 GiB each, expert caches exactly at their caps) cannot take a 4th
+> batch slot without crossing the 512 MiB floor (#2065) — see `../strata/parallel/TUNING_NOTES.md` § 2026-11-04.
+> Gone: the `settings.models` entry + `groups.gpu.members` line (backup `configuration.nix.bak-20261104-pre-coder-removal`),
+> the install tree (archived: `~/.local/share/strata-archive/strata-coder-20261104.tar.gz` — notes, presets and the
+> whole `.tune/` artifact set), the Strata pack `packs/coder-iq1_m` (1.4 G), the coder bench runs, and the HF repo
+> `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF` (**59.3 G**; the iq3_s arm reads a *different* repo,
+> `…-RCO-GGUF`, whose identically-hashed blobs are separate files — verified by inode, so nothing shared was lost).
+> pi's `models.json` entry and `modelThinkingLevels` mapping went with it. **To re-add:** everything below is
+> still correct — re-download the repo (`hf download`, 58.4 G of GGUF), let setup re-pack it, restore the tree from
+> the archive, and re-insert the entry + members line.
 
 Third Strata backend: `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF`, the expert-**pruned** coding
 build of the same family (256 of 512 routed experts per layer survive). Install tree
