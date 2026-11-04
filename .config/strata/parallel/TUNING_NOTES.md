@@ -1164,3 +1164,67 @@ Both directions of `--spec-min-p` are now measured: **0.5 = −33 %** (coder tre
 **0.80 = −6 %** here. `--spec 4 / --spec-min-p 0.70` is an interior optimum for this pack, not a default nobody
 touched. Preset restored to `split 32 / kv 20480 / frac 0.00 / spec 4 / spec-min-p 0.70` (boot asserts
 `8192 of its 8192`, `55 %`, `1179 / 2603 MiB free`, GATE PASS).
+
+## 2026-11-04 (third sweep) — `--pool-workers` 15 → 19 (and 12): the "saturated 15-worker pool" is **not** the ceiling
+
+The keeper-bench reading (§ Bench of the live keeper as-is) said the engine sits at **14.8-15.5 cores against a
+15-worker pool while both GPUs idle**, and called the feed path the cap. This tests that directly. `tune-arm.sh`
+now takes `workers=N` (backup `tune-arm.sh.bak-20261104-pre-pool-workers`). Eras w19-a 205002 · ctl-a 205321 ·
+w19-b 205623 · w12-a 205941 · restore 206259 (live).
+
+**First fact: no pool flag is set on this tree at all — 15 is the engine's own default**, chosen from the topology
+(Core Ultra 7 270K Plus, 24 physical / 24 logical, no SMT: logicals **0-7 are the P-cores at 5.4-5.5 GHz**, **8-23
+are E-cores at 4.7 GHz**):
+
+```
+strata generate: CPU pool: 15 workers by default (24 physical cores, 24 logical processors; bounded by the performance cores and half of the efficiency cores)
+strata generate: 15 pool workers on logical processors 7,0,1,2,3,5,6,8,9,10,11,12,13,14,15, the host thread on 4 (draining too) (--host-core first)
+strata aux cpus: threads that are neither pool workers nor the host go to CPUs 16,17,18,19,20,21,22,23
+```
+
+`--pool-workers 19` applies cleanly (no warning) and takes the next four **E-cores**, shrinking the aux pool to 4:
+
+```
+strata generate: 19 pool workers on logical processors 7,0,…,15,16,17,18,19, the host thread on 4 (draining too)
+strata generate: 19 expert-pool workers + the host thread · CPU pool tasks/phase: 60 (automatic), participating threads: 20
+strata aux cpus: threads that are neither pool workers nor the host go to CPUs 20,21,22,23
+```
+
+`workers=15` written explicitly reproduces the default lines byte-for-byte (same logicals, aux 16-23,
+tasks/phase 48), so it is a valid control. Gate clean in all four boots (`8192 of its 8192`, `1179 / 2603 MiB`).
+
+| boot | pool | engine CPU (all threads, bench-util) | L1 usable med | L3 agg | long gen≥400 | ms/window | CPU-experts | rows/window |
+|---|---|---|---|---|---|---|---|---|
+| w19-a | 19 (P8 + E11) | **18.41 / 18.81** | 153 | 176.9 | 156.7 | 27.84 | 5.31 | 5.25 |
+| ctl-a | 15 (default) | 14.74 / 15.06 | 154.5 | 174.6 | 159.5 | 27.82 | 5.63 | 5.21 |
+| w19-b | 19 | **18.26 / 18.65** | 152 | 176.3 | 154.3 | 27.77 | 5.45 | 5.25 |
+| w12-a | 12 (P8 + E4) | 12.16 / 12.14 | 146.5 | 173.1 | 145.8 | **28.26** | **6.01** | 5.25 |
+
+**+27 % workers bought nothing.** The workers *are* used (engine CPU 15.0 → 18.4-18.8 cores is a real +3.5 cores of
+work, not a bookkeeping change), yet `ms/window` is flat (27.77-27.84 vs 27.82), `rows/window` is flat (5.25 vs
+5.21), and the decode columns land inside the ±11 % drift (L1 −1.3 %, L3 agg +1.1 %, long −2.5 %). Going the other
+way does bite: 12 workers costs `+1.6 % ms/window`, `CPU-experts 5.63 → 6.01 ms` and ~5 % of solo tok/s. So 15 is
+close to the knee from below and flat from above — **the pool is not the limiter; leave the flag off entirely**
+(writing `--pool-workers 15` is harmless but invites future confusion).
+
+Why the earlier reading misled: `run 24.3 = CUDA0 GPU-reach wait 9.5-9.7 + CPU experts 5.3-5.6 + commit 1.1 +
+emit 1.7` — **40 % of the window is a *wait*, not runnable work.** More workers widen the part that was already
+amortized (CPU-experts is a fan-out task; `tasks/phase` auto-scales 48 → 60) and cannot shorten a dependency chain
+between windows. The cost of 19 is real and asymmetric: four E-cores leave the aux pool (`aux cpus 16-23 → 20-23`,
+so the `aux_cpus=1` path and I/O threads get 4 cores instead of 8) and the package burns ~3.5 more cores for the
+same tokens.
+
+**So the ~181 tok/s fan-out ceiling and the ~27.8 ms window are not host-thread-count-bound.** Remaining candidates
+have to attack the wait itself (`--pipeline-windows 2 is off: not with --batch slots` — i.e. overlapping CUDA0's
+GPU round trip with the next window's CPU-expert work is an engine-shape change, not a flag on this build) or the
+rows ceiling (5.2-5.3 of 6).
+
+### Operational lesson from this sweep (a near-miss, worth not repeating)
+I hand-wrote the reload curl instead of using `tune-arm.sh` and typed the model id wrong
+(`qwen3.8-flash-next-iq3-parallel`, missing the `_s`): **`reload=404 t=0.009696`** — llama-swap answered instantly,
+did **not** boot, and the container was left stopped with the arm down (this session's own model). Two tells:
+a **404** means the id isn't the proxy id (rule 5), and a cold boot takes **~38 s** — a `t=` of ~1.4 s means nothing
+loaded. `tune-arm.sh` derives `PRESET`/`MODEL` from the run config and cannot make this mistake; if you must write
+the curl by hand, echo those two values first and read the `t=`. Recovery here was passive: the next request from
+this session (correct id) triggered the cold load, and the boot verified `CPU pool: 15 workers by default`,
+`8192 of its 8192`, `1179 / 2603 MiB`.

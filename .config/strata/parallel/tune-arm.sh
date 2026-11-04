@@ -15,7 +15,7 @@
 #     the ENGINE id qwen3.8-flash-next-iq3_s on the ENGINE port from `-e PORT` (5803).
 #
 #   ./tune-arm.sh <label> [gdn=on|off] [par=on|off] [env=NAME=VAL,...] [split=N] [kv=N] [frac=X] [slots=N]
-#                   [spec=N] [specminp=X] [--no-bench]
+#                   [spec=N] [specminp=X] [workers=N] [--no-bench]
 #
 #   gdn=off  -> env STRATA_GDN_TC=0 STRATA_GDN_CONVL2=0        (pre-0.2.9 Gated DeltaNet prompt path)
 #   gdn=on   -> those two removed, wrapper re-applies 1 / 2
@@ -32,6 +32,11 @@
 #   specminp=X  preset extra `--spec-min-p X` — the acceptance gate a draft must clear to be offered
 #               Both live ONLY in preset `extra` on this tree (the run config has no user_args; its `args`
 #               are regenerated each start, so they are cosmetic). Assert the boot argv carries them.
+#   workers=N   preset extra `--pool-workers N`. Default here is 15 = 8 P-cores (logicals 0-7,
+#               5.4-5.5 GHz) + half the E-cores (logicals 8-15, 4.7 GHz), host pinned on a P-core
+#               (logical 4); logicals 16-23 are the aux CPUs. Raise it and WATCH the boot's
+#               `N pool workers on logical processors ...` + `strata aux cpus:` lines — the extra
+#               workers land on E-cores, which are ~13 % slower per task, and they steal aux CPUs.
 #   probe=TOKENS  also send a unique long prompt of ~TOKENS tokens per round (GDN/prefill arms: the
 #                 bench prompts are ~30 tokens, which is fixed overhead and shows nothing; the vendor
 #                 numbers are at 4K-32K). Judge from the era's cold reads, which the runner prints.
@@ -69,6 +74,7 @@ for a in "$@"; do
     frac=*)   PAIRS+=("--pcie-frac|${a#frac=}");;
     spec=*)   PAIRS+=("--spec|${a#spec=}");;
     specminp=*) PAIRS+=("--spec-min-p|${a#specminp=}");;
+    workers=*) PAIRS+=("--pool-workers|${a#workers=}");;
     levels=*) LEVELS=${a#levels=};;
     slots=*)  SLOTS=${a#slots=};;
     probe=*)  PROBE=${a#probe=};;
@@ -111,7 +117,7 @@ if env:
 else:
     r.pop("env", None)
 json.dump(r, open(R, "w"), indent=1); open(R, "a").write("\n")
-print("  preset: split=%s kv=%s frac=%s spec=%s spec-min-p=%s parallel(slots)=%s" % (d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac"), d["extra"].get("--spec"), d["extra"].get("--spec-min-p"), d.get("parallel")))
+print("  preset: split=%s kv=%s frac=%s spec=%s spec-min-p=%s pool-workers=%s parallel(slots)=%s" % (d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac"), d["extra"].get("--spec"), d["extra"].get("--spec-min-p"), d["extra"].get("--pool-workers"), d.get("parallel")))
 print("  run-config env (%d): %s" % (len(env), " ".join("%s=%s" % i for i in sorted(env.items())) or "(none - 0.2.9 defaults win)"))
 PY
 
