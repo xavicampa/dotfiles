@@ -20,17 +20,17 @@
  "tokenizer": "/data/models/Maya-S24/pack/tokenizer",
  "model_name": "glm-5.3-flash",
  "gpu": [
-  1,
-  0
+  0,
+  1
  ],
  "sampling": {
   "temperature": 1.0,
   "top_p": 0.95
  },
  "env": {
-   "MAYA_GLM_CPU_LANE": "7",
-   "MAYA_GLM_PCIE_SHARE": "0.00",
-   "MAYA_GLM_READ_CHUNKS": "2"
+  "MAYA_GLM_CPU_LANE": "7",
+  "MAYA_GLM_PCIE_SHARE": "0.00",
+  "MAYA_GLM_READ_CHUNKS": "2"
  },
  "reasoning_effort": "high",
  "lib_dirs": [
@@ -51,6 +51,21 @@
   "gguf": null,
   "gguf_dir": null,
   "draft": "mtp",
-  "written": "2026-10-20 22:27"
+  "written": "2026-10-20 22:27",
+  "speed_calibration": {
+   "date": "2026-11-03 21:33",
+   "version": "1.1.51",
+   "gpu": [
+    0,
+    1
+   ],
+   "mtp_tok_s": 31.6,
+   "dflash2_tok_s": 28.48,
+   "tokens": [
+    1536,
+    1536
+   ],
+   "kept": "mtp"
+  }
  }
 }

@@ -602,12 +602,11 @@ in
             -v maya-data:/data
             -v /home/javi/.config/maya:/data/config
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
-            -e HF_CACHE=/hf-cache
-            -e MODEL=Maya-S24
-            -e HOST=0.0.0.0
-            -e PORT=''${PORT}
-            localhost/maya:latest
-          '';
+            localhost/project-maya:pr-808
+            /opt/maya/.venv/bin/python /opt/maya/serve/server.py
+            --engine maya --config /data/config/maya-maya-s24.json
+            --host 0.0.0.0 --port ''${PORT}
+          ''; # the PR 808 image has no entrypoint — run the server directly (docs/DOCKER.md "Running it")
           cmdStop = ''podman stop -t 35 ''${MODEL_ID}''; # inside unloadTimeout — NOTES.md § llama-swap/maya
           checkEndpoint = "/health";
           ttl = 0;
@@ -673,7 +672,7 @@ in
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
       # preload = the boot default (no default_model key in v262); keep it on the model that serves — NOTES.md § llama-swap
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
+      # hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
     };
   };
 
