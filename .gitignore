@@ -3,7 +3,7 @@
 *.swp
 
 # --- DMS / Hyprland generated artifacts (derived from .config/dms/settings.json) ---
-# These are all re-derived by DMS from the tracked settings.json, so they are noise.
+# These are all re-derived by DMS from settings.json, so they are noise.
 # DMS 2.0 (2026-10-28) moved user config/state/cache from `DankMaterialShell` to `dms`, leaving
 # the old names as symlinks; the rules below were re-pointed to the new path the same day.
 .config/hypr/dms/binds.lua
@@ -21,6 +21,11 @@
 # (HOST == "homepc") because this generated file is per-host — expect a dirty diff
 # whenever displays are reconfigured, and commit it from the host it belongs to.
 .config/dms/firefox.css
+# Tracked until 2026-11-04, then untracked on purpose: DMS's Settings UI rewrites
+# settings.json wholesale on every click, so the diff is per-host churn, not config we
+# author. Tracked history is kept in the repo up to the commit that removed it; the file
+# itself stays on disk. Force-add with `git add -f` if it ever needs re-tracking.
+.config/dms/settings.json
 .config/dms/settings.json.bak*
 .config/dms/.changelog-*
 .config/dms/.firstlaunch
