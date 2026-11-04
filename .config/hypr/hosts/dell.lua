@@ -55,8 +55,10 @@ hl.config({
         gaps_out = 0,
     },
     decoration = {
-        dim_special = 0.7,
-        blur        = { enabled = false },
+        -- dim_special deliberately NOT set here: the main hyprland.lua sets it
+        -- AFTER require("hosts.dell"), so a value here would be silently ignored.
+        -- Legacy was 0.7 (hyprland.conf:106).
+        blur = { enabled = false },
     },
     dwindle = {
         force_split          = 2,

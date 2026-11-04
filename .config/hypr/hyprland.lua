@@ -192,9 +192,16 @@ hl.animation({ leaf = "border",      enabled = true, speed = 2,   bezier = "snap
 -- The .bak applied these via `hyprctl keyword` to keep legacy names working;
 -- stay_focused / dim_around are native hl.window_rule effects in 0.55, so the
 -- shim is gone. DMS's own rules live in dms/windowrules.lua.
--- Hyprland's Lua rule matching is FULL-MATCH: it wraps the regex in anchors.
--- So (a) `%.` is invalid RE2, and (b) the `^...$` anchors inherited from the
--- hyprlang port turn into `^(?:^(...)$)$` and never match. Write bare patterns.
+-- Hyprland's Lua rule matching is FULL-MATCH: it wraps the regex in anchors, and
+-- the patterns are RE2, not Lua patterns — escape a dot as `\.`, `%.` is invalid.
+-- The old claim that an explicit `^...$` "never matches" is WRONG on 0.56.2 —
+-- re-measured 2026-11-04 against a throwaway `kitty --app-id anchor-probe`:
+--   hyprctl eval 'hl.window_rule({ match = { class = "^anchor-probe$" },
+--                                  float = true, workspace = "special:magic" })'
+-- → the probe window landed on special:magic, floating. So anchored rows match
+-- fine; that is also why DMS's `^empower-electron$` row in dms/windowrules.lua
+-- DOES match (it is inert only because it carries no effects). Write bare
+-- patterns anyway (shorter, no double-anchor noise), but anchors are not a bug.
 hl.window_rule({
     match = { class = "com\\.onepassword\\.OnePassword" },
     float = true,
@@ -239,12 +246,69 @@ hl.window_rule({
     stay_focused = true,
 })
 
+-- Appgate SDP (Electron) → its own special workspace, floating.
+-- Measured live (`hyprctl clients` on the running 6.4.2 client):
+--   class/initialClass = empower-electron, title/initialTitle = "Appgate SDP",
+--   375x667, wayland (xwayland false).
+-- `empower-electron` is the Electron app_id the package ships
+-- (opt/appgate/Appgate); appgate.desktop's StartupWMClass = "Appgate SDP" is an
+-- X11 WM_CLASS hint and can NEVER match in this Wayland session — do not "fix"
+-- the rule to use it. Match the class only — a bare title match (`Appgate SDP`)
+-- is fragile (the Electron window title changes with state) and there is already
+-- an unrelated `Appgate SDP Client — Mozilla Firefox` window on this box.
+-- Rules apply at MAP time, so this catches the client when it starts (login/start)
+-- — an already-running window is not retroactively moved (use SUPER+CTRL+SHIFT+`-`
+-- for that, or restart the client).
+hl.window_rule({
+    name      = "appgate-sdp-work-scratch",
+    match     = { class = "empower-electron" },
+    workspace = "special:work",
+    float     = true,
+})
+
 -- Scratch workspace. On homepc DMS fills it with its own scratch helper; the dell
 -- gets `kitty` (hosts/dell.lua), same as the pre-Lua hyprlang config had.
 if HOST == "homepc" then
     hl.workspace_rule({ workspace = "special:magic",
                         on_created_empty = "/home/javi/.local/bin/dms-scratch" })
 end
+
+-- ─── Work scratch workspace (special:work) ────────────────────────────────
+-- A second special workspace, separate from `special:magic`, so the always-on
+-- VPN/office clutter (Appgate SDP above) does not mix with the scratch terminal.
+-- Same pair of binds as scratch, one CTRL added; both hosts (appgate-sdp comes
+-- from common.nix, and SUPER+CTRL+`-` is free on homepc's DMS binds and the dell).
+--   SUPER + CTRL + minus          → toggle special:work
+--   SUPER + CTRL + SHIFT + <`-`>  → send the focused window there
+-- The SHIFT row MUST be keycode form (`code:61` = <AB10>): on kb_layout=no that
+-- physical key emits keysym `underscore` with Shift down, so a
+-- `SUPER + CTRL + SHIFT + minus` keysym bind could never fire (same reason the
+-- scratch move bind in dms/binds-user.lua is `SUPER + SHIFT + code:61`). CTRL
+-- alone does not change the keysym, so the toggle is safe as plain `minus`.
+-- Unbound by Hyprland/DMS: DMS's resize defaults stop at SUPER+minus / SUPER+equal
+-- / SUPER+SHIFT+minus / SUPER+SHIFT+equal (binds.lua:157-160), no CTRL variant.
+hl.bind("SUPER + CTRL + minus", hl.dsp.workspace.toggle_special("work"),
+        { description = "toggle work scratch (special:work)" })
+hl.bind("SUPER + CTRL + SHIFT + code:61", hl.dsp.window.move({ workspace = "special:work" }),
+        { description = "move window to work scratch" })
+
+-- ─── Special-workspace background dim ─────────────────────────────────────
+-- `decoration:dim_special` darkens everything on screen that is NOT on the active
+-- special workspace: 0 = no dim, 1 = the background is black. Hyprland has NO
+-- per-workspace dim (0.56.2 rejects it — `hl.workspace_rule({ workspace=...,
+-- dim_special=... })` and `nodim` both error with "unknown field"), so it is
+-- all-specials-or-nothing: this also strengthens `special:magic`. Homepc never set
+-- it, so it was riding Hyprland's 0.2 default (barely visible); the dell had 0.7
+-- in hosts/dell.lua, now removed so this block is the only owner (it loads after
+-- require("hosts.dell"), so leaving it there would have been a silent override).
+-- Not DMS-owned: dms/layout.lua writes only decoration.rounding and
+-- decoration.blur.passes. 0.7 is the dell's legacy value (hyprland.conf:106) —
+-- 0.85 was tried first and read as too heavy.
+hl.config({
+    decoration = {
+        dim_special = 0.7,
+    },
+})
 
 -- ─── No wallpapers / no Hyprland chrome ────────────────────────────────────
 -- Hyprland is not a wallpaper daemon, but it still paints a background layer of
