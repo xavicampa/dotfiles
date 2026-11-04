@@ -1115,3 +1115,52 @@ pcie-frac are now all closed — the remaining multiplier is the **draft yield**
 `accept 77-84 %`): `--spec 4 --spec-min-p 0.70` has never been swept on this tree (the coder tree measured
 `--spec-min-p 0.5` = −33 %, which only proves the *down* direction is bad). A `spec=6` / `spec-min-p=0.80` arm would
 need a runner arg for those two keys (`PAIRS` currently knows only split/kv/frac/slots).
+
+## 2026-11-04 (second sweep) — the drafting knobs: `--spec 6`, `--spec-min-p 0.80`. Keeper kept, and **the counters inverted**
+
+The previous section closed split / kv-resident / pcie-frac; the only multiplier left in the keeper's window
+accounting was draft yield (`gen/fed 1.40-1.50`, `accept 77-84 %`). `tune-arm.sh` now takes `spec=N` and
+`specminp=X` (they live **only** in preset `extra` — this tree's run config has no `user_args`, and its `args`
+are regenerated at start, so they are cosmetic). Backup `tune-arm.sh.bak-20261104-pre-spec-arms`. Every boot was
+asserted against the era's **argv**, not the file: `--spec 6 --spec-min-p 0.70` / `--spec 4 --spec-min-p 0.80`.
+Eight boots, arm → control → arm → control, `ROUNDS=3 'levels=1 3'`; eras spec6-a 202545 · ctl-a 202877 ·
+smp080-a 203181 · ctl-b 203502 · spec6-b 203803 · ctl-c 204124 · smp080-b 204427 · restore 204749 (live). Reload
+37.7-39.0 s.
+
+| boot | argv | L1 per-stream (first discarded) | L1 usable med | L3 agg / med | long gen≥400 med | accept | drafts/step | yield gen/fed | ms/window |
+|---|---|---|---|---|---|---|---|---|---|
+| spec6-a | `spec 6` | 108 · 142 · 162 | 152 | 175.6 / 58.5 | 150.4 | 79.9 % | 4.97 | **1.287** | 28.64 |
+| ctl-a | `spec 4 / 0.70` | 110 · 149 · 152 | 150.5 | 175.0 / 59.0 | 154.1 | 85.1 % | 6.70 | 1.493 | 27.89 |
+| smp080-a | `spec-min-p 0.80` | 103 · 143 · 148 | 145.5 | **180.4** / 60.1 | 144.4 | 86.3 % | 7.31 | **1.607** | 28.02 |
+| ctl-b | `spec 4 / 0.70` | 109 · 150 · 155 | 152.5 | 175.9 / 59.0 | 158.5 | 85.7 % | 7.00 | 1.491 | 27.68 |
+| spec6-b | `spec 6` | 106 · 147 · 152 | 149.5 | 178.4 / 60.0 | 153.8 | 76.7 % | 4.30 | **1.298** | 27.78 |
+| ctl-c | `spec 4 / 0.70` | 113 · 138 · 160 | 149 | 179.8 / 60.5 | 145.4 | 85.7 % | 6.97 | 1.496 | 27.66 |
+| smp080-b | `spec-min-p 0.80` | 101 · 135 · 138 | 136.5 | 177.4 / 59.6 | 139.8 | 87.1 % | 7.77 | **1.678** | 27.91 |
+
+**`--spec 6` — reject.** Counters worse on both boots, and by a mile: `accept 76.7-79.9 %` vs `85.1-85.7 %`,
+`drafts/step 4.30-4.97` vs `6.70-7.00`, **yield 1.287-1.298 vs 1.491-1.496 (−13 %)**. Decode is a tie
+(L1 152, 149.5 vs 150.5, 152.5, 149; L3 agg 177.0 vs 176.9). It is also the only arm that moved the verify shape,
+and moved it the wrong way: `rows/window 5.32-5.34` vs `5.25-5.29` — more rows of ceiling for the same tokens.
+Deeper drafts do not feed the ceiling on this pack; they just cost acceptance. `--spec 4` stays (the other pack
+measured `--spec 2` = tie, so 4 is bracketed).
+
+**`--spec-min-p 0.80` — reject, and this is the section's real lesson.** Every drafting counter got *better*, twice:
+`accept 86.3-87.1 %` (+1.5 pts), `drafts/step 7.31-7.77` (+11 %), **`yield gen/fed 1.607-1.678` (+8…+12 %)** — and
+decode got **worse**, twice and in the same direction: L1 usable med **141.0 vs 150.7 (−6.4 %)**, long
+`gen≥400` med **142.1 vs 152.7 (−7.0 %)**, fan-out agg +1.1 % (178.9 vs 176.9, i.e. nothing), `ms/window` +0.9 %.
+Derived tokens/step (tok/s × ms/window) confirms it: 3.81-4.08 vs 4.12-4.22.
+
+> **`accept` / `drafts/step` / `yield gen/fed` are health gates, not speed proxies.** A boot that beats the control
+> on all three drafting counters measured 6-7 % slower on two independent boots. Rule 6's gate (`accept 8x %`,
+> `drafts/step 4-8`, `yield ~1.4`) would have *accepted* this arm; only `tok/s` rejected it. Read the counters for
+> "is drafting alive", never for "is this arm faster", and never decide an arm on a boot that shows a better yield.
+
+Why the inversion is plausible: the higher gate makes the head offer *more* drafts per step (6.97 → 7.77) without
+adding verified rows (`rows/window` flat at 5.25-5.29), and the draft pass is **not inside the window accounting**
+(`run = GPU-reach + CPU experts + commit + emit + adapt`, no drafting term) — so its cost lands in the gaps between
+windows, invisible to `ms/window`. The counter that "improved" is the one that counts the work, not the output.
+
+Both directions of `--spec-min-p` are now measured: **0.5 = −33 %** (coder tree, § The drafting cliff) and
+**0.80 = −6 %** here. `--spec 4 / --spec-min-p 0.70` is an interior optimum for this pack, not a default nobody
+touched. Preset restored to `split 32 / kv 20480 / frac 0.00 / spec 4 / spec-min-p 0.70` (boot asserts
+`8192 of its 8192`, `55 %`, `1179 / 2603 MiB free`, GATE PASS).

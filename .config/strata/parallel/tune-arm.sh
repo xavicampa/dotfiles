@@ -14,7 +14,8 @@
 #   * the container name is the PROXY id (…-parallel): the reload curl uses it. The bench uses
 #     the ENGINE id qwen3.8-flash-next-iq3_s on the ENGINE port from `-e PORT` (5803).
 #
-#   ./tune-arm.sh <label> [gdn=on|off] [par=on|off] [env=NAME=VAL,...] [split=N] [kv=N] [frac=X] [slots=N] [--no-bench]
+#   ./tune-arm.sh <label> [gdn=on|off] [par=on|off] [env=NAME=VAL,...] [split=N] [kv=N] [frac=X] [slots=N]
+#                   [spec=N] [specminp=X] [--no-bench]
 #
 #   gdn=off  -> env STRATA_GDN_TC=0 STRATA_GDN_CONVL2=0        (pre-0.2.9 Gated DeltaNet prompt path)
 #   gdn=on   -> those two removed, wrapper re-applies 1 / 2
@@ -27,6 +28,10 @@
 #              (N slots x 2 draft positions). A/B'd 2026-10-31: rows/s is flat (~185-190) across 3 and 4, so a 4th
 #              slot buys NO engine speed — only queue avoidance (+10.5% agg at 4 real clients), for CUDA1 -290 MiB,
 #              -4.2% CUDA0 expert cache and ~250-300 MiB less window-capture margin. Bench `--levels 3 4` with it.
+#   spec=N      preset extra `--spec N`     — drafts offered per step (drafting depth)
+#   specminp=X  preset extra `--spec-min-p X` — the acceptance gate a draft must clear to be offered
+#               Both live ONLY in preset `extra` on this tree (the run config has no user_args; its `args`
+#               are regenerated each start, so they are cosmetic). Assert the boot argv carries them.
 #   probe=TOKENS  also send a unique long prompt of ~TOKENS tokens per round (GDN/prefill arms: the
 #                 bench prompts are ~30 tokens, which is fixed overhead and shows nothing; the vendor
 #                 numbers are at 4K-32K). Judge from the era's cold reads, which the runner prints.
@@ -62,6 +67,8 @@ for a in "$@"; do
     split=*)  PAIRS+=("--layer-split|${a#split=}");;
     kv=*)     PAIRS+=("--kv-resident|${a#kv=}");;
     frac=*)   PAIRS+=("--pcie-frac|${a#frac=}");;
+    spec=*)   PAIRS+=("--spec|${a#spec=}");;
+    specminp=*) PAIRS+=("--spec-min-p|${a#specminp=}");;
     levels=*) LEVELS=${a#levels=};;
     slots=*)  SLOTS=${a#slots=};;
     probe=*)  PROBE=${a#probe=};;
@@ -104,7 +111,7 @@ if env:
 else:
     r.pop("env", None)
 json.dump(r, open(R, "w"), indent=1); open(R, "a").write("\n")
-print("  preset: split=%s kv=%s frac=%s parallel(slots)=%s" % (d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac"), d.get("parallel")))
+print("  preset: split=%s kv=%s frac=%s spec=%s spec-min-p=%s parallel(slots)=%s" % (d["extra"].get("--layer-split"), d["extra"].get("--kv-resident"), d["extra"].get("--pcie-frac"), d["extra"].get("--spec"), d["extra"].get("--spec-min-p"), d.get("parallel")))
 print("  run-config env (%d): %s" % (len(env), " ".join("%s=%s" % i for i in sorted(env.items())) or "(none - 0.2.9 defaults win)"))
 PY
 
