@@ -21,16 +21,14 @@
  *    opencode.json read directly, then the default — and it is written into
  *    every published model's `settings.baseURL`, which is what the request
  *    layer actually uses, so discovery and requests cannot diverge.
- *  - setup() returns a cleanup and the catalog is re-read on a timer, because
- *    a local server swaps its resident model while OpenCode keeps running.
- *    OpenCode's own local-provider plugins do the same: 30s poll, publish on
- *    change only.
+ *  - the catalog is fetched ONCE, in setup() at startup. No polling: the
+ *    endpoint is only queried when OpenCode starts. (The server may swap its
+ *    resident model afterwards; the published catalog stays as discovered.)
  *
  * Configuration (all optional):
  *   "plugin": [{ "package": "./plugins/local-model-discovery",
  *                "options": { "providerId": "local",
- *                             "baseUrl": "http://localhost:8080/v1",
- *                             "refreshMs": 30000 } }]
+ *                             "baseUrl": "http://localhost:8080/v1" } }]
  * The endpoint may instead live in the provider entry of opencode.json
  * (`settings.baseURL`, or the older `options.baseURL`).
  */
@@ -48,9 +46,6 @@ const DEFAULT_PACKAGE = "@opencode/ai/providers/openai-compatible";
 const DEFAULT_CONTEXT = 131072;
 const MAX_OUTPUT_TOKENS = 65536;
 const FETCH_TIMEOUT_MS = 10000;
-// Poll the endpoint: a local server can swap the resident model, load another
-// one or change its context window at any time. 0 disables polling.
-const DEFAULT_REFRESH_MS = 30000;
 
 /**
  * The endpoint declared for the provider in opencode.json: v2
@@ -233,13 +228,8 @@ export default Plugin.define({
       typeof ctx.options?.providerId === "string" && ctx.options.providerId.length > 0
         ? ctx.options.providerId
         : DEFAULT_PROVIDER_ID;
-    const refreshMs =
-      typeof ctx.options?.refreshMs === "number"
-        ? ctx.options.refreshMs
-        : DEFAULT_REFRESH_MS;
 
-    // Endpoint priority, re-resolved on every cycle so editing opencode.json
-    // takes effect: plugin options, then opencode.json, then the default.
+    // Endpoint priority: plugin options, then opencode.json, then the default.
     const resolveBaseURL = () =>
       (typeof ctx.options?.baseUrl === "string" && ctx.options.baseUrl.length > 0
         ? ctx.options.baseUrl
@@ -281,35 +271,7 @@ export default Plugin.define({
       await ctx.provider.reload();
     };
 
+    // One fetch at startup, nothing afterwards: setup() runs once per process.
     await refresh();
-
-    // setup() runs once per process while the server keeps swapping models, so
-    // poll and re-publish on change. Returning a cleanup is honoured by the
-    // plugin host, which keeps it to one timer per plugin instance across the
-    // repeated "plugin reconciliation" runs.
-    const timer =
-      refreshMs > 0
-        ? setInterval(() => {
-            refresh().catch(() => {});
-          }, refreshMs)
-        : undefined;
-
-    // An endpoint change should not have to wait for the next poll — this is
-    // how OpenCode's own local-provider plugins pick up config edits.
-    const abort = new AbortController();
-    const watching = (async () => {
-      for await (const _ of ctx.event.subscribe({
-        types: ["config.updated"],
-        signal: abort.signal,
-      })) {
-        await refresh().catch(() => {});
-      }
-    })().catch(() => {});
-
-    return () => {
-      if (timer !== undefined) clearInterval(timer);
-      abort.abort();
-      void watching;
-    };
   },
 });
