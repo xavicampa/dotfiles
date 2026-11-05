@@ -295,7 +295,10 @@ in
       };
 
       enableSystemMonitoring = true; # dgop (26.05 channel pkg): CPU/RAM/net + process list
-      enableDynamicTheming = true; # matugen: wallpaper -> DMS/rofi/gtk palette
+      enableDynamicTheming = true; # matugen: wallpaper -> DMS palette (+ DMS's own template
+                                   # targets: gtk, vscode, firefox userchrome). NOT rofi — no
+                                   # .rasi template exists here; rofi/rofimoji are dell-only
+                                   # (common.nix hostName gate).
       enableCalendarEvents = true; # khal widget
       enableClipboardPaste = true; # wtype for Shift+Return
       enableVPN = false; # NetworkManager is inactive here (iwd)

@@ -35,6 +35,22 @@
 .config/hypr/hyprland.lua.backup*
 .config/hypr/.dms-backups/
 
+# --- DMS plugin installs ---
+# `dms plugins install` clones the ENTIRE registry repo into
+# .config/dms/plugins/.repos/<repohash>/ (144 MB on 2026-11-05 — all 405 plugins, not just
+# the installed one) and symlinks plugins/<id> into that checkout; `<id>.meta` is the pointer
+# file (repo= / path= / repodir=). All derived. The reviewable record is the lockfile below:
+# .config/dms/plugins.lock.json holds one pinned commit per managed plugin, so a fresh machine
+# rebuilds with `dms plugins lock` / `dms plugins restore`. Keep the lockfile tracked.
+.config/dms/plugins/.repos/
+.config/dms/plugins/*.meta
+.config/dms/plugins/emojiPicker
+# omarchyWallpapers is a plain file copy (NOT a managed git checkout — `dms plugins lock` skips
+# it with "not a managed git checkout", so it never lands in the lockfile). Its source is the
+# separate repo ~/dev/personal/dms-omarchy-themes, reachable through the local registry listed
+# in .config/dms/registries.json; reinstall from there instead of vendoring a copy here.
+.config/dms/plugins/omarchyWallpapers/
+
 # --- Hand snapshots: `<file>.bak-<what>` / `<file>.bak.<what>` ---
 # The repo's convention for "copy the file before I change it" (strata run-config
 # edits, nixos edits). The repo already keeps that history better than a file copy

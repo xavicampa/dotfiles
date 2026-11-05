@@ -47,6 +47,7 @@ DMS rewrites that file and drops comments.
 | `SUPER + minus` (printed `-`) | `togglespecialworkspace magic` | scratch on/off; displaces DMS's `resizeactive -100 0`, which still lives on the printed `+` (`SUPER+code:20`). Width resize therefore = `+` / `\`, never `-` |
 | `SUPER + SHIFT + code:61` (printed `-`) | `movetoworkspace special:magic` | window → scratch — the only one now (`SUPER+S` / `SUPER+SHIFT+S` unbound). **Must** be the `code:` form: on `no` the printed `-` key emits keysym `underscore` with Shift down, so `SUPER + SHIFT + minus` is unreachable — see [the shift trap](#the-shift-trap-why-supershiftminus-is-dead-on-no) |
 | `SUPER + Z` | `dms ipc call keybinds toggle hyprland` | keybind cheatsheet overlay |
+| `SUPER + CTRL + Space` | `dms ipc call emojiPicker toggle` | emoji picker — the DMS `emojiPicker` plugin, **not** rofimoji; same key as the dell's rofi path, different backend ([why](#emoji-picker-dms-plugin-not-rofimoji)) |
 | `F11` / `F12` | `dms ipc call brightness decrement/increment 5 "ddc:i2c-11"` | = **Fn + `-` / `=`** on the Ducky One 3 Mini |
 | `XF86MonBrightnessDown/Up` | same two brightness commands | unreachable on this keyboard — kept for a laptop |
 
@@ -70,6 +71,34 @@ physical key (`code:61` = XKB keycode 61 = `<AB10>` = minus/underscore on `no`),
 left explicitly unbound to stop DMS's legacy scratch bind landing there twice. `SUPER+grave` is
 unbound because `no(basic)` has no `grave` keysym — such a bind registers and then never fires.
 Letters are layout-stable; punctuation keysyms are not.
+
+---
+
+## Emoji picker — DMS plugin, not rofimoji
+
+`SUPER+CTRL+Space` was the hyprlang/dell emoji bind (`rofimoji --action clipboard`, rofi selector). On
+homepc it now calls DMS's own picker, so nothing external is spawned:
+
+```bash
+dms ipc call emojiPicker toggle          # bound key
+dms ipc call emojiPicker open | close    # also available
+```
+
+Installed as a registry plugin (`dms plugins install emojiPicker`, author Loc Huynh,
+`hthienloc/dms-plugins`), enabled with `dms ipc call plugins enable emojiPicker`. `plugin.json` says
+`requires_dms: >=2.0.0`, `type: daemon`, `capabilities: [ipc, clipboard]` — the installed DMS here is
+2.0.0, so it loads (`dms ipc call plugins list` → `emojiPicker [loaded]`). Upstream
+[hthienloc/dms-plugins#6](https://github.com/hthienloc/dms-plugins/issues/6) — `DankSearchField is
+not a type`, plugin silently disabled on NixOS — is **fixed in 0.6.0**, which vendors its own
+`shared/DankSearchField.qml` + `qmldir` instead of reaching into DMS internals. `rofimoji` is **dell-only** in Nix now — `common.nix` gates it behind
+`lib.optionals (config.networking.hostName == "dell")` next to `hyprshot` — so the binary is not on
+homepc at all; `~/.local/share/rofimoji` (frecency data) is left over from the shared listing.
+
+**DMS hot-applies its own override.** `dms keybinds set` writes `dms/binds-user.lua` *and* registers
+the bind in the running session, so a follow-up `hyprctl eval 'hl.bind(...)'` produces a **second**
+identical row (`hyprctl binds | grep -c 'key: Space'` → 3). Dedupe in order:
+`hyprctl eval 'hl.unbind("SUPER + CTRL + Space")'` then one `hl.bind(...)`. `hl.unbind` removes every
+row for that key, so it is the reset button, not a decrement.
 
 ---
 
@@ -242,12 +271,17 @@ unused legacy field; the real keycode lives in `sMkKeys`).
   every `dms/*` fragment is gitignored. Only six are — `.gitignore` lists `dms/binds.lua`,
   `colors.lua`, `layout.lua`, `cursor.lua`, `input.lua`, `windowrules.lua`; **`dms/binds-user.lua`
   and `dms/outputs.lua` are tracked**. The tables are gone; query live state instead.
-- **`dms keybinds set` writes Lua-config-broken actions.** It emits
-  `hl.exec_cmd("hyprctl dispatch dms ipc call bar toggle index 0")`, and Hyprland 0.55 parses
+- **`hyprctl reload` does not re-run the Lua config** (0.56.2): the `__lua` bind count is identical
+  before and after, so binds added to `dms/binds-user.lua` or `hosts/*.lua` need `hyprctl eval
+  'hl.bind(...)'` to go live now, or a compositor restart to load from the file. `hyprctl keyword`
+  cannot help — non-legacy parsers reject it.
+- **`dms keybinds set` wrote Lua-config-broken actions — in 1.6.x only.** It emitted
+  `hl.exec_cmd("hyprctl dispatch dms ipc call bar toggle index 0")`, and Hyprland 0.55 parsed
   dispatch strings as Lua → `')' expected near 'ipc'`. Upstream
-  [#2290](https://github.com/AvengeMedia/DankMaterialShell/issues/2290). Hand-write the
-  working form instead: `hl.bind("SUPER + B", hl.dsp.exec_cmd("dms ipc call bar toggle index 0"), { description = "…" })`.
-  The CLI still reports `success: true`, so verify with `hyprctl binds` after every `set`.
+  [#2290](https://github.com/AvengeMedia/DankMaterialShell/issues/2290). **2.0.0 emits the working
+  `hl.dsp.exec_cmd(...)` form** (verified: `binds-user.lua:10` registered live for
+  `SUPER + CTRL + Space`), so no hand-rewrite is needed on the current version. The CLI still reports
+  `success: true` even when nothing bound, so verify with `hyprctl binds` after every `set`.
 - **`dms/binds-user.lua` is rewritten wholesale** by `dms keybinds set/remove/reset` and
   Control Center: comments dropped, `[[...]]` normalized, an `hl.unbind()` inserted before
   each bind. Keep prose here, not there.
@@ -272,8 +306,12 @@ hyprctl binds | grep -B4 -A7 "key: Return"   # is one specific bind registered? 
 
 # `dms keybinds show` is NOT live state — it also lists 8 source:"config" rows lifted from
 # hosts/dell.lua (rofimoji, pamixer code:121-123, light code:232/233, SUPER+S, SUPER+SHIFT+S),
-# which DMS parses even though the hostname gate skips that file on this host. None are bound here:
+# which DMS parses even though the hostname gate skips that file on this host (`hyprland.lua:136
+# if HOST == "dell" then require("hosts.dell") end`). None are bound here — that includes the
+# `SUPER+CTRL+Space → exec rofimoji --action clipboard` row: it looks configured and fires nothing.
+# Cross-check the key, not the table:
 hyprctl binds | grep -c "key: S$"            # 0 → both S binds really are unbound
+hyprctl binds | awk '/^bindd?$/{if(r)print r; r=""} {r=r" "$0} END{if(r)print r}' | grep -i "key: space"
 
 # With the Lua config, `hyprctl dispatch` is eval("hl.dispatch(...)"): hyprlang strings fail with
 # "')' expected near '0'". Run a bind's exact action instead, and read geometry around it:
@@ -285,7 +323,11 @@ hyprctl activeworkspace | grep tiledLayout
 # hl.dsp.exec_cmd("touch /tmp/keyhit")) — press it, then look for the file.
 # NB: a fullscreen window holding a keyboard lock (Chrome) can inhibit binds; probe on a tiled one.
 
-hyprctl reload                       # apply config edits
+# NB: `hyprctl reload` does NOT re-run the Lua config on 0.56.2 — the Lua bind count is unchanged
+# across it (126 → 126), so a bind added to a required file stays dead. `hyprctl keyword` is worse:
+# `keyword can't work with non-legacy parsers. Use eval.` Hot-apply one bind instead:
+hyprctl eval 'hl.bind("SUPER + CTRL + Space", hl.dsp.exec_cmd("dms ipc call emojiPicker toggle"), { description = "emoji picker (DMS plugin)" })'
+# ...or restart Hyprland. Full reload of binds from a host fragment: only a restart sees it.
 grep -i "lua error" "$(ls -t $XDG_RUNTIME_DIR/hypr/*/hyprland.log | head -1)"
 ```
 
@@ -326,7 +368,7 @@ where a plain-Hyprland equivalent exists.
 |---|---|
 | `SUPER + Return` · `SUPER + CTRL + Return` | `kitty` · `kitty pi` |
 | `SUPER + E` | `nautilus --new-window` |
-| `SUPER + Space` · `SUPER + Tab` · `SUPER + CTRL + Space` | rofi drun · rofi `-show` · `rofimoji --action clipboard` |
+| `SUPER + Space` · `SUPER + Tab` · `SUPER + CTRL + Space` | rofi drun · rofi `-show` · `rofimoji --action clipboard` — same `SUPER+CTRL+Space` as homepc, but the dell has no DMS so it must stay rofimoji there |
 | `SUPER + X` · `SUPER + SHIFT + P` | `~/.config/rofi/powermenu.sh` · `displaymenu_dell.sh` |
 | `SUPER + Q` · `F` · `SHIFT+F` · `SHIFT+T` · `P` · `R` · `W` · `SHIFT+E` | close · maximize · fullscreen · float · pseudo · togglesplit · group · exit |
 | `SUPER + H J K L` / arrows (＋`SHIFT` = move) | focus / move window |

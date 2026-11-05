@@ -33,7 +33,16 @@ in
   };
 
   environment = {
-    etc."rofi/themes".source = "${pkgs.rofi}/share/rofi/themes";
+    # rofi themes = dell only. The dell's menus ARE rofi (hosts/dell.lua:113-117: SUPER+Space
+    # drun, SUPER+Tab, SUPER+X powermenu.sh, SUPER+SHIFT+P displaymenu_dell.sh); homepc's are
+    # DMS (dms/binds.lua: SUPER+space spotlight, ALT+space spotlight-bar, SUPER+X powermenu).
+    # Nothing on either host actually reads this file — ~/.config/rofi/config.rasi is
+    # self-contained (no @import, colors inlined) — it only feeds `rofi-theme-selector`.
+    # The gate matters on its own: an environment.etc entry drags its `source` derivation into
+    # the system closure, so gating only the user package would keep pkgs.rofi on homepc anyway.
+    etc."rofi/themes" = lib.mkIf (config.networking.hostName == "dell") {
+      source = "${pkgs.rofi}/share/rofi/themes";
+    };
     etc."hypr/hypr.conf".source =
       "${config.users.users.javi.home}/.config/hypr/${config.networking.hostName}.conf";
     etc."waybar/config.jsonc".source =
@@ -279,8 +288,6 @@ in
         # pasystray
         pavucontrol
         psmisc
-        rofi
-        rofimoji
         transmission_4-gtk
         unstable.kiro-cli
         unstable.rpi-imager
@@ -302,6 +309,22 @@ in
         # hostName-gated rather than moved to dell/configuration.nix (see the
         # apple-cursor note above for why position churn matters).
         hyprshot
+        # rofi + rofimoji = dell only. Both were shared from the pre-DMS hyprlang days, when
+        # rofi was the launcher on every box; homepc has had no rofi caller since the DMS
+        # migration. Rofi: every caller lives in hosts/dell.lua (drun / window menu / powermenu
+        # / display menu), and homepc's equivalents are DMS IPC — SUPER+space spotlight,
+        # ALT+space spotlight-bar, SUPER+X powermenu, SUPER+CTRL+Space emojiPicker. The old
+        # "matugen themes rofi" note at homepc/configuration.nix:298 never held: no .rasi
+        # template exists in ~/.config/matugen/templates or in DMS's matugen templates. Rofimoji:
+        # its only remaining caller is that file's SUPER+CTRL+Space, and the dell has no DMS to
+        # replace it (homepc now runs DMS's own emojiPicker plugin — see the "Emoji picker — DMS
+        # plugin, not rofimoji" section of ~/.config/hypr/keybinds.md). Closures are heavy for
+        # two binaries nothing here launches: rofi-2.0.0 ~309 MiB, rofimoji-6.7.0 ~365 MiB
+        # (wrapped python + emoji data). Only their bin symlinks were on PATH; the python3 on
+        # PATH is from ~/.nix-profile, untouched. The ~/.config/rofi scripts + gruvbox .rasi
+        # files stay in dotfiles — they are the dell's, and the repo is shared.
+        rofi
+        rofimoji
       ];
     };
   };
