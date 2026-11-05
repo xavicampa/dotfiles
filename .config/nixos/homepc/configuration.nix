@@ -556,11 +556,11 @@ in
             -v maya-data:/data
             -v /home/javi/.config/maya:/data/config
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
-            localhost/project-maya:pr-808
+            localhost/project-maya:1.1.53-cuda13
             /opt/maya/.venv/bin/python /opt/maya/serve/server.py
             --engine maya --config /data/config/maya-maya-s24.json
             --host 0.0.0.0 --port ''${PORT}
-          ''; # the PR 808 image has no entrypoint — run the server directly (docs/DOCKER.md "Running it")
+          ''; # the image has no entrypoint — run the server directly (docs/DOCKER.md "Running it")
           cmdStop = ''podman stop -t 35 ''${MODEL_ID}''; # inside unloadTimeout — NOTES.md § llama-swap/maya
           checkEndpoint = "/health";
           ttl = 0;
