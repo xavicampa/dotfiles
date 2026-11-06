@@ -268,9 +268,31 @@ hl.window_rule({
 
 -- Scratch workspace. On homepc DMS fills it with its own scratch helper; the dell
 -- gets `kitty` (hosts/dell.lua), same as the pre-Lua hyprlang config had.
+--
+-- The old `on_created_empty` workspace rule is deprecated as of Hyprland 0.57
+-- (the startup notification "N deprecated config option(s)" reports it;
+-- `hyprctl deprecated-config` lists it explicitly, suggesting a Lua handler for
+-- the "workspace.created" event checking ws.is_empty — the official replacement
+-- per wiki "Launching programs on workspace creation"). workspace.created fires
+-- with the workspace object after activation; ws.is_empty gates to first-show.
+-- Keyed by ws.name (special workspaces get their "special:<name>" name), which
+-- keeps the dell path unaffected: dell creates its scratch the same way,
+-- so any future dell-side entry can key off the same table.
 if HOST == "homepc" then
-    hl.workspace_rule({ workspace = "special:magic",
-                        on_created_empty = "/home/javi/.local/bin/dms-scratch" })
+    local workspace_programs = {
+        ["special:magic"] = "/home/javi/.local/bin/dms-scratch",
+    }
+    hl.on("workspace.created", function(ws)
+        if not ws.is_empty then
+            return
+        end
+        local program = ws.id and workspace_programs[tostring(ws.id)]
+            or workspace_programs[ws.name]
+        if program == nil then
+            return
+        end
+        hl.exec_cmd(program)
+    end)
 end
 
 -- ─── Work scratch workspace (special:work) ────────────────────────────────
