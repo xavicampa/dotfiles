@@ -220,7 +220,7 @@ in
     hostName = "homepc";
     useDHCP = lib.mkDefault true;
     # interfaces.enp3s0.mtu = 9000;
-    # wireless.enable = lib.mkForce false;
+    wireless.enable = lib.mkForce false;
   };
 
   nixpkgs.config.cudaSupport = true;
