@@ -216,11 +216,21 @@ in
   '';
 
   # Network — :8080 = llama-swap, backends 5800+ closed — NOTES.md § network
+  # NetworkManager owns wired + Wi-Fi (iwd as its supplicant); dhcpcd is off because the NM
+  # module sets useDHCP = false and DMS has no dhcpcd backend — NOTES.md § network-manager
   networking = {
     hostName = "homepc";
-    useDHCP = lib.mkDefault true;
+    # useDHCP left to the NM module (false). Do not re-add `useDHCP = lib.mkDefault true`
+    # here: it re-enables dhcpcd, which then races NetworkManager for enp129s0.
+    networkmanager = {
+      enable = true;
+      wifi.backend = "iwd"; # keeps iwd (common.nix); wpa_supplicant stays off
+    };
+    # NM pulls ModemManager in via mkDefault for the cellular widget; no modem here, so drop
+    # the daemon and its port probing — NOTES.md § network-manager
+    modemmanager.enable = false;
     # interfaces.enp3s0.mtu = 9000;
-    wireless.enable = lib.mkForce false;
+    wireless.enable = lib.mkForce false; # wpa_supplicant off — iwd is the supplicant
   };
 
   nixpkgs.config.cudaSupport = true;
@@ -301,7 +311,7 @@ in
                                    # (common.nix hostName gate).
       enableCalendarEvents = true; # khal widget
       enableClipboardPaste = true; # wtype for Shift+Return
-      enableVPN = false; # NetworkManager is inactive here (iwd)
+      enableVPN = true; # NetworkManager is the DMS backend now — NOTES.md § network-manager
       # enableAudioWavelength: leave at default (true) — NOTES.md § dms-shell
     };
 

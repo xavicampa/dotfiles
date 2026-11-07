@@ -161,6 +161,51 @@ in `systemd.user.extraConfig`:
 `interfaces.enp3s0.mtu = 9000` (jumbo frames) and the `wireless.enable` override are
 left commented out.
 
+## network-manager
+
+**Since 2026-11-07 NetworkManager manages homepc** —
+`networking.networkmanager.enable = true` with `wifi.backend = "iwd"`.
+
+The trigger was DMS: it picks exactly **one** network backend at startup, and with the old
+stack (iwd for Wi-Fi, `dhcpcd` for wired) it logged
+`Network backend detection: iwd detected without NM/ConnMan. Using iwd API.` The iwd
+backend is Wi-Fi **only** (docs matrix: NM = WiFi+Ethernet+VPN, iwd = WiFi only,
+networkd = Ethernet only, iwd+networkd = WiFi+Ethernet, no VPN), so Settings' Ethernet page
+reported *"no Ethernet devices available"* while `enp129s0` was up with a lease — DMS has
+no `dhcpcd` backend, so wired is simply invisible to it. That is also why `enableVPN` was
+false (§ dms-shell). Not a driver/udev problem: nothing was wrong with the link.
+
+- `common.nix`: `networking.useDHCP` became `lib.mkDefault true`. The NM module assigns
+  `useDHCP = false` at normal priority, and common.nix's plain `true` would *clash* with it
+  (evaluation error), not lose to it. dell keeps `dhcpcd` (its own `mkDefault true`, plus
+  no NM); homepc takes NM's `false`. **Do not re-add `useDHCP` to homepc** — that
+  re-enables `dhcpcd`, which then races NetworkManager for `enp129s0`.
+- `wifi.backend = "iwd"` keeps iwd as the supplicant: PSKs stay in `/var/lib/iwd`, wpa\_supplicant
+  stays off (`networking.wireless.enable = lib.mkForce false` still wanted), and common.nix's
+  `networking.wireless.iwd.enable = true` is now duplicated by the NM module (same value, fine).
+- DNS pipeline unchanged: the NM module sets `rc-manager = resolvconf` while
+  `networking.resolvconf.enable` is on, so NM just replaces `dhcpcd` as the producer of the
+  resolvconf-generated `/etc/resolv.conf`.
+- The NM module also enables `networking.modemmanager.enable` (`mkDefault`) for the cellular
+  widget; homepc overrides it to plain `false` (no modem on this box → no ModemManager daemon
+  and no serial/USB port probing). Plain `false` beats the module's `mkDefault true`.
+- Verified after the 2026-11-07 switch: DMS logs `Network backend detection: NetworkManager
+  present; iwd also running (likely NM's Wi-Fi backend). Using NM API.` and
+  `nmcli device status` shows `enp129s0:ethernet:connected`, so Settings now lists Ethernet.
+  `virbr0` reads `connected (externally)` — NM leaves libvirt's bridge alone, so no
+  `networking.networkmanager.unmanaged` entry is needed. The activation dropped the old lease
+  (`.143`) and NM's internal DHCP client renewed a new one (`.137`).
+- `programs.dms-shell.enableVPN = true` now that NM answers.
+- Backend detection happens **once at DMS start**: after `switch`, run
+  `systemctl --user restart dms.service`, then `dms doctor` → `Network ··· NetworkManager`,
+  and Settings gains Ethernet + VPN + connection editing.
+- Activation hands `enp129s0` from `dhcpcd` to NM, i.e. a brief link drop (NFS automount and
+  the `--network host` strata containers ride it out) — do it at the desk, not over SSH.
+- The rejected alternative that kept the no-NM design: replace `dhcpcd` with
+  `systemd.network` (`iwd + systemd-networkd`, Ethernet but no VPN). Needs DNS work — NixOS
+  networkd does not feed `resolvconf`, so `services.resolved` or static DNS would be required —
+  and it has known churn after an iwd restart (upstream dux-shell #3495).
+
 ## readynas
 
 `/mnt/readynas-media` NFS mount:
@@ -288,8 +333,8 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   the package with `programs.dux-shell.excludePackages` to drop them, and a calendar backend
   must be installed separately) — so these assignments become hard errors the moment the
   system's modules pass 26.05.
-- **`enableVPN = false`** — the VPN widget drives NetworkManager, which is inactive
-  here (plain iwd).
+- **`enableVPN = true`** — the VPN widget drives NetworkManager, which is the DMS backend
+  since 2026-11-07 (§ network-manager). It was `false` while the stack was plain iwd.
 - **`enableAudioWavelength` is deliberately left at its default (true → installs cava).**
   It was pinned to `false` here until 2026-10-18, which is the only reason `dms doctor`
   reported "cava: Missing" (the doctor treats cava as an important dep and warns

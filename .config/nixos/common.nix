@@ -95,7 +95,10 @@ in
   networking = {
     # nameservers = [ "172.16.99.1" ];
     enableIPv6 = false;
-    useDHCP = true;
+    # mkDefault so a host that enables NetworkManager (homepc) can win: the NM module
+    # assigns `useDHCP = false` at normal priority, and an explicit `true` here would
+    # clash with it (homepc NOTES.md § network-manager).
+    useDHCP = lib.mkDefault true;
     wireless = {
       enable = false;
       iwd = {
