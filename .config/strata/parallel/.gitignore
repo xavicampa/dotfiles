@@ -54,3 +54,7 @@ strata/presets/
 # principle. The settings that matter are the run config, the preset and
 # strata-vision.
 strata/settings.json
+
+# strata tuning artifacts (boot archives, bench logs, era markers) — same rule as the
+# 1slot tree; without it `git add .config/strata/parallel` sweeps in every .tune/ dump.
+.tune/
