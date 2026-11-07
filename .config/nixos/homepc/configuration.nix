@@ -556,7 +556,7 @@ in
             -v maya-data:/data
             -v /home/javi/.config/maya:/data/config
             -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
-            localhost/project-maya:1.1.53-cuda13
+            localhost/project-maya:1.1.56-cuda13
             /opt/maya/.venv/bin/python /opt/maya/serve/server.py
             --engine maya --config /data/config/maya-maya-s24.json
             --host 0.0.0.0 --port ''${PORT}
@@ -568,6 +568,33 @@ in
           capabilities = {
             context = 131072;
             "in" = [ "text" "image" ]; # vision tower on GPU 0
+            out = [ "text" ];
+            tools = true;
+          };
+        };
+
+        # Maya: MiniMax-M3.1-Flash MoE, Maya-XS GGUF quant (93 GB), images built locally; model bytes stay in /hf-cache — NOTES.md § llama-swap/maya-mm3
+        "minimax-maya-xs" = {
+          cmd = ''
+            podman run --replace --name ''${MODEL_ID}
+            --network host
+            --device nvidia.com/gpu=all
+            --ulimit memlock=-1
+            -v maya-data:/data
+            -v /home/javi/.config/maya:/data/config
+            -v /home/javi/.cache/huggingface/hub:/hf-cache:ro
+            localhost/project-maya:1.1.56-cuda13
+            /opt/maya/.venv/bin/python /opt/maya/serve/server.py
+            --engine maya --config /data/config/maya-minimax-maya-xs.json
+            --host 0.0.0.0 --port ''${PORT}
+          ''; # the image has no entrypoint — run the server directly (docs/DOCKER.md "Running it")
+          cmdStop = ''podman stop -t 35 ''${MODEL_ID}''; # inside unloadTimeout — NOTES.md § llama-swap/maya
+          checkEndpoint = "/health";
+          ttl = 0;
+          # keep context in step with the config's --max-context
+          capabilities = {
+            context = 32768;
+            "in" = [ "text" "image" ]; # vision tower runs in RAM beside the model
             out = [ "text" ];
             tools = true;
           };
@@ -615,6 +642,7 @@ in
               "qwen3.8-flash-next-iq3_s"
               "qwen3.8-flash-next-iq3_s-parallel"
               "glm-5.3-flash-maya-s24"
+              "minimax-maya-xs"
               # "bartowski/Qwen3.8-27B-GGUF:Q8_0" # parked
             ];
           };

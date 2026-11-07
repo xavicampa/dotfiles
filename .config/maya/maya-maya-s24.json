@@ -31,6 +31,7 @@
     "MAYA_GLM_SPLIT": "21",
     "MAYA_GLM_READ_CHUNKS": "8",
     "MAYA_GLM_CPU_LANE": "7",
+    "MAYA_GLM_CPU_LANE_MAX": "24",
     "MAYA_GLM_DISK_QD": "4",
     "MAYA_GLM_DEFER_CPU": "2",
     "MAYA_GLM_SPEC_SAMPLE": "1",
