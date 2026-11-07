@@ -705,3 +705,33 @@ lines, not wall time. ~1 token per word for that word list (11500 words = 11602 
   (✓ 3090 Ti + 5070 Ti) **and** every routed expert on the cards (✗ — 61 % resident, CUDA1 has 20.06 GiB free for
   experts) **and** context ≤ 131072 (✗ — 262144), and the vendor never ran a GeForce pair. `--split-engine on` is the
   supported way to ask: it prints why it cannot.
+
+## Env-clear audit + STRATA_SELECT_TWO_PASS accepted — measured 2026-11-07 (eras 215759 ENVCLR-TP · **216049 ACCEPT, live**)
+
+The four 0.1.55-era container pins are **load-bearing on 0.1.58 — do not drop them.** Clearing
+`STRATA_PF_FUSED=1 STRATA_ADAPT_LAG=2 STRATA_EXCHANGE_ROTATE=1 STRATA_SPLIT_RING=384` from the llama-swap entry
+(one rebuild) cost 6-8 % on both paths, with everything else identical (`9216/9216 pairs`, free 1022/1133):
+
+| probe | pins ON (215444) | pins cleared (215759) | delta |
+|---|---|---|---|
+| 4K cold read | 1198.6, 2124.3, 2138.2 | 1122.9, 1993.9, 1998.7 | −6.3 %, −6.1 %, −6.5 % |
+| 128102 cold read (paired by round) | 5162.3, 4945.2 | 4785.3, 4637.2 | **−7.3 %, −6.2 %** |
+| decode @4K | 139.5, 152.5, 152.8 | 130.9, 134.9, 139.0 | −7…−9 % |
+
+Telling line: with `STRATA_SPLIT_RING` unset the boot never prints
+`layer split: … the prompt path's streamed ring 384 slots` at all — the prompt path's streamed ring is what was
+lost, so `SPLIT_RING=384` is almost certainly the one paying; the other three were not bisected (three more
+rebuilds for a knob that costs nothing to keep).
+
+**Accepted arm (live): the four pins + `-e STRATA_SELECT_TWO_PASS=1`.** The two-pass selector replicated across two
+independent boots against the same control, paired by round position (the round-to-round drift is ~4 % and cancels):
+
+| boot | 128102 cold read, round 1 / round 2 | vs control 5162.3 / 4945.2 |
+|---|---|---|
+| 215167 TP1 | 5237.5 / 5016.6 | +1.46 % / +1.44 % |
+| 216049 ACCEPT | 5216.8 / 5017.1 | +1.05 % / +1.45 % |
+
+Decode is untouched (142.5, 147.5 vs 146.7, 148.9) and 4K reads unchanged, so it is free. The engine prints no
+line for it — the only proof is the measured rate, so keep the probe set (unique nonce prefix, `reused=0`, 128K band).
+Gate on the accepted boot: `9216 of its 9216 profiled pairs`, `61% of the experts resident`, `streamed ring 384 slots`,
+`1020 / 1131 MiB free`, no LOW/WARNING.

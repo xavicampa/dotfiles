@@ -472,6 +472,7 @@ in
             -e STRATA_ADAPT_LAG=2
             -e STRATA_EXCHANGE_ROTATE=1
             -e STRATA_SPLIT_RING=384
+            -e STRATA_SELECT_TWO_PASS=1
             ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
