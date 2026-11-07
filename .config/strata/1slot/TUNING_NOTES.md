@@ -653,3 +653,55 @@ too early to judge; `skip parking (65 tokens, below the 16384 minimum)` is the `
 | `.tune/CC0-baseline.counters.txt`, `.tune/CC{1,2}.{era,boot.txt}` | baseline counters snapshot + the two arms' era line numbers and boot archives |
 | `/tmp/gpuswap/{arm.sh,arm2.sh,arm3.sh}` | the throwaway predecessors (superseded by `tune-arm.sh`) |
 | `/tmp/gpuswap/fractab.py` | pools per-request decode/prefill samples across eras, labelled from each boot's effective argv |
+
+## 0.2.12 (engine 0.1.58) on the 1slot tree — measured 2026-11-07
+eras: 213324 BASE(+BASElong) · 213939 AF2 *dead* · 214127 PW0 · 214307 DF2 *refused* · 214503 DF2b *refused* ·
+214701 RESTORED · 214932 AF2n (env via nix) · 215167 TP1 · **215444 CTRL128 = accepted config, verified**
+
+Image check first: `latest-cuda13` and `0.2.12-cuda13` are the same manifest (`sha256:c3a85342…`), the running
+package is `0.1.58-linux-x86_64-cuda-cuda13` (`archs: sm_75/86/89/120`), and GHCR lists nothing above 0.2.12 —
+so the tree is already on the newest release. `strata-split-2-sm86` **and** `-sm120` both ship in the package.
+
+**Accepted arm: nothing new on. `--pipeline-windows 2`, `--spec 4`, MTP, and the four container-env pins stay.**
+Boot gate identical across every arm: `9216 of its 9216 profiled pairs`, `61% of the experts resident`,
+`1020 MiB / CUDA1: 1131 MiB free`, draft layer 837 MiB, no LOW/WARNING.
+
+Probe set (new runner `ab-arm.sh`): greedy temperature 0, unique NONCE prefix so `reused=0`, 3–4K-token and
+115K/128K-token cold reads, 600/200 tokens out; judge the engine's own `prompt … = 0 reused … , N generated …`
+lines, not wall time. ~1 token per word for that word list (11500 words = 11602 tokens — calibrate before use).
+
+| arm | decode @4K cold | decode @128K/115K | prompt @128K | note |
+|---|---|---|---|---|
+| BASE 213324 | 135.6, 139.7 | 136.7, 140.0 | 5096, 5047 (115K) | reference |
+| RESTORED 214701 | 142.1, 145.2 | 142.4 | 5127 (115K) | same config, new boot → the drift band |
+| **PW0** 214127 (`--pipeline-windows 0`) | 130.8, 128.4 | 126.0, 126.8 | 5124, 4916 | **all four samples below the band: keeping 2 is worth +8-10 % decode** |
+| AF2n 214932 (`-e STRATA_ADAPT_FETCH=2`) | 138.6, 150.7, 144.0 | 138.8 | 5133 (115K) | inside the band — the release note's "+10.2 % in one setup" does not reproduce here |
+| TP1 215167 (`-e STRATA_SELECT_TWO_PASS=1`) | 136.4 | 146.4, 146.8 | 5237.5, 5016.6 | vs CTRL128 5162.3, 4945.2 → **+1.46 % / +1.44 % paired by round** |
+
+* The engine's own `note: --pipeline-windows 2 on a layer split of two stages without the draft layer on the first
+  card (STRATA_MTP_STAGE0=1 asks for it)` reads like a defect report. It is not one here: taking the pipeline off
+  cost ~8-10 % decode (PW0). `STRATA_MTP_STAGE0=1` is the untested alternative if the draft chain is ever suspected.
+* **DFlash2 (the 0.2.10-0.2.12 drafter, vendor +1.4…+7.9 % on IQ3_S/sm_120) cannot run on this tree.** Setting the
+  preset's `drafting: "dflash2"` reaches choices/config fine, but the start answers
+  `Drafting: MTP (DFlash2 isn't available in this mode)`: `strata_control/drafting.py blocked_by()` returns True
+  for a named DFlash2 whenever `--pipeline-windows` is *present* (line 809 — the value does not matter, `0` blocks
+  too), and `--pipeline-windows 2` is in `args_derived` — `setup.py` writes it for this two-stage split, it is not
+  in the preset. Removing it from `extra` did not help (214503 re-derived it). Two cards + one request at a time is
+  explicitly supported (the 0.1.56 note in that docstring), so the blocker is only the pipeline flag.
+* **This tree has no usable run-config `env` layer** — unlike `parallel/`, where `strata-iq3_s.json` `env` reaches
+  the engine. Here llama-swap runs the image's `run` command, `serve.server` reads
+  `state/strata/launch/docker.json`, and the launch **regenerates that file** from preset + choices, so a hand-written
+  `env` map is gone by the next boot (arm 213939 proved it: value absent from `/proc/<pid>/environ`).
+  Knob layers here: preset `extra` (flags) → preset top-level (`drafting`, `context`, `parallel`, `split_engine`) →
+  **container `-e` in the llama-swap nix entry (needs `nixos-rebuild switch`)**. `ab-arm.sh` asserts the boot argv
+  and the engine child env instead of trusting the files, which is what caught both dead arms.
+* `--pipeline-windows`/`--spec` are also *derived* (`args_derived`), so `extra-del` alone does not remove them.
+* The four 0.1.55-era pins are still read by 0.1.58 (`grep -a` of the binary finds `STRATA_PF_FUSED`,
+  `STRATA_ADAPT_LAG`, `STRATA_EXCHANGE_ROTATE`, `STRATA_SPLIT_RING`), so they still win over the new defaults;
+  an `env-clear` audit is still open.
+* Bench-method warning for every comparison against pre-0.2.12 numbers: 0.2.12 counts **admission time** in the
+  reported rate ("a short request admitted into a slot now reads 125, not 215, tokens per second").
+* The all-cards split engine (0.2.10) stays out of reach on this box: Auto wants two NVIDIA cards of cc 8.6 or 12.0
+  (✓ 3090 Ti + 5070 Ti) **and** every routed expert on the cards (✗ — 61 % resident, CUDA1 has 20.06 GiB free for
+  experts) **and** context ≤ 131072 (✗ — 262144), and the vendor never ran a GeForce pair. `--split-engine on` is the
+  supported way to ask: it prints why it cannot.
