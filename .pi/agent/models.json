@@ -62,7 +62,7 @@
             }
           }
         },
-        "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:Q2_0": {
+        "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_XXS": {
           "thinkingLevelMap": {
             "minimal": null,
             "low": "low",
