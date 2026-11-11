@@ -490,6 +490,98 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   wires up); its right shape is only for X11/XSETTINGS-following apps, of which this machine
   has none.
 
+### dms-shell/icon-theme — the two broken Nautilus glyphs (wired 2026-11-11)
+
+**Symptom.** Nautilus 50.4's sidebar drew GTK's *missing-icon* placeholder — the page-with-⚠
+`image-missing` glyph, itself one of the icons embedded in `libgtk-4.so.1` — for **Starred**
+and **Trash**, with a blurred 128 px instance as the "No Starred Files" placeholder.
+
+**Which names.** `strings` over `…-nautilus-50.4/bin/.nautilus-wrapped` yields **38**
+`…-symbolic` names. The two on screen are **`non-starred-symbolic`** (the Starred row *and*
+that empty-view placeholder) and **`user-trash-full-symbolic`** — *full*, because
+`~/.local/share/Trash/files` holds **1** item; the empty variant `user-trash-symbolic` is a
+different name and *was* resolving.
+
+**Why only those two, and why the breakage looked random.** `ldd` pins the runtime to
+**`gtk4-4.22.5`** + **`libadwaita-1.9.4`**; `gresource list` (`glib-2.88.3-dev/bin/gresource`,
+not on PATH) against **the libraries actually linked** enumerates the private fallback ladder:
+**127** icons in `libgtk-4.so.1`, **22** in Nautilus's own GResource, 19 in libadwaita — all
+those 19 `adw-`-prefixed, i.e. serving only `adw-*` names, covering nothing here. Diffing the
+38 against those 149 leaves **6** unresolved: `edit-clear-rtl-symbolic`,
+`emblem-synchronizing-symbolic`, `list-drag-handle-symbolic`, `process-stop-symbolic` — none
+of which sits on a widget that was visible (RTL variant, sync emblem, DnD handle, progress
+dialog) — plus **`non-starred-symbolic`** and **`user-trash-full-symbolic`**, the two that
+were. Home/Recent/Pictures/Downloads/the hard-disk row all rode GTK's built-in set and
+`network-computer-symbolic` rode Nautilus's bundle, so an *icon theme set to nothing* looked
+like two arbitrary rows being broken.
+
+**The name configured is a cursor package.** dconf `…/icon-theme` read `'macOS-White'` and
+`~/.config/gtk-{3,4}.0/settings.ini` both carried `gtk-icon-theme-name=macOS-White`; that name
+resolves to **`apple_cursor-2.0.1`**
+(`/nix/store/3kmnfmdrq30ww2riizfmk4kbx4x1kz0l-…`), whose `share/icons/macOS-White/` holds
+**only `cursors/` + `cursor.theme`**, its `index.theme` reading
+`Comment=White macOS (v2.0.1) XCursors`, `Inherits="hicolor"`. The dark slot `macOS` is the
+same package. `hicolor` inherits nothing useful: 83 / 10 / 49 files across
+`/run/current-system/sw`, `~/.nix-profile`, `/etc/profiles/per-user/javi`, of which
+`symbolic/apps/` accounts for 2 / 1 / 7 — app icons only. Enumerating
+`$XDG_DATA_DIRS/share/icons/*/index.theme` off the **live** nautilus `/proc/<pid>/environ`
+returns exactly seven roots: `macOS`, `macOS-White`, **`Adwaita`** (from `~/.nix-profile`, the
+`pkgs.adwaita-icon-theme` at `~/.config/home-manager/home.nix:152`) and `hicolor` ×2. **Adwaita
+50.0 carries every one of the six unresolved names**
+(`symbolic/status/non-starred-symbolic.svg`, `symbolic/status/user-trash-full-symbolic.svg`,
+`symbolic/status/semi-starred*-symbolic.svg`, `symbolic/places/user-trash-symbolic.svg`) — it
+was simply never selected, so the fix costs no rebuild, only a name.
+
+**Who writes the name** — the reason a hand-edit of the `.ini` files alone does not survive:
+DMS's `SettingsData.iconThemePerMode` / `iconThemeLight` / `iconThemeDark`, here
+`~/.config/dms/settings.json:274-276` holding `"macOS-White"` light and `"macOS"` dark, fanned
+out by dux-shell through `GSettings.setCmd("org.gnome.desktop.interface","icon-theme",…)`,
+through `dms matugen … --icon-theme`, and by rewriting both `settings.ini`. **Correction to the
+§ above:** calling those `settings.ini` files "unimported and inert" is right only for the
+`@import url("dank-colors.css")` route — the files themselves are read, and they are one of the
+two live wires for the **icon** theme (dconf being the other).
+
+**Probe hygiene.** `gsettings set` from a tool shell dies with **"No schemas installed"** — the
+`share/gsettings-schemas/<pkg>` roots the Nix wrappers inject are absent from that shell's
+`XDG_DATA_DIRS`; `dconf write /org/gnome/desktop/interface/icon-theme "'Adwaita'"` needs no
+schemas at all (`dconf read` to verify, note the nested quotes for a string). `dms screenshot
+full --json --no-clipboard` reports `"scale":2` over 3840×2160 while Hyprland's own geometry
+(`hyprctl clients -j`) is **1:1 with image pixels** — cropping that window's
+`at [1446,6] size [1428,798]` at ×2 lands in the middle of the file list; crop at ×1. And
+GTK caches the icon theme **per process**, so nothing changes until `nautilus -q` + relaunch;
+relaunch by replaying a live GUI process's environment (`cp /proc/<dms pid>/environ`, then
+`while IFS= read -r -d '' kv; do export "$kv"; done`) — **`pgrep -x nautilus` matches nothing
+on this box**, read `ps -o pid,cmd` instead.
+
+**Applied 2026-11-11 — four per-host values, none of them tracked:**
+`~/.config/dms/settings.json:275-276` → `"iconThemeDark": "Adwaita"`,
+`"iconThemeLight": "Adwaita"` · `~/.config/gtk-3.0/settings.ini` and
+`~/.config/gtk-4.0/settings.ini` → `gtk-icon-theme-name=Adwaita` · dconf
+`/org/gnome/desktop/interface/icon-theme` → `'Adwaita'`. Verified by capture after the restart:
+star and bin render, list-view folders come out Adwaita blue. **Cursor side untouched** —
+`XCURSOR_THEME=macOS` + `XCURSOR_PATH` unchanged, and `apple_cursor` stays exactly the right
+package for *cursors*, referenced by cursor settings only. Pre-change copies sit next to each
+file as `*.pre-icontheme.bak`. `git --git-dir=$HOME/.dotfiles ls-files` answers `no` for all
+four and `check-ignore` names the rules: `.gitignore:28` (`.config/dms/settings.json`, carrying
+its own "untracked on purpose: DMS's Settings UI rewrites settings.json wholesale" comment),
+`.dotfiles/info/exclude:78-79` (`.config/gtk-3.0/`, `.config/gtk-4.0/` — **repo-local exclude,
+not in `.gitignore`**, so they surface as untracked noise on a fresh clone) and
+`.gitignore:224` (`.config/dconf/`). **This note is therefore the only durable record of the
+change.**
+
+**Light/dark, settled by the same read.** Icon themes on this box have **no dark variant at
+all**: `find` over `adwaita-icon-theme-50.0` matches **zero** `*-dark*` files and no
+`Adwaita-dark` icon theme exists, so pointing `iconThemeDark` at such a name would put the
+broken glyphs straight back. What *is* mode-adaptive is **runtime recoloring**: GTK repaints
+`*-symbolic` SVGs (which ship with no baked-in fill) with the widget's CSS `color`, so every
+sidebar/toolbar/placeholder glyph follows `adw-gtk3` ↔ `adw-gtk3-dark` on its own, while
+full-color icons — list-view folders, app icons, `user-trash.svg` — look identical in both
+modes. `iconThemePerMode: true` with both slots at `Adwaita` is thus a deliberate **no-op**;
+it earns its keep only if a family that publishes real dark theme names lands (`Tela` /
+`Tela-dark`, `Papirus` / `Papirus-Dark`), and those `Inherits=` Adwaita, so they cannot
+re-break name resolution this way. `pkgs.adwaita-icon-theme` at `home.nix:152` stays the
+requirement either way — it is what the bar/OSD icon names resolve against.
+
 ## hyprland
 
 Hyprland **0.56+** is needed for DMS compositor blur (`ext-background-effect-v1`).
