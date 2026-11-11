@@ -3,9 +3,6 @@
     "enabled": true,
     "pickMode": "cycle"
   },
-  "themeSwitchTest": {
-    "enabled": false
-  },
   "emojiPicker": {
     "enabled": true
   }
