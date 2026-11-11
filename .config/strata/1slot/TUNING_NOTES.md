@@ -735,3 +735,58 @@ Decode is untouched (142.5, 147.5 vs 146.7, 148.9) and 4K reads unchanged, so it
 line for it — the only proof is the measured rate, so keep the probe set (unique nonce prefix, `reused=0`, 128K band).
 Gate on the accepted boot: `9216 of its 9216 profiled pairs`, `61% of the experts resident`, `streamed ring 384 slots`,
 `1020 / 1131 MiB free`, no LOW/WARNING.
+
+## 0.2.13 (engine 0.1.59) — DFlash2 is now reachable on this tree, and it still loses (measured 2026-11-11)
+
+eras/probes: `.tune/{CTRL159,CTRL159L,DF2-NOWIND2,DF2-CONF07,RESTORED159}.{era,boot.txt,probes.txt}`.
+The box moved to 0.2.13 / engine 0.1.59 on its own (`latest-cuda13` == `0.2.13-cuda13`, digest `b6e18765…`); the
+keeper config booted identically on it (`9216 of 9216 pairs`, ring 384, `1020 / 1131 MiB` free), so 0.2.13 needs no
+re-tuning of the split — only the drafting question, which 0.2.13 changed upstream.
+
+**The `--pipeline-windows` mystery from 2026-11-07 is solved, and it flips the conclusion.** The flag is not
+`args_derived`: it sits in the **run-config `args`** of `~/.config/strata/1slot/strata-iq3_s.json`, and that directory
+**is bind-mounted to `/data/install`** (`podman inspect -f '{{range .Mounts}}'` → `/home/javi/.config/strata/1slot -> /data/install`).
+Preset `extra` only *overrides* keys that already exist in those args, so `extra-del=--pipeline-windows` is a no-op (that is
+exactly why arm 214503 "re-derived" it). Delete it from the run-config args and it is gone. `ab-arm.sh`'s header call
+"a stale Nov-4 copy — never edit it as if it were live" is right about `pcie-frac`/`kv-resident` (extra wins there) but wrong
+about flags that exist **only** in `args`.
+
+Why it matters: 0.2.13's `strata_control/drafting.py::blocked_by` no longer treats a **layer split** as a blocker for
+DFlash2 (only `--batch/--slots/--parallel` and `--pipeline-windows` do), so the drafter became testable on this tree.
+
+Arms (`ab-arm.sh`, greedy, nonce prefix so `reused=0`, `wl=127500` → **127,602 tokens**, `p40k=2 p120k=2`, one boot per
+arm, pi served by this engine — every boot carried `9216 of its 9216 profiled pairs` and ring 384, no `LOW`/`WARNING`):
+
+| arm | drafter as started | 127,602 cold read r1 / r2 | decode @4K | decode on the 128K probe | free VRAM CUDA0 / CUDA1 |
+|---|---|---|---|---|---|
+| **CTRL159L** (keeper) | `--mtp …` + `--pipeline-windows 2 --spec 4` (837 MiB) | **5240.7 / 5207.4** | 129.2, 145.8 | 138.1, 142.5 | 1020 / 1131 |
+| DF2-NOWIND2 | `--draft dflash2 …q4_0-selq4.pack --draft-fallback none`, `--spec 6`, conf auto = **0.35**, windows ≤ 8 (625 MiB) | 5356.1 / 5127.6 | 122.4, 130.1 | 123.8, 128.6 | 868 / 1469 |
+| DF2-CONF07 | same + `--draft-conf 0.7` | 5341.5 / 5145.5 | 119.6, 124.2 | 122.4, 122.9 | 868 / 1469 |
+| RESTORED159 | keeper restored | gate identical (61 %, 9216/9216, 1020/1131) | | | |
+
+* **Prompt path is flat**: arm means 5242 / 5244 vs control 5224 → +0.3…0.4 %, inside the ±1 % cold-read band. DFlash2
+  neither helps nor hurts reads here.
+* **Decode is where it dies**: −8.1 % (conf 0.35) and −11.3 % (conf 0.7) at 4K; −10 % / −12.5 % on the long probe. That is
+  the `--pipeline-windows 2` cost (PW0 on 0.1.58: −8…−10 %) with DFlash2 contributing ~break-even against the MTP on this
+  card pair — so at 61 % residency the pipeline gain is not repaid. **Rejected.**
+* **conf 0.7 is worse than 0.35 here**, opposite to the vendor `CONF_STEPS` table: offered drafts fall 584 → 308 per 600
+  tokens (acceptance 56 % → 86 %) and decode loses another 3-4 %. Do not re-try a higher conf on this tree.
+* **The 0.35 is structural, not a mistake**: `drafting.apply()` sizes `--draft-conf` from `vram_mib` of *one* card and
+  `serve/server.py::drafting_vram_mib()` returns None for several cards → the `DRAFT_CONF` default 0.35. The release note's
+  "conf by expert slots" step is unreachable on a split; only `extra=--draft-conf|N` moves it.
+* **VRAM is a wash on the stage that needs it**: the selq4 drafter (625 MiB) frees 338 MiB on CUDA1 but costs CUDA0
+  152 MiB versus the MTP layer — CUDA0 is the constrained stage (`expert cache auto … -> 4322 slots`).
+* The arms ran the **stock** `q4_0-selq4` pack (`/data/Strata-data/dflash2/` holds `q4_0.pack` + `q4_0-selq4.pack` + `.ok`);
+  the tuned `…strata1.q4_0-selq4.pack` (+2.1 % on IQ3_S *resident*, 339,694,592 B, sha `4df2e5ab…`, a GitHub release asset)
+  is not on disk. A tuned pack cannot buy back 8-11 %, so it was not fetched.
+* **Accepted arm: unchanged** — `drafting` unset (Auto → MTP here), `--pipeline-windows 2`, `--spec 4`, the four env pins.
+  Backups: `strata/launch-presets/docker.json.bak-20261111-pre-df2`, `strata-iq3_s.json.bak-20261111-pre-df2`.
+* Banked free on 0.1.59: `STRATA_SELECT_TWO_PASS` is now an engine **default** (`data/settings-register.json`: status
+  `default`, "on unless set to 0", since v0.2.12) — the `-e` pin is redundant (kept as documentation; no rebuild needed).
+  The other three pins still pay: `STRATA_PF_FUSED` is default-on only for gfx1151-Windows/sm_121, `STRATA_ADAPT_LAG=2`
+  only for sm_86/sm_60 (`nv_defaults.cpp`), `STRATA_EXCHANGE_ROTATE` and `STRATA_SPLIT_RING` are still opt-in.
+
+**Still open (not measurable from a pi session on this arm):** DFlash2 with `--batch` on the `parallel` tree — naming
+`"drafting": "dflash2"` beats the batch blocker ("the engine serves them with a drafter per request"), and per-slot
+DFlash2 drafts are on by default for a split whose slots run as one group. Booting that arm unloads the engine serving
+this session (hard rule 1), so it needs either pi pointed elsewhere or a session that does not live in the arm.

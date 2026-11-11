@@ -1227,4 +1227,67 @@ a **404** means the id isn't the proxy id (rule 5), and a cold boot takes **~38 
 loaded. `tune-arm.sh` derives `PRESET`/`MODEL` from the run config and cannot make this mistake; if you must write
 the curl by hand, echo those two values first and read the `t=`. Recovery here was passive: the next request from
 this session (correct id) triggered the cold load, and the boot verified `CPU pool: 15 workers by default`,
+the curl by hand, echo those two values first and read the `t=`. Recovery here was passive: the next request from
+this session (correct id) triggered the cold load, and the boot verified `CPU pool: 15 workers by default`,
 `8192 of its 8192`, `1179 / 2603 MiB`.
+
+## Measured: DFlash2 with `--batch` on this tree — REJECTED (2026-11-11, engine 0.1.59)
+
+The last open speed lever from 0.2.13. `strata_control/drafting.py::blocked_by` no longer treats a layer split as a
+blocker, and naming the drafter is the person's word too: "the engine serves them with a drafter per request
+(`--draft dflash2 --batch N`, the slot drafts)" — Auto keeps the MTP for several requests, so it needs
+`"drafting": "dflash2"` written in the preset. Vendor IQ3_S numbers with the tuned pack: all +6.1 %, agent +10.1 %
+(RTX PRO 5000 72 GB, every expert resident). This arm ran it on a 55 %-resident two-card split. **It loses.**
+
+Run from a session served by *this* arm (`PI_MODEL=qwen3.8-flash-next-iq3_s-parallel` at `:8080`), so the switch was
+§3: edit + `podman stop -t 120` + `sleep 2` + one wake curl in the same call; the session survived every switch
+(`reload=200 t≈37.7 s`) and no probe paid a cold read. Era files:
+`.tune/*.csv` per bench (CTRL-P1/P2/P3, DF2-P1/P2/P3/P4, RESTORED-P/P2); `.tune/{DF2-P1,DF2-P3,DF2-P4,CTRL-P3,RESTORED-P,RESTORED-P2}.{era,boot.txt}` per boot
+(the two repeat benches reused their boot's era).
+
+**The session is background load, and it shows.** With pi on the arm, the same keeper config reads **159.1-172.5** at
+level 4 where the accepted numbers above (measured with pi on another arm) read 179.0-183.4 — call it 10 % of
+self-load — and it drifts down within a long session (controls fell 172.5 → 159.1 across eight boots). So judge only
+by **bracketed pairs**, never against an old number:
+
+| # | boot | arm as started | L4 agg | L1 agg | acceptance |
+|---|---|---|---|---|---|
+| 1 | CTRL-P1 | keeper (`--batch-mtp --spec 4 --pipeline-windows 2`) | 162.6 | 143.7 | 83.7 % (205/245) |
+| 2 | CTRL-P2 | same boot, repeat | 172.5 | 146.9 | |
+| 3 | DF2-P1 | `--draft dflash2 …q4_0-selq4 --draft-fallback none --spec 6 --draft-conf 0.35` (launcher's own values) | **156.3** | 142.5 | 60.6 % (192/317) |
+| 4 | DF2-P2 | same boot, repeat | **158.8** | 133.0 | |
+| 5 | CTRL-P3 | keeper restored | 161.8 | 142.4 | 83.7 % |
+| 6 | DF2-P3 | DF2 + `--draft-conf 0.5` | **156.8** | 139.2 | 77.2 % (196/254) |
+| 7 | RESTORED-P | keeper | 159.8 | 132.4 | |
+| 8 | DF2-P4 | DF2 + `--spec 6 --draft-conf 0.5` (the vendor-shaped cell) | **151.2** | 122.4 | 76.2 % (192/252) |
+| 9 | RESTORED-P2 | keeper (final state) | 159.1 | 131.7 | |
+
+* **Every DF2 boot is below both neighbouring controls.** DF2 mean 155.8 (n=4) vs control 163.6 (n=5): **−4.8 %**;
+  bracket-paired **−2.8 … −5 %**. Level 1 moves with it (122.4-142.5 vs 131.7-146.9), so it is not a fan-out effect —
+  decode per row gets slower.
+* **Why**: the MTP holds 83.7 % of its drafts; DFlash2 at the launcher's auto conf offers *more* (317 vs 245 per ~250
+  accepted) and holds only **60.6 %**. Conf 0.5 repairs acceptance (77.2 %) and buys nothing; conf 0.5 *with* `--spec 6`
+  is the worst cell of the set.
+* **The cost the vendor runs never pay is in the boot line**: `the drafter is on CUDA1 (last stage), the other stages'
+  taps are gathered onto it` — every drafted token drags activations from CUDA0 across PCIe, on a split that already
+  streams 45 % of the experts that way. DFlash2 is a single-card feature on this pair.
+* **VRAM is slightly better and is not the constraint**: selq4 drafter **625 MiB** (CUDA1) vs the MTP layer **835 MiB**
+  → `1116 / 2695 MiB free` vs `1180 / 2597`, residency 55 % vs 54 %, and every boot kept
+  `8192 of its 8192 profiled pairs` + `streamed ring 384 slots`, no `LOW`/`WARNING`.
+* **Launcher gotcha worth remembering**: a hand-set `--draft-conf` in preset `extra` makes the launcher treat the args
+  as `user_args`, and then it **stops adding its own `--spec 6`** — boot 6 silently ran DFlash2 at the preset's
+  `--spec 4` (boot line `windows up to 6 tokens`, not 8). Set `--spec` by hand whenever you set conf by hand.
+* **`--pipeline-windows` here really is `args_derived`** (unlike the 1slot tree, where it lives in the mounted
+  run-config `args` — see `../1slot/TUNING_NOTES.md` § 0.2.13): deleting it from preset `extra` is enough, but its
+  *presence* is what blocks DFlash2 in the launcher even though the engine prints `is off: not with --batch slots` under
+  `--batch`. Assert the boot argv; do not trust `docker.choices.json`.
+* Stock pack only (`dflash2/…q4_0-selq4.pack`). The tuned `…strata1.q4_0-selq4.pack` (+2.1 % on IQ3_S *resident*, 340 MB
+  release asset) was not fetched: the gap is 5 %, and a tuned selector table does not address tap gathering across the
+  split or acceptance collapse at 55 % residency.
+
+**Accepted arm (live, unchanged): `drafting` unset (Auto → MTP + `--batch-mtp`), `--pipeline-windows 2`, `--spec 4`,
+`--spec-min-p 0.70`, `--batch 3`.** Preset restored from `strata/launch-presets/docker.json.bak-20261111-pre-df2`; the
+final boot carries `--mtp … --batch-mtp --pipeline-windows 2 --spec 4 --batch 3`, `8192 of its 8192`, 54 % resident,
+`1180 / 2597 MiB` free, and re-measures L4 159.1 / L1 131.7 — inside the control band. The 1slot tree reaches the same
+verdict (−8…−11 %, there the loss is the pipeline window DFlash2 forbids): **DFlash2 stays off on both trees** until
+something changes split-side tap gathering. Do not re-run this arm on this model/hardware pair.
