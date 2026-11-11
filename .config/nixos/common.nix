@@ -54,6 +54,7 @@ in
     };
     systemPackages = [
       pkgs.dig
+      pkgs.discord
       pkgs.efibootmgr
       pkgs.gedit
       pkgs.gftp
