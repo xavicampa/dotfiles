@@ -230,7 +230,7 @@ in {
         # rather than decoration.blur.size/passes (the protocol is client-driven;
         # verified on homepc: Hyprland 0.56.2 + kitty 0.49.1, 40 blurred the
         # window behind it, 24 is milder). Needs background_opacity < 1.
-        background_opacity = "0.85";
+        background_opacity = "0.75";
         background_blur = 24;
         tab_bar_style = "powerline";
         # tab_powerline_style = "slanted";
