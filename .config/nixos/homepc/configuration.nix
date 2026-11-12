@@ -539,7 +539,6 @@ in
             -e STRATA_ADAPT_LAG=2
             -e STRATA_EXCHANGE_ROTATE=1
             -e STRATA_SPLIT_RING=384
-            -e STRATA_PW_WITH_BATCH=1
             ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
@@ -551,7 +550,7 @@ in
             # --max-context in the parallel tree (131072 since 2026-10-31, with the preset's "parallel": 3; pi discovers
             # this value and holds no modelOverrides contextWindow for this model). Cap rationale:
             # ~/.config/strata/parallel/TUNING_NOTES.md § the RAM wall.
-            # 196608 tried 2026-11-12 and reverted the same day: 3/3 boots ended in `verify: layer 32 never rang` — .config/strata/parallel/.tune/issue-verify-never-rang.md
+            # `verify: layer 32 never rang` fired 4x on 2026-11-12 at both 131072 and 196608; suspect is STRATA_PW_WITH_BATCH=1 (4/55 ON boots vs 0/466 OFF), so it is out of the container env — .config/strata/parallel/.tune/issue-verify-never-rang.md
             context = 131072;
             "in" = [ "text" "image" ];
             out = [ "text" ];
