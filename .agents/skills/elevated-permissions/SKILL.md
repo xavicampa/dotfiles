@@ -5,7 +5,7 @@ description: Execute commands requiring elevated (root) permissions. Triggered w
 
 # Elevated permissions (pkexec)
 
-Default to `pkexec`, not `sudo`, on Linux/NixOS.
+Default to `pkexec`, not `sudo`, on Linux/NixOS. **`pkexec` works from the tool shell** — the dialog appears on the user's desktop, not in the terminal. Assume it works; claim otherwise only with a `pkexec` error you actually observed.
 
 ## Scope
 
@@ -31,18 +31,27 @@ This skill decides **how** to elevate. It does not decide **what** to run or **w
 
 The agent's shell is **not a terminal** (no stdin/stdout TTY). This changes everything:
 
-- `pkexec` works only because a polkit **GUI agent** is running: the password prompt appears **on the user's desktop**, and the tool call **blocks** until the user answers it. Tell the user to expect a dialog, and bound the wait, e.g. `timeout 180 pkexec …` (or pass a `timeout` to the bash tool).
-- `pkexec`'s own fallback agent prompts on `/dev/tty`, which does not exist here — with no GUI agent it fails with `Not authorized` / `Failed to get authentication`.
+- Elevation goes through **polkit**: `pkexec` asks the desktop's registered polkit agent to show a password dialog **on the user's desktop**, and the tool call **blocks** until the user answers it. Tell the user to expect a dialog, and bound the wait, e.g. `timeout 180 pkexec …` (or pass a `timeout` to the bash tool).
+- `pkexec`'s own fallback agent prompts on `/dev/tty`, which does not exist here — if no agent is reachable the call fails with `Not authorized` / `Failed to get authentication`. That error is a **result**, obtained by running `pkexec`, never by inspecting processes first.
 - `sudo` is **not** a fallback for a fresh prompt: with no TTY it cannot read a password. It is only usable when a timestamp is already cached from the user's own terminal — test with `sudo -n <cmd>` and fall back to asking the user if it fails.
 - On macOS `sudo` can never prompt from the tool at all → print the exact command and ask the user to run it in their own terminal.
 
-### Preflight — is elevation even possible?
+## No preflight — attempt, then diagnose
+
+**In a desktop session, run the command with `pkexec`. Do not try to prove in advance that elevation is possible.** There is no reliable way to detect a polkit agent, and a wrong "no" costs the whole task:
+
+- `pgrep -i polkit` shows **only `polkitd`** on homepc — the authentication agent is built into the desktop shell (DMS / Dux Shell: processes `.dms-wrapped`, `quickshell`; GNOME/KDE/other stacks embed theirs in the shell, portal or compositor too). "No agent process found" is a **false negative, not a blocker**. Never conclude anything from this probe.
+- `sudo -n` failing ("a password is required"), or the user's history of typing `sudo …` in their own terminal, says **nothing** about polkit. Different mechanism — not evidence.
+- Never write "I cannot elevate from here" / "pkexec has no prompt to show you" unless you can quote the **actual error from a `pkexec` call you ran**. Otherwise: make the call, mention the dialog, and let the user answer it.
+
+The legitimate blockers are only: the user declined, the dialog was dismissed/timed out, or `pkexec` returned an auth error. In that last case the usual cause is that this shell is not inside an active local seat session — check *after* the failure:
 
 ```bash
-pgrep -a -i polkit        # polkitd + an agent (e.g. hyprpolkitagent) must be running
+cat /proc/self/cgroup                                  # needs /…/session.slice/… ; SSH/system service/container won't have it
+loginctl show-session <id> -p Active -p Type -p Remote # from the session number above
 ```
 
-No agent (SSH session, systemd service, headless) → don't attempt `pkexec`; hand the command to the user.
+Confirmed headless/remote → hand the exact command to the user to run in their own terminal. Do not retry via another elevation path.
 
 ## One invocation per task
 
@@ -106,7 +115,7 @@ Then elevate only for the real privilege gap. Re-running a broken command as roo
 | Symptom | Meaning / action |
 |---|---|
 | `pkexec must be setuid root` | `pkexec` was resolved off the default PATH (PATH was tampered with) — re-run with the default PATH, see above. |
-| `Not authorized` / `Failed to get authentication` | No polkit agent for this session — hand the command to the user. |
+| `Not authorized` / `Failed to get authentication` | This session really has no reachable agent (headless/remote/system-service — see the session check above). Hand the command to the user. |
 | `… No such file or directory` while executing | The command isn't on pkexec's secure PATH — add the `env PATH=…` prefix or use an absolute path. |
 | Command hangs | Dialog is waiting on the desktop — tell the user, and use a timeout. |
 | Dialog dismissed / timed out | Treat as a decline: stop, report, don't retry. |
