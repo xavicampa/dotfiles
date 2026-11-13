@@ -671,8 +671,7 @@ in
       # activity -> sqlite; dir from StateDirectory below
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
-      # preload = the boot default (no default_model key in v262); keep it on the model that serves — NOTES.md § llama-swap
-      # hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
     };
   };
 

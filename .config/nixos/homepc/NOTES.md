@@ -1009,8 +1009,9 @@ slots** instead of one — a second llama-swap model so clients pick the mode by
   The measured better arm at 2–4 streams on a two-stage split was `--batch-groups 1` (+
   optionally `STRATA_BATCH_MTP=1`); try it in `docker-p3.json`'s `extra`, one change per
   restart. Check `/metrics` → `live.slots` and `/v1/status` while measuring.
-- Not in `hooks.on_startup.preload`: the boot backend stays the single-stream one, and
-  this entry swaps in on first request like Maya.
+- Not in `hooks.on_startup.preload`: whichever entry that list names is the boot backend (the pick
+  moves — § routing / activity / preload has the mechanism, `configuration.nix` the current one),
+  and this entry swaps in on first request like Maya.
 
 ### llama-swap/swift — `swift-1.5-iq3_s` (DROPPED 2026-10-25)
 
@@ -1102,9 +1103,10 @@ section twice now only ever touches its own tree.
   `--pipeline-windows 2` is off in batch mode (the engine logs `… is off: not with --batch slots`),
   so this entry loses p1's CUDA1 interleaving; count it as batch cost. The measured better arm at
   2–4 streams was `--batch-groups 1` (+ optionally `STRATA_BATCH_MTP=1`) — try it in **this**
-  preset's `extra`, one change per restart. Not in `hooks.on_startup.preload`: the boot backend
-  stays the single-stream one. (Superseded: its `-parallel5` successor — today's `-parallel` — **is** preloaded since
-  2026-10-26 — see § routing / activity / preload.)
+  preset's `extra`, one change per restart. Not in `hooks.on_startup.preload` as the config stood
+  then; the boot pick moves between the single-stream and batch entries (§ routing / activity /
+  preload for the mechanism, `configuration.nix` for the current one). (Superseded: its
+  `-parallel5` successor — today's `-parallel`.)
 
 ### llama-swap/strata-parallel — where each serving setting lives (2026-10-27)
 
@@ -1373,17 +1375,23 @@ in `~/.config/llamacpp/llama-preset.ini` and stay unique across llama-swap.
   in-memory ring buffers either way. The directory comes from `StateDirectory` in the
   unit override below: `ProtectSystem=strict` leaves `/var` read-only apart from what
   systemd opens.
-- `hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ]` — changed 2026-10-29 from
-  `qwen3.8-flash-next-coder-iq1_m-parallel` (which was renamed 2026-10-27 from `…-parallel5`, and
-  before that 2026-10-26 from `qwen3.8-flash-next-iq3_s`): llama-swap v262 has no `default_model`
-  key — the preload list *is* the boot default — and the model actually being served was the
-  single-stream one, so a parallel preload meant paying an exclusive-group swap (full reload + cold
-  re-prefill) on the first request after every boot. Flip back to the batch entry when concurrency
-  is the real workload (parallel/TUNING_NOTES.md: 4 streams = 179.3 agg / 45.0 per stream). Either
-  way only one entry: the exclusive gpu group evicts whatever else is preloaded. Strata
-  is still loaded at boot, not on first request. **Maya is deliberately not
-  preloaded**: its cold load is minutes and it pins 44 GiB, so it swaps in on request
-  (its first request pays for that, and `sendLoadingState` says so).
+- `hooks.on_startup.preload` — **the current value is deliberately not recorded here**; it has
+  been renamed and flipped between the single-stream and the batch `…-parallel` entry more than
+  once, so naming it here only ever goes stale. Source of truth is the one line in
+  `configuration.nix` (`services.llama-swap.settings.hooks.on_startup.preload`); read it with
+  `grep -n "on_startup.preload" ~/.config/nixos/homepc/configuration.nix` — `nixos-option` cannot
+  resolve into that attrset (`type.descriptionClass == "composite"` eval error), so there is no
+  option-path query for it.
+  What does not change: llama-swap v262 has **no `default_model` key** — the preload list *is*
+  the boot default — so an empty/commented-out list means nothing is in VRAM after a boot and the
+  first request pays the cold load, and changing which entry is preloaded costs an
+  exclusive-group swap (full reload + cold re-prefill) on the first request after that boot.
+  Single-stream preload wins when the first request after boot is the common case; batch preload
+  wins when concurrency is the workload (parallel/TUNING_NOTES.md: 4 streams = 179.3 agg /
+  45.0 per stream). Exactly **one** entry either way: the gpu group is `exclusive = true`, so
+  anything else preloaded is evicted. Strata stays loaded at boot, not on first request.
+  **Maya is deliberately never preloaded**: its cold load is minutes and it pins 44 GiB, so it
+  swaps in on request (its first request pays for that, and `sendLoadingState` says so).
 
 ## strata-logs
 
