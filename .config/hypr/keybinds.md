@@ -41,7 +41,7 @@ DMS rewrites that file and drops comments.
 |---|---|---|
 | `SUPER + Return` | `kitty` | terminal (replaces DMS's `SUPER+T`) |
 | `SUPER + CTRL + Return` | `kitty pi` | pi inside kitty; carried over from the hyprlang config |
-| `SUPER + E` | `nautilus --new-window` | Files; `SUPER+E` was free (only `SUPER+SHIFT+E` = exit and `SUPER+End` existed). Drop `--new-window` for raise-the-existing-window behaviour |
+| `SUPER + E` | `dfiles` | Files — `dfiles` (Quickshell, `unstable.dux-files`) since 2026-11-13; nautilus went dell-only in `common.nix`. Bare `dfiles` (no `--new-window` equivalent) goes over IPC to the already-running `dfiles run -d --daemon-child` + its `dfiles-shell` quickshell, so it raises/opens rather than forking a second FM |
 | `SUPER + B` | `dms ipc call bar toggle index 0` | hide / show the DMS bar |
 | `SUPER + SHIFT + B` | `dms ipc call bar toggleAutoHide index 0` | bar auto-hide on/off |
 | `SUPER + minus` (printed `-`) | `togglespecialworkspace magic` | scratch on/off; displaces DMS's `resizeactive -100 0`, which still lives on the printed `+` (`SUPER+code:20`). Width resize therefore = `+` / `\`, never `-` |

@@ -61,7 +61,16 @@ in
       pkgs.spice-gtk
       pkgs.librepods
       pkgs.lsof
+    ] ++ lib.optionals (config.networking.hostName == "dell") [
+      # Nautilus = dell only since 2026-11-13: homepc's Files bind (SUPER+E in
+      # ~/.config/hypr/dms/binds-user.lua) launches `dfiles` (unstable.dux-files,
+      # already in homepc/configuration.nix environment.systemPackages), so the GTK4
+      # Files shell plus its gnome stack was dead weight in homepc's system path.
+      # The dell still runs it — hosts/dell.lua:110. Spliced inline at the old slot
+      # rather than appended: same slot, just absent on homepc (see the apple-cursor
+      # note below for why position churn re-hashes the system-path buildEnv).
       pkgs.nautilus
+    ] ++ [
       (pkgs.catppuccin-sddm.override {
         flavor = "mocha";
         accent = "mauve";
@@ -283,7 +292,19 @@ in
         docker-compose
         egl-wayland
         feh
+      ] ++ lib.optionals (config.networking.hostName == "dell") [
+        # file-roller = dell only since 2026-11-13, the other half of nautilus going
+        # dell-only: it builds its Nautilus extension, so on homepc it was the last thing
+        # holding the 1.26 GB nautilus-50.4 tree in the closure — `nix why-depends <toplevel>
+        # <nautilus>`: etc -> user-environment -> file-roller-44.7 -> nautilus-50.4. Nothing
+        # on homepc called it: no mimeapps/defaults entry, no keybind, and `strings` over
+        # dfiles (homepc's SUPER+E file manager) mentions neither file-roller nor nautilus;
+        # archives stay covered there by 7z / unrar / unzip / xz / zstd. Kept on the dell, which
+        # still runs nautilus (hosts/dell.lua:110) and where nautilus delegates archive
+        # open/extract to file-roller — removing it there would buy nothing. Spliced inline at
+        # the old slot, not appended to the existing dell block below, to keep the merged order.
         file-roller
+      ] ++ [
         git
         google-chrome
         hyprpaper

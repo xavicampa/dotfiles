@@ -23,7 +23,7 @@ hl.bind("SUPER + SHIFT + code:61", hl.dsp.window.move({ workspace = "special:mag
 hl.unbind("SUPER + minus")
 hl.bind("SUPER + minus", hl.dsp.workspace.toggle_special("magic"), { description = "toggle scratch (special:magic)" })
 hl.unbind("SUPER + E")
-hl.bind("SUPER + E", hl.dsp.exec_cmd("nautilus --new-window"), { description = "Files (Nautilus)" })
+hl.bind("SUPER + E", hl.dsp.exec_cmd("dfiles"), { description = "Files (dfiles)" })
 hl.unbind("SUPER + CTRL + Return")
 hl.bind("SUPER + CTRL + Return", hl.dsp.exec_cmd("kitty pi"), { description = "kitty running pi" })
 hl.unbind("SUPER + Return")

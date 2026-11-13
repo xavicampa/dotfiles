@@ -322,20 +322,11 @@ in {
     };
   };
 
-  # Nautilus (GTK4 / Files 50) reads its sidebar bookmarks from
-  # ~/.config/gtk-3.0/bookmarks as "URI label" lines and monitors that file, so
-  # appending is enough - no restart.  Appended idempotently instead of managed
-  # as a symlink so Nautilus can still rewrite it (Ctrl+D stays usable).
-  # The share itself is a systemd automount (NixOS fileSystems), so clicking the
-  # bookmark is what mounts it.
-  home.activation.readynasMediaBookmark = lib.mkIf (!macos)
-    (lib.hm.dag.entryAfter [ "writeBoundary" ]
-      ''
-        _bm="${config.home.homeDirectory}/.config/gtk-3.0/bookmarks"
-        mkdir -p "$(dirname "$_bm")"
-        grep -qF "file:///mnt/readynas-media" "$_bm" 2>/dev/null ||
-          printf 'file:///mnt/readynas-media ReadyNAS Media\n' >> "$_bm"
-      '');
+  # Nautilus bookmarks (home.activation.readynasMediaBookmark, which appended the
+  # ReadyNAS Media share to ~/.config/gtk-3.0/bookmarks) removed 2026-11-13 along with
+  # the package: homepc's SUPER+E now launches `dfiles` and nautilus is dell-only in
+  # common.nix. The existing ~/.config/gtk-3.0/bookmarks file is left on disk untouched
+  # (dfiles and other GTK file choosers read it; re-add here if an FM needs it seeded).
 
   # xdg.enable = true;
 }
