@@ -6,25 +6,10 @@ let
   #   inherit pkgs;
   # };
 
-  # TEMP: the nixos-unstable channel (our root pin 1d060086d60c, 2026-11-03)
-  # predates upstream's opencode node_modules hash fix (nixpkgs c399e1b7fb90,
-  # 2026-11-04), so unstable.opencode 2.2.5 fails its fixed-output hash. This
-  # overlay applies upstream's exact corrected Linux value - drop it once the
-  # channel carries that commit.
-  unstable = import <nixpkgs-unstable> {
-    config.allowUnfree = true;
-    overlays = [
-      (
-        self: super: {
-          opencode = super.opencode.overrideAttrs (final: prev: {
-            node_modules = prev.node_modules.overrideAttrs (_: {
-              outputHash = "sha256-prx9dX7kUvs/E3zopkaPk5LXh3xJAy5sZeum/W8L7cA=";
-            });
-          });
-        }
-      )
-    ];
-  };
+  # Removed 2026-11-13: the opencode node_modules hash overlay (upstream fix
+  # nixpkgs c399e1b7fb90, 2026-11-04) is obsolete - the root nixpkgs-unstable
+  # channel now carries it and ships opencode 2.2.6, pre-built on the cache.
+  unstable = import <nixpkgs-unstable> { config.allowUnfree = true; };
 
   # Pinned nixpkgs master — the nixos-unstable channel lags and still ships the
   # broken opencode 1.18.30 (upstream regression #48645, fixed in 1.18.31).
