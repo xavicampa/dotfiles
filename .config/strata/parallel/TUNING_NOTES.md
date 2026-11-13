@@ -538,7 +538,8 @@ Readings:
 - **`--spec-min-p` must match in both files.** The install config carried `0.5` while the preset carried `0.70`; the
   preset's args come later in the command line so it wins, but launch straight from the install config and you get
   the looser gate silently. Both are `0.70` now.
-- **`STRATA_SPLIT_RING=384` (container env, set in `homepc/configuration.nix` for the 3-slot entry).** On a split the
+- **`STRATA_SPLIT_RING=384` (since 2026-11-13 an `extra` key in `strata/launch-presets/docker.json`; before that
+  container env `-e` in `homepc/configuration.nix` for the 3-slot entry).** On a split the
   prompt path lends tail slots of each card's cache; the default rule gives 96 ring slots once ≥75 % of pairs are
   cache-resident, i.e. `borrows 2918 slots`. The override sets ring 384 → `borrows 3655 slots (ring 384 slots at chunk
   8192), 3655 of them keep their experts in RAM too` — K == N, so the `lend sizing` WARNING does not fire and long
@@ -618,10 +619,44 @@ acceptance 83.7-86.1 %, `drafts/step 6.1-7.2`. So all three stacks are free of V
 (Note line "expect ~650 CUDA0 / ~700 CUDA1" is stale: with 0.1.55 + these args the boots report 1177/1106, and the
 `strata verify` capture windows only fall to 1098.)
 
-**Hygiene check (the coder tree needed this): this tree was NOT damaged by the 0.1.55 regeneration** — `max_queue 3`,
+**Hygiene check (the coder tree needed this): this tree was NOT damaged by the 0.1.55 regeneration** — *(this line
+stopped being true on 2026-11-12; see the 2026-11-13 entry below)* `max_queue 3`,
 `queue_timeout 90`, `vision.cuda_device 1` all still in `strata-iq3_s.json`, and the preset has no `user_args` key at all
 (schema here is `extra`, not `args`), so there is no stale-args copy to trip over. Compute apps confirm the split: the
 engine's 21.8 GiB row on the 3090 Ti, its 14.8 GiB row on the 5070 Ti, and **vision's 1336 MiB row on the 3090 Ti only**.
+
+**2026-11-13 — the regeneration damage this section warns about did happen here: 2026-11-12 17:11, and it repeated on
+every boot until it was fixed.** `strata-iq3_s.json` lost `vision`, `max_queue 3`, `queue_timeout 90`, `gpu` /
+`gpus_asked`, and `--spec-min-p` went back to `0.5`. Path: `tune-ctx.sh` sets the preset's `"context"` (line 104) as
+well as the `--max-context` `extra`, and `ensure_model`'s reuse test (launch/runner.py:262 `desc_matches`) compares
+that `context` with the config's `--max-context` — so the `ctx=196608` arm answered "not installed" and setup ran.
+Setup in this container cannot see the cards (the CDI-injected `nvidia-smi` will not exec — `rc=127`, its `PT_INTERP`
+is a `/nix/store` path), so it failed "no NVIDIA GPU found (nvidia-smi did not answer)" and the launcher fell back to
+`adopt_prepared_files` (runner.py:1379 → 1477, launch/adopt.py), which writes the config from the model files and
+**carries nothing over** — that is the writer here, not setup's `carry_over`. The tell in this log: the last batched
+boot with `--vision` in the engine command is 2026-11-12 17:09:35, the first without it 17:11:00. It then re-happened
+at every start, because a config without the section reports `images: off` while the preset asks `vision: on`, so
+`desc_matches` never passed again — today's 13:29 boot rewrote the file a second time. Restored (backup
+`strata-iq3_s.json.bak-20261113-pre-restore`): the 2026-11-03 vision keeper (`exe: /data/install/strata-vision`, the
+BF16 mmproj, `gpu: false`, `cuda_device: 1`, `max_tokens: 512` — `serve/server.py:4018` puts the bare `--vision` back
+at every start from the section, so `args` need not carry it), plus `max_queue 3`, `queue_timeout 90` and
+`--spec-min-p 0.70` (the keeper; adopt's `0.5` sat under the preset's `0.70` and only the argument order was saving
+us — NOTES.md § llama-swap/strata-p1 has the rule). Re-checked with the image's own code: `desc_matches True`,
+`files_present []`, `installed_serves_request True`, so the next boot prints "IQ3_S is already installed with these
+choices." and stops rewriting this file, and `derive_config` carries `vision`, `max_queue 3` and `queue_timeout 90`
+into `state/strata/launch/docker.json` again. **An arm that changes a preset's `context` costs this paste
+afterwards**: check the `--vision` line and those keys before trusting boots after one. (2026-11-13, from
+`state/strata/launch/docker.engine.log`, the file mtimes, and the image's own `desc_matches`/`files_present`.)
+
+Confirmed end-to-end after the 2026-11-13 14:09 `nixos-rebuild switch` (llama-swap restarted, its container
+recreated at 14:09:03 with the new `podman run`): the container env now carries only `STRATA_INSTALL_DIR`,
+`STRATA_COMPONENTS_DIR` and `STRATA_IN_DOCKER` — the old four `-e` pins and `STRATA_SELECT_TWO_PASS` are gone — yet
+`/proc/<engine>/environ` still reads `STRATA_SPLIT_RING=384`, `STRATA_PF_FUSED=1`, `STRATA_ADAPT_LAG=2`,
+`STRATA_EXCHANGE_ROTATE=1`, so they arrive from the preset through the run config's `env` alone. The boot says
+"IQ3_S is already installed with these choices.", `--vision` is back in the engine command with the CPU reader at
+`--max-tokens 512`, `--batch 3`/`--spec-min-p 0.70`/`--kv-resident 20480`/`--conversation-cache-mib 6144` hold, and
+the log shows `the prompt path's streamed ring 384 slots` and `lend sizing: … 3660 … in RAM too`; CUDA0 1,181 MiB
+and CUDA1 2,597 MiB free with everything loaded. So `extra-del=` now really clears a knob for an A/B arm.
 
 ### The nine parallel settings: **+8-11 % fan-out at 4 concurrent, nothing at 1** — keep on
 

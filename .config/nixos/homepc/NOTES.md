@@ -958,6 +958,24 @@ slots** instead of one — a second llama-swap model so clients pick the mode by
   reader; the engine's `strata-vision: warmed up at N image tokens` line is the proof it is
   on. Making both presets agree on context and KV would stop the setup runs — at the price of
   p1's 256k.
+- **2026-11-13: the same damage came back through a second writer, and it repeats until the section is back.**
+  The trigger was the context arm, not a p1↔p3 switch: `strata/parallel/tune-ctx.sh` writes the preset's
+  `"context"` (line 104) as well as the `--max-context` `extra`, and `desc_matches` compares that `context` with the
+  config's `--max-context` — so the 2026-11-12 17:11 `ctx=196608` boot re-ran setup on the batch tree. Setup still
+  cannot see the cards in a container (the CDI-injected `nvidia-smi` exists but will not exec — `rc=127`, its
+  `PT_INTERP` is a `/nix/store` path; § llama-swap/strata), so `gpus()` came back empty and setup.py:10818 failed
+  "no NVIDIA GPU found (nvidia-smi did not answer)"; the launcher then used its own-files writer
+  `adopt_prepared_files` (launch/runner.py:1379 → 1477 → launch/adopt.py), which builds `strata-iq3_s.json` from the
+  model files and merges **nothing** — no `vision` section (adopt.py never mentions vision), no `max_queue` /
+  `queue_timeout`, no `gpu`, and `--spec-min-p` back to its 0.5 default. Unlike the p1/p3 case this one is
+  self-sustaining: a config without the section reports `images: off` against the preset's `vision: on`, so
+  `desc_matches` fails on every later start and every start re-runs setup + adopt (the 2026-11-13 13:29 boot
+  rewrote it again). The boot log dates it exactly: the last batched boot whose engine command has `--vision` is
+  2026-11-12 17:09:35, the first without it 17:11:00. Restored by hand and re-checked with the image's own code:
+  all three halves of `ensure_model`'s test pass (`desc_matches`, empty `files_present`, `installed_serves_request`),
+  so the next boot prints "IQ3_S is already installed with these choices." and stops rewriting the file; the 1slot
+  tree passes the same test, which is why its `strata-iq3_s.json` was left alone. After any arm that changes a
+  preset's `context`, check for the `--vision` line and the top-level keys before trusting the next boots.
 - **The reported `model` field stays `qwen3.8-flash-next-iq3_s` for both**: llama-swap
   passes the upstream body through (verified) and the name comes from the shared run
   config's `model_name`, which no env overrides. Only the *request* name and

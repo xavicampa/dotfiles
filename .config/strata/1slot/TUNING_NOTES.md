@@ -36,12 +36,20 @@ as no gain (CUDA0 +45 slots, CUDA1 +62 MiB margin, decode slightly lower). Setup
 65536 flat or better").
 `strata-iq3_s.json` mirrors the live args (no `env` block any more).
 
-**Where `STRATA_SPLIT_RING=384` lives:** only in the container cmd of
-`~/.config/nixos/homepc/configuration.nix` (`-e STRATA_SPLIT_RING=384`). It went live with the
-2026-10-26 01:07 container (`docker inspect .Config.Env` lists it, and the engine prints the streamed-ring
-line); the copy in the preset `extra` and the stopgap `env` block in `strata-iq3_s.json` were both removed.
-If you ever put it back in the run config's `env`, note that it is applied **on top of** the container env —
-two copies then have to be kept in step.
+**Where the four engine pins live now (2026-11-13):** as `extra` keys in the tree's launch preset —
+`strata/launch-presets/docker.json`: `STRATA_PF_FUSED=1`, `STRATA_ADAPT_LAG=2`, `STRATA_EXCHANGE_ROTATE=1`,
+`STRATA_SPLIT_RING=384`. History: from the 2026-10-26 01:07 container they were `-e` in the container cmd of
+`~/.config/nixos/homepc/configuration.nix` (`docker inspect .Config.Env` listed them); those `-e` lines are gone.
+`launch --set STRATA_X=1` puts a key in the run config's `env` (`settings.py as_argv_changes` →
+`runner.py derive_config:587`) and `serve/server.py child_env:4480` applies that **over** the container env, so
+the preset decides and an env-clear rebuild no longer clears a pin — clear the preset key instead. Do not put
+them back in the install config's `env` block: a container boot that re-runs setup rewrites `strata-iq3_s.json`
+from the model files (seen on the parallel tree on 2026-11-13 13:29, which also dropped its `max_queue`,
+`queue_timeout` and `vision` keys — the writer there was the launcher's own-files fallback `adopt_prepared_files`
+(launch/runner.py:1477 → launch/adopt.py), reached because a `tune-ctx.sh` arm had changed that tree's preset
+`"context"` and setup cannot see the cards in a container; the case is written up in the 2026-11-13 entry of
+`~/.config/strata/parallel/TUNING_NOTES.md`), so only the preset survives every start. `STRATA_SELECT_TWO_PASS` was
+dropped, not moved — default-on in the engine since 0.2.12.
 
 After a rebuild, a preset change or any restart, confirm the ring is still in play; it falls back to 96
 silently (−16 % cold prompt reads) and the only proof is in the engine log:
@@ -181,7 +189,7 @@ suites, so it needs its own one-key A/B first.
   starts with the KV in VRAM instead of `--kv-resident 32768` — sync that or retire the script before trusting
   it.
 - Image env already sets `STRATA_EXCHANGE_ROTATE=1` (`exchange buffer rotation enabled … 1.51 GiB page-locked`)
-  and `STRATA_ADAPT_LAG=2`, `STRATA_PF_FUSED=1` — they apply to resident mode too.
+  and `STRATA_ADAPT_LAG=2`, `STRATA_PF_FUSED=1` — they apply to resident mode too (since 2026-11-13 the preset's `extra` sets these, not the container `-e`).
 - The 3slots install shares this volume's `/data/state` and also uses preset name `docker`
   (`state/strata/launch/docker.json`, `docker.choices.json`, the runtime profile lock). Run one at a time;
   the state file is regenerated per launch, but the learned profile `state/strata/profile-learned.bin`

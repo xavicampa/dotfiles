@@ -467,6 +467,11 @@ in
         # Strata: MODEL_PATH (not HF_CACHE), files bound from HF blobs — NOTES.md § llama-swap/strata
         "qwen3.8-flash-next-iq3_s" = {
           # swap.max=0 keeps the anon arena resident; no comments inside cmd — NOTES.md § llama-swap/strata
+          # The STRATA_* engine pins left this cmd on 2026-11-13: they are `extra` keys in the tree's launch preset
+          # (~/.config/strata/1slot/strata/launch-presets/docker.json), which `launch --set` writes into the run
+          # config's "env"; serve/server.py child_env applies that on top of the container env, so the preset wins
+          # if both name a key - keep one home. STRATA_SELECT_TWO_PASS is dropped, not moved: default-on in the
+          # engine since 0.2.12 (data/settings-register.json). An A/B arm now clears the preset key, not a rebuild.
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
@@ -485,11 +490,6 @@ in
             -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
             -e PORT=''${PORT}
-            -e STRATA_PF_FUSED=1
-            -e STRATA_ADAPT_LAG=2
-            -e STRATA_EXCHANGE_ROTATE=1
-            -e STRATA_SPLIT_RING=384
-            -e STRATA_SELECT_TWO_PASS=1
             ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
@@ -516,7 +516,15 @@ in
         # "parallel": null, the fallback is fit_parallel(main_vram_gb) = 3 on a 24 GB card but 1 on a 16 GB card, so
         # read the boot line for `--batch` after any preset regeneration (cf. the 0.1.55 regeneration).
         # The queue bound has no launch flag/env, so max_queue + queue_timeout sit as top-level
-        # keys in ~/.config/strata/parallel/strata-iq3_s.json, which derive_config copies.
+        # keys in ~/.config/strata/parallel/strata-iq3_s.json, which derive_config copies. That file is
+        # rewritten whenever a launch answers "not installed" — a preset `context` change does that in a
+        # container, where setup cannot see the cards — so re-check those keys and the `vision` section
+        # after such an arm (2026-11-13 entry in ~/.config/strata/parallel/TUNING_NOTES.md).
+        # Engine pins (STRATA_PF_FUSED=1, STRATA_ADAPT_LAG=2, STRATA_EXCHANGE_ROTATE=1, STRATA_SPLIT_RING=384): in the
+        # preset's `extra` since 2026-11-13, not in this cmd. A key there goes through `launch --set` to the run
+        # config's "env" (strata_cli/launch/settings.py as_argv_changes + launch/runner.py derive_config) and
+        # serve/server.py child_env puts that over the container env - so the file is the one that decides, and a
+        # clear-by-rebuild arm no longer clears these. None of the four is on the tuner's never list.
         # Context cap is NOT an env knob here: the number the engine obeys is --max-context in the preset extra
         # + the run config, "context" below only carries the reuse test, and capabilities.context below is what
         # gets advertised - keep them and pi's contextWindow in step. 131072 with 3 slots (preset "parallel": 3)
@@ -542,10 +550,6 @@ in
             -e MODEL_PATH=/data/gguf/IQ3_S
             -e MODEL=IQ3_S
             -e PORT=''${PORT}
-            -e STRATA_PF_FUSED=1
-            -e STRATA_ADAPT_LAG=2
-            -e STRATA_EXCHANGE_ROTATE=1
-            -e STRATA_SPLIT_RING=384
             ghcr.io/niko1221/strata:latest-cuda13
           '';
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
@@ -557,7 +561,7 @@ in
             # --max-context in the parallel tree (131072 since 2026-10-31, with the preset's "parallel": 3; pi discovers
             # this value and holds no modelOverrides contextWindow for this model). Cap rationale:
             # ~/.config/strata/parallel/TUNING_NOTES.md § the RAM wall.
-            # `verify: layer 32 never rang` fired 4x on 2026-11-12 at both 131072 and 196608; suspect is STRATA_PW_WITH_BATCH=1 (4/55 ON boots vs 0/466 OFF), so it is out of the container env — .config/strata/parallel/.tune/issue-verify-never-rang.md
+            # `verify: layer 32 never rang` fired 4x on 2026-11-12 at both 131072 and 196608; suspect is STRATA_PW_WITH_BATCH=1 (4/55 ON boots vs 0/466 OFF), so it is out of the container env and out of the preset's `extra` — .config/strata/parallel/.tune/issue-verify-never-rang.md
             context = 131072;
             "in" = [ "text" "image" ];
             out = [ "text" ];

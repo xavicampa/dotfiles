@@ -26,7 +26,11 @@
     "--spec-min-p": "0.70",
     "--trim-stage-weights": "on",
     "--vram-reserve-later-mib": "1024",
-    "--vram-reserve-mib": "1024"
+    "--vram-reserve-mib": "1024",
+    "STRATA_ADAPT_LAG": "2",
+    "STRATA_EXCHANGE_ROTATE": "1",
+    "STRATA_PF_FUSED": "1",
+    "STRATA_SPLIT_RING": "384"
   },
   "family": "qwen",
   "gpu_roles": null,
@@ -35,7 +39,7 @@
     1
   ],
   "kv": "int8",
-  "last_used": "2026-11-11 11:41:51.213759",
+  "last_used": "2026-11-13 12:28:13.749977",
   "model": "IQ3_S",
   "model_path": "/data/gguf/IQ3_S",
   "mtp": null,
