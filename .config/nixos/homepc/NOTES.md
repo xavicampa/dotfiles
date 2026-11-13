@@ -322,13 +322,22 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   `restartIfChanged = true` restarts it on config changes.
 - Feature toggles: `enableSystemMonitoring` (dgop: CPU/RAM/net widgets + process list),
   `enableDynamicTheming` (matugen: wallpaper → DMS/rofi/gtk palette),
-  `enableCalendarEvents` (khal; needs `~/.config/khal`), `enableClipboardPaste`
+  `enableCalendarEvents` (khal 0.14.0 — no `~/.config/khal` here, so that backend has no
+  accounts; the widget runs on `dcal` instead, § packages), `enableClipboardPaste`
   (wtype for Shift+Return in clipboard history).
   They are **26.05-module** options, and the packages they add come from the **channel**, not
-  from unstable — `dgop 0.2.2`, `matugen`, `cava`, `khal`, `wtype`, `glib`/`networkmanager`
-  (`optionalPackages` in the 26.05 module) — so the shell 2.0.0 runs against a channel dgop.
-  That skew predates the 2.0.0 bump; it is the thing to look at first if the CPU/RAM/net
-  widgets stop updating. In nixpkgs ≥ the 2.0.0 module every one of these is
+  from unstable — `matugen`, `cava`, `khal`, `wtype`, `glib`/`networkmanager`
+  (`optionalPackages` in the 26.05 module).
+- **`enableSystemMonitoring = false` (since 2026-11-13)**, unlike the other toggles. Its only
+  effect in the 26.05 module is `optionals cfg.enableSystemMonitoring [ pkgs.dgop ]` → the
+  pre-rename **dgop 0.2.2** (AvengeMedia), while the shell is `unstable.dux-shell` 2.1.2. Its
+  successor `unstable.dux-gop` 2.1.1 (duxlabs-dev, renamed from dgop) installs the **same
+  `bin/dgop` name**, so leaving the flag on would collide in `system-path`
+  ("colliding subpath … bin/dgop") and activation would pick one arbitrarily. The flag is off
+  and `unstable.dux-gop` sits in `environment.systemPackages` (§ packages) instead, so the DMS
+  system widgets talk to 2.1.1 — the dgop half of the old channel/unstable skew is gone; the
+  matugen/cava/khal/wtype half is not. DMS does **not** bundle dgop (nothing dgop-shaped in
+  `nix path-info -r` of the 2.1.2 closure), so it really does need it on PATH. In nixpkgs ≥ the 2.0.0 module every one of these is
   `mkRemovedOptionModule` (monitoring/theming/cava are built in, matugen and cava move into
   the package with `programs.dux-shell.excludePackages` to drop them, and a calendar backend
   must be installed separately) — so these assignments become hard errors the moment the
@@ -1512,10 +1521,53 @@ restart into an otherwise byte-identical switch (see the comment in `common.nix`
 
 Remaining homepc-only packages: `jellyfin-media-player`, `level-zero` (oneAPI Level
 Zero), `libmtp`, `nvidia_oc`, `nvtopPackages.nvidia`, `unstable.btop-cuda` (wrapped
-below with `cap_perfmon`), and the `security.wrappers.btop` root-owned wrapper that
+below with `cap_perfmon`), `unstable.dux-gop` (`dgop` 2.1.1 — system/process monitoring
+CLI/TUI/REST, and the backend for the DMS CPU/RAM/net widgets; replaces the channel dgop 0.2.2
+the 26.05 module would add, see the collision note in § dms-shell) and `unstable.dux-files`
+(`dfiles` — the Dux Labs Quickshell/Wayland file manager; both are linux-only and exist only in
+`<nixpkgs-unstable>`), and the `security.wrappers.btop` root-owned wrapper that
 gives btop `cap_perfmon=ep` for GPU/CPU perf counters. `environment.etc."lact/config.yaml"`
 binds the host-editable `~/.config/lact/config.yaml` into `/etc` for the LACT GPU
 overclocker (enabled with `unstable.lact`).
+
+### dux-calendar (`dcal`)
+
+`unstable.dux-calendar` 2.1.2 is a standalone calendar app **and** the Dux backend of the DMS
+calendar widget — DMS 2.1.2 ships both `CalendarDankBackend.qml` (talks to the `dcal` session
+daemon over its `dankcal-*.sock` socket) and `CalendarKhalBackend.qml` (`khal list --json`), and
+DMS Settings exposes a `calendarBackend` choice between them. Channel `khal` stays installed via
+`enableCalendarEvents` but is unconfigured (`~/.config/khal` does not exist), so `dcal` is the
+working one; it needs its own accounts set up first (`dcal` TUI, or `dcal accounts` — CalDAV /
+Google / local).
+
+It is listed in **`systemd.packages`** as well as `systemPackages`, because it ships
+`lib/systemd/user/dcal.service` (`dcal run --session --hidden`, `After=` + `PartOf=` +
+`WantedBy=graphical-session.target`, `Slice=app.slice`, `Restart=on-failure`). Only
+`systemd.user.services.dcal.wantedBy` and `…​.path` are set here: NixOS copies the package's unit file
+**verbatim** into `/etc/systemd/user/` and adds a `dcal.service.d/overrides.conf` drop-in
+(`LOCALE_ARCHIVE`/`TZDIR` + `[Install] WantedBy`), the same shape `dms.service` has — verified by
+`diff`ing the shipped unit against `/etc/systemd/user/dms.service`, which is byte-identical.
+Deliberately **not** set: `partOf`/`after` — the upstream unit already declares them, so the
+option would only duplicate them into the drop-in. The unit is a *user* unit reached through the
+system-level `systemd.packages` list; `systemd.user.packages` does not exist in the 26.05 module
+set (`nixos-option systemd.user.packages` → "Couldn't resolve config path").
+
+**`path = lib.mkForce [ ]` is load-bearing** (same trick `programs.dms-shell` uses for
+`dms.service`). Declaring *any* `systemd.user.services.dcal.*` option makes NixOS emit
+`dcal.service.d/overrides.conf` with `Environment=PATH=` built from the **default** service
+`path` (coreutils, findutils, gnugrep, gnused, systemd) — a *replacement*, not an append, so the
+session PATH disappears. `dcal` then dies at once with
+`ERROR go: starting UI: exec: "qs": executable file not found in $PATH`
+(`Restart=on-failure` + `RestartSec=2` makes it flap; the unit stays `activating (auto-restart)`).
+The reason it needs `qs` at all: nixpkgs builds dux-calendar with `tags = [ "withshell" ]` +
+`make -C core sync-shell`, which embeds the Quickshell **QML** but **no quickshell dependency**
+(`nix path-info -r` of the out path: 0 quickshell paths, while `dux-files` carries
+`quickshell-0.3.2`) — the binary execs `qs` from PATH. With `path` forced empty NixOS writes no
+PATH line at all, the unit inherits the user manager's session PATH (which has
+`/run/current-system/sw/bin/qs`, installed transitively by `programs.dms-shell.quickshell.package`
+= `unstable.quickshell` 0.3.2), and the daemon comes up. Upstream distro packaging (deb/rpm)
+declares quickshell as a dependency, so this is a nixpkgs gap, not a config mistake — worth an
+upstream issue if we keep hitting it.
 
 `imports`: `../common.nix` (shared config, `unstable` comes from its `_module.args`)
 and `./hardware-configuration.nix`; `./openvino.nix` is commented out.

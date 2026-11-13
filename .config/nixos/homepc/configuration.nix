@@ -304,7 +304,7 @@ in
         restartIfChanged = true;
       };
 
-      enableSystemMonitoring = true; # dgop (26.05 channel pkg): CPU/RAM/net + process list
+      enableSystemMonitoring = false; # 26.05 flag only adds pre-rename dgop 0.2.2; dux-gop 2.1.1 in systemPackages instead — NOTES.md § dms-shell
       enableDynamicTheming = true; # matugen: wallpaper -> DMS palette (+ DMS's own template
                                    # targets: gtk, vscode, firefox userchrome). NOT rofi — no
                                    # .rasi template exists here; rofi/rofimoji are dell-only
@@ -324,6 +324,13 @@ in
 
   # DMS draws its own bar — NOTES.md § waybar
   systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
+
+  # dcal's user unit ships in the package (NixOS copies it verbatim to /etc/systemd/user,
+  # same as dms.service); only enablement is wired here — NOTES.md § packages
+  systemd.packages = [ unstable.dux-calendar ];
+  systemd.user.services.dcal.wantedBy = [ "graphical-session.target" ];
+  # empty path => no Environment=PATH drop-in, so dcal keeps the session PATH and finds `qs` — NOTES.md § packages
+  systemd.user.services.dcal.path = lib.mkForce [ ];
 
   # Services
   services = {
@@ -777,6 +784,9 @@ in
     pkgs.sqlite
     pkgs.jq
     unstable.btop-cuda
+    unstable.dux-gop # dgop 2.1.1 (renamed dgop): DMS CPU/RAM/net widgets + `dgop` TUI/REST — NOTES.md § dms-shell
+    unstable.dux-files # dfiles: Dux Labs Quickshell file manager — NOTES.md § packages
+    unstable.dux-calendar # dcal 2.1.1: Dux Labs calendar + daemon; DMS `CalendarDankBackend` — NOTES.md § packages
   ];
   environment.etc."lact/config.yaml".source =
     "${config.users.users.javi.home}/.config/lact/config.yaml";
