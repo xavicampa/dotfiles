@@ -115,7 +115,9 @@ let
       sleep 10
     done
   '';
-  # NPU dictation stack: GenAI/Whisper + npu-driver/compiler come from unstable because the root channel's 1.28.0 driver predates the Arrow Lake NPU (8086:ad1d) — NOTES.md § dictate
+  # Dictation client: capture/VAD/insert only — transcription runs in the
+  # whisper-npu container (ghcr.io/xavicampa/whisper-npu) under llama-swap, so no
+  # GenAI deps here anymore (server half moved out 2026-11-15) — NOTES.md § dictate
   dictatePkg = unstable.python3.pkgs.buildPythonApplication {
     pname = "dictate";
     version = "0.1.0";
@@ -123,12 +125,8 @@ let
     src = ./dictation;
     nativeBuildInputs = [ unstable.python3.pkgs.setuptools ];
     propagatedBuildInputs = with unstable.python3.pkgs; [
-      openvino-genai
-      openvino
-      openvino-tokenizers
       sounddevice
       numpy
-      huggingface-hub
     ];
     pythonImportsCheck = [ "dictate" ];
     # wl-copy/wtype/qs/hyprctl wrapped onto PATH for the daemon (session Wayland/D-Bus env comes from systemd)
@@ -649,19 +647,33 @@ in
         };
 
         # Whisper int8 on the Intel NPU: backend for `dictate daemon` (push-to-talk dictation).
-        # Not a container — plain binary spawned by llama-swap itself (service runs as User=javi:
-        # child inherits HOME for ~/.cache/dictation + render-group access to /dev/accel).
+        # Podman backend, image ghcr.io/xavicampa/whisper-npu (repo github.com/xavicampa/whisper-npu:
+        # whisperd + Containerfile; Actions builds :<openvino-base-ver> + :latest on tag push).
+        # Tag follows the openvino/ubuntu24_runtime base — its level-zero/compiler must keep matching
+        # the host intel-npu-driver overlay pin or ~/.cache/dictation/npu-cache goes cold.
+        # Offline fallback: hand-build the same tag from that repo (`podman build -t <same-ref> .`).
+        # Container children of the rootless podman socket escape llama-swap's unit seccomp,
+        # which is what kept the NPU load dead under MemoryDenyWriteExecute — NOTES.md § llama-swap.
         # POST /v1/audio/transcriptions, routed here by its multipart `model` field; whisperd
-        # takes the port via --port macro (per-model `env` only appends, there is no PORT auto).
+        # takes the port via --port macro (per-model `env` only appends, there is no PORT auto —
+        # and env wouldn't cross the podman socket anyway, so DICTATE_* ride as -e flags).
         # Audio contract: PCM16 mono 16 kHz — NOTES.md § dictate/whisperd
         "whisper-medium-int8-npu" = {
-          cmd = ''${dictatePkg}/bin/whisperd --port ''${PORT}'';
+          cmd = ''
+            podman run --replace --init --name ''${MODEL_ID}
+            --network host
+            --device /dev/accel/accel0
+            --pull newer
+            -v /home/javi/.cache/dictation:/data/cache
+            -v /home/javi/.cache/huggingface/hub:/root/.cache/huggingface/hub
+            -e DICTATE_MODEL=OpenVINO/whisper-medium-int8-ov
+            -e DICTATE_TASK=translate
+            ghcr.io/xavicampa/whisper-npu:2026.4.1
+            whisperd --port ''${PORT}
+          '';
+          cmdStop = ''podman stop -t 10 ''${MODEL_ID}''; # tini+SIGTERM handler stop in ~1 s; well inside unloadTimeout = 40
           checkEndpoint = "/health";
           ttl = 0; # never idle-evicted; the npu group's persistent:true is what shields it from the gpu group
-          env = [
-            "DICTATE_MODEL=OpenVINO/whisper-medium-int8-ov" # turbo exports drop task=translate — NOTES.md § dictate
-            "DICTATE_TASK=translate"                        # speak any language, get English
-          ];
           capabilities = {
             "in" = [ "audio" ];
             out = [ "text" ]; # -> capabilities.audio_transcriptions in /v1/models
@@ -757,12 +769,13 @@ in
       # activity -> sqlite; dir from StateDirectory below
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
-      # whisper is preloaded too: dictation's first press stays instant across boots
-      # (NPU compile lives in ~/.cache/dictation/npu-cache; ttl 0 + persistent keeps it warm).
+      # whisper deliberately NOT preloaded (changed 2026-11-14): it swaps in on the
+      # first press in ~6 s (NPU compile lives in ~/.cache/dictation/npu-cache);
+      # ttl 0 + the persistent npu group keep it loaded once it is up.
       # preload is strictly sequential (startPreload: one goroutine, blocking GET / per name,
-      # apigroup.go:383) so order = ready order: whisper first = dictation warm at boot+6s,
-      # chat ~6 s later; their evict sets never intersect so runtime loads DO run parallel (fifo rule 6).
-      hooks.on_startup.preload = [ "whisper-medium-int8-npu" "qwen3.8-flash-next-iq3_s-parallel" ];
+      # apigroup.go:383) so order = ready order; their evict sets never intersect so
+      # runtime loads DO run parallel (fifo rule 6).
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
     };
   };
 
@@ -786,17 +799,15 @@ in
         serviceConfig = {
           User = "javi";
           Group = "users";
-          # whisperd's NPU compile mlocks DMA buffers: system units start at the 8 MiB
-          # default (the user-service chain gives infinity — NOTES.md § memlock) and
-          # level-zero dies with "can't protect"; whisperd children inherit this.
-          # engine.build_pipeline also self-raises as belt-and-braces.
+          # kept past the container move as cheap insurance (was: whisperd's NPU compile
+          # mlocked DMA buffers under this unit; now the container gets podman's defaults,
+          # and engine.build_pipeline self-raises inside it — NOTES.md § memlock).
           LimitMEMLOCK = "infinity";
-          # THE actual killer (2026-11-14 bisect): the module's MemoryDenyWriteExecute=yes
-          # seccomp-kills the W+X mprotects of level-zero's NPU graph compiler -> whisperd
-          # load fails with "can't protect" (unitless/MDWE-off runs load fine; the podman
-          # gpu backends are containers and untouched by this). engine.py's setrlimit fix
-          # alone was NOT enough — memlock infinity + MDWE still fails.
-          MemoryDenyWriteExecute = lib.mkForce false;
+          # Historical (native whisperd era, 2026-11-14): MDWE=yes seccomp-killed level-zero's
+          # W+X mprotects -> NPU load died with "can't protect"; memlock infinity + engine
+          # setrlimit were NOT enough. Fixed by moving whisperd into a podman backend instead:
+          # container children of the rootless podman socket never inherit this unit's seccomp,
+          # so MDWE stays on — the module default (bisect method: NOTES.md § dictate).
           StateDirectory = "llama-swap"; # holds store.path's activity.sqlite
           DynamicUser = lib.mkForce false;
           PrivateUsers = lib.mkForce false;

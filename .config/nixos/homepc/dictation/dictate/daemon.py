@@ -2,10 +2,10 @@
 
 Push-to-talk: `dictate start-capture` opens the mic, `stop-capture` closes it
 and finalizes. Energy VAD cuts segments on silence while held. Each finalized
-segment is transcribed with OpenVINO GenAI's WhisperPipeline on the NPU, then
-appended to ~/dictation/YYYY-MM-DD.md, copied to the clipboard (wl-copy) and
-typed at the keyboard-focused cursor (wtype), with a spinner at the cursor
-while the NPU is generating.
+segment is POSTed to the whisperd backend (llama-swap → whisper-npu container
+on the NPU), then appended to ~/dictation/YYYY-MM-DD.md, copied to the
+clipboard (wl-copy) and typed at the keyboard-focused cursor (wtype), with a
+spinner at the cursor while the NPU is generating.
 """
 
 from __future__ import annotations
@@ -32,10 +32,6 @@ import sounddevice as sd
 
 log = logging.getLogger("dictate")
 
-from . import engine
-
-MODEL = engine.MODEL  # HF id for logging/status; endpoint mode routes by llama-swap model name instead
-CACHE_DIR = engine.CACHE_DIR
 OUT_DIR = Path(os.environ.get("DICTATE_OUT_DIR", os.path.expanduser("~/dictation")))
 SOCK_PATH = Path(os.environ.get("DICTATE_SOCKET", os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "dictate.sock")))
 
@@ -84,10 +80,10 @@ INSERT_MODE = os.environ.get("DICTATE_INSERT", "type")
 # empty results too, so a stray spinner never lingers. "" disables.
 PLACEHOLDER = os.environ.get("DICTATE_PLACEHOLDER", "\u2026")  # … rounded ellipsis: 1 codepoint, 1 backspace
 
-# Transcription backend. Set DICTATE_ENDPOINT (e.g. http://127.0.0.1:8080/v1/audio/transcriptions)
-# to POST segments to whisperd via llama-swap instead of loading the pipeline in-process;
-# llama-swap owns the NPU model then (warm via preload, NOTES.md § dictate/whisperd).
-# Unset = fall back to the in-process pipeline (the original daemon behavior).
+# Transcription backend: segments are POSTed to whisperd via llama-swap (the
+# whisper-npu image, repo github.com/xavicampa/whisper-npu); llama-swap owns the
+# NPU model (NOTES.md § dictate/whisperd). DICTATE_ENDPOINT is required — the
+# original in-process pipeline was dropped 2026-11-15 with the engine move.
 ENDPOINT = os.environ.get("DICTATE_ENDPOINT", "").strip()
 BACKEND_MODEL = os.environ.get("DICTATE_BACKEND_MODEL", "whisper-medium-int8-npu")
 
@@ -285,34 +281,15 @@ class Daemon:
         # already hold the lock (inside handle()) — a plain Lock would deadlock
         # there, wedge the daemon, and leave the socket file behind.
         self.lock = threading.RLock()
-        self.state = "loading"
-        self.pipe = None
+        self.state = "ready"  # endpoint mode: nothing to load (whisperd/llama-swap own the model)
         self.segments = 0
         self.busy = False  # worker is mid-transcription (shutdown drain, see serve())
-        self.error: str | None = None  # set by load_model on failure
+        self.error: str | None = None
         self.q: queue.Queue = queue.Queue()
         self.capture: Capture | None = None
         self.qs: subprocess.Popen | None = None  # dim overlay instance (dim/shell.qml)
         self.dim_lock = threading.RLock()  # qs spawn + IPC; shared with the dim-warm thread
         self.placeholder_on = False  # spinner is sitting at the cursor (worker thread only)
-
-    # ── model ──────────────────────────────────────────────────────────────
-    def load_model(self):
-        """Runs on its own thread; a failure must not wedge the daemon as 'loading'."""
-        try:
-            self._load_model()
-        except Exception:
-            log.exception("model load failed")
-            self.state = "error"
-            self.error = "model load failed — see daemon log; restarting the daemon may help"
-
-    def _load_model(self):
-        from . import engine
-        t0 = time.monotonic()
-        self.pipe = engine.build_pipeline(
-            MODEL, os.environ.get("DICTATE_TASK", "").strip(), os.environ.get("DICTATE_LANGUAGE", "").strip())
-        self.state = "ready"
-        log.info("model ready in %.1f s", time.monotonic() - t0)
 
     # ── transcription ──────────────────────────────────────────────────────
     def enqueue(self, audio, dur, spoken: datetime):
@@ -321,11 +298,8 @@ class Daemon:
         self.q.put((audio, dur, spoken))
 
     def transcribe(self, audio) -> str:
-        """One segment -> text: POST to the endpoint (llama-swap/whisperd) or in-process pipe."""
-        if ENDPOINT:
-            return self._transcribe_endpoint(audio)
-        result = self.pipe.generate(audio)
-        return (result.texts[0] or "").strip()
+        """One segment -> text: POST to the endpoint (llama-swap/whisperd)."""
+        return self._transcribe_endpoint(audio)
 
     def _transcribe_endpoint(self, audio) -> str:
         """OpenAI-style multipart POST; the `model` field is what routes the
@@ -516,10 +490,6 @@ class Daemon:
     # ── capture control ────────────────────────────────────────────────────
     def start_capture(self) -> str:
         with self.lock:
-            if self.state == "loading":
-                return "ERR model is still loading"
-            if self.state == "error":
-                return f"ERR {self.error}"
             if self.state != "ready":
                 return f"ERR daemon state is {self.state}"
             if self.capture is not None and self.capture.active:
@@ -565,8 +535,8 @@ class Daemon:
                 segments = self.segments
             return json.dumps({
                 "state": "capturing" if cap_active else self.state,
-                "model": MODEL,
-                "backend": ENDPOINT or "in-process",
+                "model": BACKEND_MODEL,
+                "backend": ENDPOINT,
                 "segments": segments,
                 "error": self.error,
                 "socket": str(SOCK_PATH),
@@ -595,7 +565,7 @@ class Daemon:
         os.chmod(str(SOCK_PATH), 0o600)
         srv.listen(8)
 
-        if DIM_QS:  # warm the overlay instance during model load so the first press is instant
+        if DIM_QS:  # spawn the overlay instance right away so the first press is instant
             threading.Thread(target=self.ensure_qs, name="dim-warm", daemon=True).start()
 
         def shutdown(*_):
@@ -623,7 +593,7 @@ class Daemon:
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
 
-        log.info("listening on %s (model=%s)", SOCK_PATH, MODEL)
+        log.info("listening on %s (backend model=%s)", SOCK_PATH, BACKEND_MODEL)
         while True:
             conn, _ = srv.accept()
             try:
@@ -643,15 +613,15 @@ class Daemon:
 def run():
     logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                         format="%(asctime)s %(levelname)s %(message)s")
+    if not ENDPOINT:
+        # llama-swap/whisperd (whisper-npu image) is the only backend now.
+        log.error("DICTATE_ENDPOINT is required (in-process pipeline removed 2026-11-15; "
+                  "NOTES.md § dictate/whisperd)")
+        sys.exit(1)
     d = Daemon()
-    if ENDPOINT:
-        # endpoint mode: llama-swap/whisperd owns the NPU pipeline; the daemon
-        # only captures, encodes and POSTs (cold whisperd = a few s wait on the
-        # first press, covered by the cursor placeholder).
-        d.state = "ready"
-        log.info("backend: endpoint %s (model=%s)", ENDPOINT, BACKEND_MODEL)
-    else:
-        log.info("backend: in-process pipeline (%s)", MODEL)
-        threading.Thread(target=d.load_model, name="model", daemon=True).start()
+    # daemon mode: llama-swap/whisperd owns the NPU pipeline; the daemon only
+    # captures, encodes and POSTs (cold whisperd = a few s wait on the first
+    # press, covered by the cursor placeholder).
+    log.info("backend: endpoint %s (model=%s)", ENDPOINT, BACKEND_MODEL)
     threading.Thread(target=d.worker, name="transcribe", daemon=True).start()
     d.serve()
