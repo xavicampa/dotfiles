@@ -34,6 +34,16 @@ hl.unbind("SUPER + S")
 hl.unbind("SUPER + SHIFT + S")
 hl.unbind("SUPER + SHIFT + Slash")
 hl.unbind("SUPER + SHIFT + minus")
+hl.unbind("SUPER + equal")
+hl.unbind("SUPER + SHIFT + equal")
+
+-- === Vertical resize (keycode form; keysym forms are dead on `no`, see keybinds.md) ===
+-- Same physical keys as the width pair (code:20 = printed `+`, code:21 = printed `\`), + SHIFT.
+hl.bind("SUPER + SHIFT + code:20", hl.dsp.window.resize({ x = 0, y = -100, relative = true }), { repeating = true, description = "Move split gap up (grows the window below the gap)" })
+hl.bind("SUPER + SHIFT + code:21", hl.dsp.window.resize({ x = 0, y = 100, relative = true }), { repeating = true, description = "Move split gap down (grows the window above the gap)" })
+-- Vertical preselect: creates the horizontal split edge that makes height a real axis in dwindle
+hl.bind("SUPER + CTRL + 8", hl.dsp.layout("preselect t"), { description = "Preselect split top" })
+hl.bind("SUPER + CTRL + 2", hl.dsp.layout("preselect b"), { description = "Preselect split bottom" })
 hl.unbind("SUPER + T")
 hl.unbind("SUPER + code:61")
 hl.unbind("SUPER + grave")
