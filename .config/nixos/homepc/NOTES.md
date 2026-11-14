@@ -725,6 +725,28 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
 - **Backends are no longer systemd units** (2026-10-20): llama-swap starts every
   container itself (per-model `cmd`), so the old `llamacpp`/`strata`/`maya` fallback
   units are gone. A hand-run `podman` is the fallback if weights are re-downloaded.
+- **Not every backend is a container** (2026-11-14): `whisper-medium-int8-npu` is a
+  plain process (`cmd = ${dictatePkg}/bin/whisperd --port ''${PORT}` — no podman). The
+  service unit is `User=javi`, so the child inherits HOME (`~/.cache/dictation` model
+  cache) and render-group access to `/dev/accel` — no device flags needed. It lives in
+  its own `persistent: true` group (`npu`), which is the only thing that shields it
+  from the `gpu` group's `exclusive: true` (docs: "other groups can never unload this
+  one"); `ttl: 0` + preload keeps it warm. There is no automatic `PORT` env for the
+  child — per-model `env` is `[]string` appended to the inherited env — the port
+  arrives via the `''${PORT}` macro in `cmd`. Routing of `/v1/audio/transcriptions`
+  is by the multipart **form field `model`** (`swaputil.extractContext` parses
+  multipart forms, then the body is proxied verbatim). § dictate/whisperd.
+  Gotcha found on the first switch: the module's `MemoryDenyWriteExecute=yes`
+  hardening breaks the NPU load (`can't protect`) — the service block force-off's it.
+- **Preload is strictly sequential; runtime loads are not** (2026-11-14, v268 source):
+  `startPreload` (internal/server/apigroup.go) is one goroutine firing a blocking
+  synthetic `GET /` per name — each waits for the model's health check before
+  `preloading model:` logs for the next. So the `hooks.on_startup.preload` list order
+  **is** the boot ready order: whisper first (warm NPU compile ~4 s) means dictation is
+  usable at boot+4 s while the 40–90 s chat load follows. At runtime the FIFO scheduler
+  (internal/router/scheduler/fifo.go decision rule 6) starts swaps *in parallel* when
+  their evict sets don't intersect — our persistent `npu` group is never in anyone's
+  evict set, so a cold qwen swap and a dictation press load side by side.
 - Settings:
   - `logLevel = "info"`.
   - `logToStdout = "both"` — llama-swap always captures upstream (the `podman run`
@@ -1778,6 +1800,53 @@ cursor is the feedback).
   dynamic themes (`currentThemeName != "custom"`) or no dms → plain white
   fallback; the `t[mode] || t[other]` empty-block guard mirrors the
   dux-empty-mode-palette patch semantics (§ dms-shell).
+- **Backend moved under llama-swap 2026-11-14 (whisperd)**: the daemon no longer owns
+  the NPU pipeline. `dictation/dictate/whisperd.py` is a ~180-line stdlib HTTP server
+  (console script `whisperd`) registered as the llama-swap model
+  **`whisper-medium-int8-npu`** — `ttl: 0`, persistent `npu` group, in
+  `on_startup.preload`, `capabilities in:[audio] out:[text]` (renders
+  `audio_transcriptions` in `/v1/models`). Contract: llama-swap proxies
+  `POST /v1/audio/transcriptions` verbatim (routing by the multipart `model` field —
+  see § llama-swap); whisperd answers `/health` (checkEndpoint), `/` (preload) and the
+  transcription; **audio is PCM16 mono 16 kHz only** (the GenAI pipeline takes raw
+  float samples; other formats = 400, no stdlib decoder debt) and returns
+  `{"text": ...}`. The daemon POSTs that multipart with `task`/`language` from its own
+  env — knobs `DICTATE_ENDPOINT` (set = HTTP client, unset = in-process fallback
+  kept intact) and `DICTATE_BACKEND_MODEL`. `dictate/engine.py` now holds the shared
+  pipeline builder (snapshot_download + the `forced_decoder_ids` patch + NPU compile)
+  used by both entrypoints, so both share `~/.cache/dictation/{models,npu-cache}`.
+  Group gotcha (docs routing/groups-and-matrix): `gpu`'s `exclusive: true` would
+  otherwise unload whisperd on every chat-model swap — `persistent: true` on the `npu`
+  group is the shield; the NPU is multi-client (`/dev/accel` is `crw-rw-rw-`), so the
+  two coexist without contention. whisperd runs single-threaded on purpose (one
+  segment at a time, no pipeline locks). Multipart parsing without `cgi` (removed in
+  3.13): hand the Content-Type header + body to `email.BytesParser` — multipart *is*
+  MIME. Standalone test recipe: `/nix/store/...-dictate-0.1.0/bin/whisperd --port
+  5899`, then `curl -F model=whisper-medium-int8-npu -F task=translate -F
+  file=@seg16k.wav http://127.0.0.1:5899/v1/audio/transcriptions` — verified es→en,
+  ru→en, en verbatim before the switch.
+- **`can't protect` under llama-swap = MemoryDenyWriteExecute, not memlock**
+  (2026-11-14, cost an afternoon): whisperd loads fine standalone but the NPU compile
+  died instantly (~80 ms) with `RuntimeError ... can't protect` when spawned as a
+  llama-swap child. First suspect was the 8 MiB `RLIMIT_MEMLOCK` that **system** units
+  get (user units get infinity via the PAM chain — § memlock), so the unit got
+  `LimitMEMLOCK = "infinity"` and `engine.build_pipeline` self-raises
+  `RLIMIT_MEMLOCK` (soft limit check + `setrlimit`, shared by both entrypoints) —
+  **necessary but not sufficient**: the child then had memlock unlimited and still
+  failed. What actually killed it: the llama-swap module's stock hardening sets
+  `MemoryDenyWriteExecute=yes`, whose seccomp filter `EPERM`s the W+X
+  `mprotect(PROT_EXEC)` that level-zero's NPU graph compiler does on its JIT blob —
+  "can't protect" is that call's failure string. Fixed with
+  `MemoryDenyWriteExecute = lib.mkForce false` on `systemd.services.llama-swap`
+  (podman gpu backends are containers, unaffected). Pinning method: `systemd-run
+  --unit=wdprobeN -p User=javi -p <OneSetting>=yes whisperd --port 58NN` + a
+  `/health` poll — bisected `PrivateTmp` (pass), `SystemCallFilter=@system-service`
+  (pass), `MemoryDenyWriteExecute` (**fail**). Control = bare `systemd-run` scope
+  passed, proving a setting (not env/HOME/cgroup) was the discriminator. Two
+  traps along the way: `strace` self-dies with SIGSYS under `SystemCallFilter`
+  (ptrace not in the list), and `pkill -f 'whisperd --port 5811'` kills your own
+  shell — the pattern matches the shell's cmdline; use `wdprobe*` units +
+  `systemctl stop`, or a bracket regex (`58[1]1`).
 - **First live run 2026-11-14**: hotkey press → speak → release; 1.6 s segment
   transcribed in **1.52 s**, markdown + clipboard + notification all fired; dim
   overlay confirmed on both monitors, click-through untouched.

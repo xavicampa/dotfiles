@@ -10,6 +10,7 @@ while the NPU is generating.
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -21,6 +22,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
+import wave
 from datetime import datetime
 from pathlib import Path
 
@@ -29,10 +32,10 @@ import sounddevice as sd
 
 log = logging.getLogger("dictate")
 
-MODEL = os.environ.get("DICTATE_MODEL", "OpenVINO/whisper-medium-int8-ov")
-CACHE_DIR = Path(os.environ.get("DICTATE_CACHE_DIR", os.path.expanduser("~/.cache/dictation")))
-MODEL_CACHE = CACHE_DIR / "models"   # HF snapshot dir (kept out of the nix store)
-NPU_CACHE = CACHE_DIR / "npu-cache"  # NPU compiled-model cache (first compile ~70 s)
+from . import engine
+
+MODEL = engine.MODEL  # HF id for logging/status; endpoint mode routes by llama-swap model name instead
+CACHE_DIR = engine.CACHE_DIR
 OUT_DIR = Path(os.environ.get("DICTATE_OUT_DIR", os.path.expanduser("~/dictation")))
 SOCK_PATH = Path(os.environ.get("DICTATE_SOCKET", os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "dictate.sock")))
 
@@ -80,6 +83,13 @@ INSERT_MODE = os.environ.get("DICTATE_INSERT", "type")
 # correct while focus doesn't move; cleared on transcription failure and on
 # empty results too, so a stray spinner never lingers. "" disables.
 PLACEHOLDER = os.environ.get("DICTATE_PLACEHOLDER", "\u2026")  # … rounded ellipsis: 1 codepoint, 1 backspace
+
+# Transcription backend. Set DICTATE_ENDPOINT (e.g. http://127.0.0.1:8080/v1/audio/transcriptions)
+# to POST segments to whisperd via llama-swap instead of loading the pipeline in-process;
+# llama-swap owns the NPU model then (warm via preload, NOTES.md § dictate/whisperd).
+# Unset = fall back to the in-process pipeline (the original daemon behavior).
+ENDPOINT = os.environ.get("DICTATE_ENDPOINT", "").strip()
+BACKEND_MODEL = os.environ.get("DICTATE_BACKEND_MODEL", "whisper-medium-int8-npu")
 
 
 _wave_warned = False
@@ -297,38 +307,10 @@ class Daemon:
             self.error = "model load failed — see daemon log; restarting the daemon may help"
 
     def _load_model(self):
-        from huggingface_hub import snapshot_download
-        import openvino_genai as ov_genai
-
+        from . import engine
         t0 = time.monotonic()
-        log.info("fetching model %s into %s", MODEL, MODEL_CACHE)
-        path = snapshot_download(MODEL, cache_dir=str(MODEL_CACHE))
-        # The OpenVINO export ships forced_decoder_ids=[[1,null],[2,50360]] which hard-pins
-        # the <|transcribe|> token; GenAI honors it over WhisperGenerationConfig.task, so
-        # translate silently never fires. Drop it and let the config own the prefix.
-        gc_path = Path(path) / "generation_config.json"
-        if gc_path.exists():
-            gc = json.loads(gc_path.read_text())
-            if "forced_decoder_ids" in gc:
-                del gc["forced_decoder_ids"]
-                gc_path.chmod(0o644)
-                gc_path.write_text(json.dumps(gc, indent=2))
-                log.info("patched %s: dropped forced_decoder_ids (was forcing <|transcribe|>)", gc_path)
-        log.info("compiling pipeline on NPU (first compile may take ~1 minute)...")
-        self.pipe = ov_genai.WhisperPipeline(path, "NPU", CACHE_DIR=str(NPU_CACHE))
-        task = os.environ.get("DICTATE_TASK", "").strip()
-        lang = os.environ.get("DICTATE_LANGUAGE", "").strip()
-        if task or lang:
-            gen = self.pipe.get_generation_config()
-            if task:
-                # NOTE: task=translate is IGNORED by whisper-*-turbo-*-ov exports in
-                # GenAI 2026.4 (int8 and fp16, NPU and CPU). whisper-medium-int8-ov
-                # handles it correctly -> model default in configuration.nix is medium.
-                gen.task = task
-            if lang:
-                gen.language = lang
-            self.pipe.set_generation_config(gen)
-            log.info("generation config: task=%s language=%s", gen.task, gen.language or "auto")
+        self.pipe = engine.build_pipeline(
+            MODEL, os.environ.get("DICTATE_TASK", "").strip(), os.environ.get("DICTATE_LANGUAGE", "").strip())
         self.state = "ready"
         log.info("model ready in %.1f s", time.monotonic() - t0)
 
@@ -338,6 +320,43 @@ class Daemon:
             return
         self.q.put((audio, dur, spoken))
 
+    def transcribe(self, audio) -> str:
+        """One segment -> text: POST to the endpoint (llama-swap/whisperd) or in-process pipe."""
+        if ENDPOINT:
+            return self._transcribe_endpoint(audio)
+        result = self.pipe.generate(audio)
+        return (result.texts[0] or "").strip()
+
+    def _transcribe_endpoint(self, audio) -> str:
+        """OpenAI-style multipart POST; the `model` field is what routes the
+        request through llama-swap to whisperd (see whisperd.py docstring)."""
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(SAMPLE_RATE)
+            w.writeframes((np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes())
+        wav = buf.getvalue()
+
+        boundary = "dictate" + os.urandom(8).hex()
+        fields = {"model": BACKEND_MODEL}
+        for key in ("task", "language"):
+            val = os.environ.get(f"DICTATE_{key.upper()}", "").strip()
+            if val:
+                fields[key] = val
+        body = b""
+        for name, val in fields.items():
+            body += (f"--{boundary}\r\nContent-Disposition: form-data; "
+                     f'name="{name}"\r\n\r\n{val}\r\n').encode()
+        body += (f"--{boundary}\r\nContent-Disposition: form-data; "
+                 f'name="file"; filename="segment.wav"\r\nContent-Type: audio/wav\r\n\r\n').encode()
+        body += wav + f"\r\n--{boundary}--\r\n".encode()
+
+        req = urllib.request.Request(ENDPOINT, data=body, headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return (json.loads(r.read().decode("utf-8", "replace")).get("text") or "").strip()
+
     def worker(self):
         while True:
             audio, dur, spoken = self.q.get()
@@ -346,8 +365,7 @@ class Daemon:
                 t0 = time.monotonic()
                 self.show_placeholder()
                 try:
-                    result = self.pipe.generate(audio)
-                    text = result.texts[0].strip()
+                    text = self.transcribe(audio)
                 except Exception:
                     log.exception("transcription failed")
                     self.clear_placeholder()
@@ -548,6 +566,7 @@ class Daemon:
             return json.dumps({
                 "state": "capturing" if cap_active else self.state,
                 "model": MODEL,
+                "backend": ENDPOINT or "in-process",
                 "segments": segments,
                 "error": self.error,
                 "socket": str(SOCK_PATH),
@@ -625,6 +644,14 @@ def run():
     logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                         format="%(asctime)s %(levelname)s %(message)s")
     d = Daemon()
-    threading.Thread(target=d.load_model, name="model", daemon=True).start()
+    if ENDPOINT:
+        # endpoint mode: llama-swap/whisperd owns the NPU pipeline; the daemon
+        # only captures, encodes and POSTs (cold whisperd = a few s wait on the
+        # first press, covered by the cursor placeholder).
+        d.state = "ready"
+        log.info("backend: endpoint %s (model=%s)", ENDPOINT, BACKEND_MODEL)
+    else:
+        log.info("backend: in-process pipeline (%s)", MODEL)
+        threading.Thread(target=d.load_model, name="model", daemon=True).start()
     threading.Thread(target=d.worker, name="transcribe", daemon=True).start()
     d.serve()

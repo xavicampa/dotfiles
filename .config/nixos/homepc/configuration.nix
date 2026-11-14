@@ -374,6 +374,10 @@ in
         "DICTATE_TASK=translate"
         # dim overlay while capturing: quickshell config dir (compositor-side; DDC was too slow) — NOTES.md § dictate
         "DICTATE_DIM_QS=${./dictation/dim}"
+        # transcription now runs in whisperd under llama-swap (NPU model lives there, warm
+        # via preload); daemon only captures/POSTs. Empty would fall back to in-process — NOTES.md § dictate/whisperd
+        "DICTATE_ENDPOINT=http://127.0.0.1:8080/v1/audio/transcriptions"
+        "DICTATE_BACKEND_MODEL=whisper-medium-int8-npu"
       ];
     };
     # same rationale as dcal: keep the session environment (Wayland/D-Bus vars come via uwsm's systemd import)
@@ -644,6 +648,26 @@ in
           };
         };
 
+        # Whisper int8 on the Intel NPU: backend for `dictate daemon` (push-to-talk dictation).
+        # Not a container — plain binary spawned by llama-swap itself (service runs as User=javi:
+        # child inherits HOME for ~/.cache/dictation + render-group access to /dev/accel).
+        # POST /v1/audio/transcriptions, routed here by its multipart `model` field; whisperd
+        # takes the port via --port macro (per-model `env` only appends, there is no PORT auto).
+        # Audio contract: PCM16 mono 16 kHz — NOTES.md § dictate/whisperd
+        "whisper-medium-int8-npu" = {
+          cmd = ''${dictatePkg}/bin/whisperd --port ''${PORT}'';
+          checkEndpoint = "/health";
+          ttl = 0; # never idle-evicted; the npu group's persistent:true is what shields it from the gpu group
+          env = [
+            "DICTATE_MODEL=OpenVINO/whisper-medium-int8-ov" # turbo exports drop task=translate — NOTES.md § dictate
+            "DICTATE_TASK=translate"                        # speak any language, get English
+          ];
+          capabilities = {
+            "in" = [ "audio" ];
+            out = [ "text" ]; # -> capabilities.audio_transcriptions in /v1/models
+          };
+        };
+
         # Maya: MiniMax-M3.1-Flash MoE, Maya-XS GGUF quant (93 GB), images built locally; model bytes stay in /hf-cache — NOTES.md § llama-swap/maya-mm3
         # "minimax-maya-xs" = {
         #   cmd = ''
@@ -717,13 +741,28 @@ in
               # "bartowski/Qwen3.8-27B-GGUF:Q8_0" # parked
             ];
           };
+          # NPU whisper lives beside the GPU models, not in contention with them:
+          # gpu's exclusive:true would otherwise unload whisperd on every chat model
+          # swap — persistent:true is the only shield. RAM-only footprint (~1 GB),
+          # NPU is multi-client (/dev/accel) — NOTES.md § dictate/whisperd
+          npu = {
+            swap = false;
+            exclusive = false;
+            persistent = true;
+            members = [ "whisper-medium-int8-npu" ];
+          };
         };
       };
 
       # activity -> sqlite; dir from StateDirectory below
       store.path = "/var/lib/llama-swap/activity.sqlite";
 
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
+      # whisper is preloaded too: dictation's first press stays instant across boots
+      # (NPU compile lives in ~/.cache/dictation/npu-cache; ttl 0 + persistent keeps it warm).
+      # preload is strictly sequential (startPreload: one goroutine, blocking GET / per name,
+      # apigroup.go:383) so order = ready order: whisper first = dictation warm at boot+6s,
+      # chat ~6 s later; their evict sets never intersect so runtime loads DO run parallel (fifo rule 6).
+      hooks.on_startup.preload = [ "whisper-medium-int8-npu" "qwen3.8-flash-next-iq3_s-parallel" ];
     };
   };
 
@@ -747,6 +786,17 @@ in
         serviceConfig = {
           User = "javi";
           Group = "users";
+          # whisperd's NPU compile mlocks DMA buffers: system units start at the 8 MiB
+          # default (the user-service chain gives infinity — NOTES.md § memlock) and
+          # level-zero dies with "can't protect"; whisperd children inherit this.
+          # engine.build_pipeline also self-raises as belt-and-braces.
+          LimitMEMLOCK = "infinity";
+          # THE actual killer (2026-11-14 bisect): the module's MemoryDenyWriteExecute=yes
+          # seccomp-kills the W+X mprotects of level-zero's NPU graph compiler -> whisperd
+          # load fails with "can't protect" (unitless/MDWE-off runs load fine; the podman
+          # gpu backends are containers and untouched by this). engine.py's setrlimit fix
+          # alone was NOT enough — memlock infinity + MDWE still fails.
+          MemoryDenyWriteExecute = lib.mkForce false;
           StateDirectory = "llama-swap"; # holds store.path's activity.sqlite
           DynamicUser = lib.mkForce false;
           PrivateUsers = lib.mkForce false;
