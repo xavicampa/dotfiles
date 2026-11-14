@@ -389,3 +389,26 @@ end
 if HOST == "homepc" then
     hl.monitor({ output = "DP-3", disabled = true })
 end
+
+-- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────
+-- The NixOS config (~/.config/nixos/homepc/configuration.nix, systemd.user.services.dictate)
+-- runs an always-on daemon (Whisper on the Intel NPU via OpenVINO GenAI); these
+-- binds drive it over $XDG_RUNTIME_DIR/dictate.sock.
+-- Hold SUPER+CTRL+H to capture, RELEASE to stop + transcribe the segment
+-- (segments are also auto-cut mid-hold on ~0.6s of silence). Output:
+-- ~/dictation/YYYY-MM-DD.md + clipboard + a DMS notification.
+-- Hyprland 0.56's Lua API has no hl.bindz — the bindz equivalent is
+-- hl.bind(..., { release = true }); the handler may be a Lua function
+-- (exec_cmd spawns through Hyprland's executor). Absolute path because the
+-- hyprland/uwsm unit env's PATH is not guaranteed to carry the system profile.
+-- SUPER+CTRL+H was DMS's focus-monitor-left chord (dms/binds.lua:76) — the
+-- unbind here (which loads AFTER require("dms.binds")) frees it; the same
+-- action stays reachable on SUPER+CTRL+left.
+if HOST == "homepc" then
+    local dictate_bin = "/run/current-system/sw/bin/dictate"
+    hl.unbind("SUPER + CTRL + H")
+    hl.bind("SUPER + CTRL + H", function() hl.exec_cmd(dictate_bin .. " start-capture") end,
+            { description = "dictate: start capture (hold)" })
+    hl.bind("SUPER + CTRL + H", function() hl.exec_cmd(dictate_bin .. " stop-capture") end,
+            { release = true, description = "dictate: stop + transcribe (release)" })
+end

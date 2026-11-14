@@ -115,6 +115,27 @@ let
       sleep 10
     done
   '';
+  # NPU dictation stack: GenAI/Whisper + npu-driver/compiler come from unstable because the root channel's 1.28.0 driver predates the Arrow Lake NPU (8086:ad1d) — NOTES.md § dictate
+  dictatePkg = unstable.python3.pkgs.buildPythonApplication {
+    pname = "dictate";
+    version = "0.1.0";
+    pyproject = true;
+    src = ./dictation;
+    nativeBuildInputs = [ unstable.python3.pkgs.setuptools ];
+    propagatedBuildInputs = with unstable.python3.pkgs; [
+      openvino-genai
+      openvino
+      openvino-tokenizers
+      sounddevice
+      numpy
+      huggingface-hub
+    ];
+    pythonImportsCheck = [ "dictate" ];
+    # wl-copy/wtype/qs/hyprctl wrapped onto PATH for the daemon (session Wayland/D-Bus env comes from systemd)
+    postInstall = ''
+      wrapProgram $out/bin/dictate --prefix PATH : ${lib.makeBinPath [ unstable.wl-clipboard unstable.wtype unstable.quickshell unstable.hyprland ]}
+    '';
+  };
 in
 {
   # Hardware — NOTES.md § hardware
@@ -322,6 +343,9 @@ in
     };
   };
 
+  # root channel's intel-npu-driver 1.28 predates the Arrow Lake NPU (8086:ad1d) — pin driver+firmware+validation (all outputs the npu module consumes) to unstable — NOTES.md § dictate
+  nixpkgs.overlays = [ (final: prev: { intel-npu-driver = unstable.intel-npu-driver; }) ];
+
   # DMS draws its own bar — NOTES.md § waybar
   systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
 
@@ -331,6 +355,30 @@ in
   systemd.user.services.dcal.wantedBy = [ "graphical-session.target" ];
   # empty path => no Environment=PATH drop-in, so dcal keeps the session PATH and finds `qs` — NOTES.md § packages
   systemd.user.services.dcal.path = lib.mkForce [ ];
+
+  # Dictate daemon: mic opens only while SUPER+CTRL+H is held (hyprland binds drive `dictate start/stop-capture`
+  # over $XDG_RUNTIME_DIR/dictate.sock); first start fetches ~1.6 GB model + ~70 s NPU compile — NOTES.md § dictate
+  systemd.user.services.dictate = {
+    description = "Dictate — live microphone dictation on the Intel NPU";
+    wantedBy = [ "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = "${dictatePkg}/bin/dictate daemon";
+      Restart = "on-failure";
+      RestartSec = 5;
+      Environment = [
+        "PYTHONUNBUFFERED=1"
+        # GenAI's task=translate is broken in the whisper-*-turbo-*-ov exports (2026.4):
+        # medium-int8-ov translates correctly — NOTES.md § dictate
+        "DICTATE_MODEL=OpenVINO/whisper-medium-int8-ov"
+        # speak Spanish, get English (whisper translate task; drop for verbatim) — NOTES.md § dictate
+        "DICTATE_TASK=translate"
+        # dim overlay while capturing: quickshell config dir (compositor-side; DDC was too slow) — NOTES.md § dictate
+        "DICTATE_DIM_QS=${./dictation/dim}"
+      ];
+    };
+    # same rationale as dcal: keep the session environment (Wayland/D-Bus vars come via uwsm's systemd import)
+    path = lib.mkForce [ ];
+  };
 
   # Services
   services = {
@@ -790,6 +838,7 @@ in
     unstable.dux-gop # dgop 2.1.1 (renamed dgop): DMS CPU/RAM/net widgets + `dgop` TUI/REST — NOTES.md § dms-shell
     unstable.dux-files # dfiles: Dux Labs Quickshell file manager — NOTES.md § packages
     unstable.dux-calendar # dcal 2.1.1: Dux Labs calendar + daemon; DMS `CalendarDankBackend` — NOTES.md § packages
+    dictatePkg # push-to-talk Whisper-on-NPU dictation daemon + CLI — NOTES.md § dictate
   ];
   environment.etc."lact/config.yaml".source =
     "${config.users.users.javi.home}/.config/lact/config.yaml";
@@ -797,6 +846,5 @@ in
   imports = [
     ../common.nix
     ./hardware-configuration.nix
-    # ./openvino.nix
   ];
 }

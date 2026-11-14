@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dictate"
+version = "0.1.0"
+description = "Push-to-talk dictation: Whisper on the Intel NPU via OpenVINO GenAI"
+requires-python = ">=3.11"
+# No `dependencies` list on purpose: the runtime deps (numpy, sounddevice,
+# openvino_genai, huggingface_hub) come from the Nix package env; a plain
+# `pip install` into a fresh venv would fail at import time.
+
+[project.scripts]
+dictate = "dictate.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dictate*"]

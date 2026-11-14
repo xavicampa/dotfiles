@@ -9,7 +9,7 @@ Index: [hardware](#hardware) · [wifi-firmware](#wifi-firmware) · [boot](#boot)
 [memlock](#memlock) · [network](#network) · [readynas](#readynas) ·
 [libvirt](#libvirt) · [dms-shell](#dms-shell) · [hyprland](#hyprland) ·
 [waybar](#waybar) · [greeter](#greeter) · [udev](#udev) · [wifi-suspend](#wifi-suspend) ·
-[llama-swap](#llama-swap) · [strata-logs](#strata-logs) · [lact](#lact) · [systemd](#systemd) · [packages](#packages)
+[llama-swap](#llama-swap) · [strata-logs](#strata-logs) · [lact](#lact) · [systemd](#systemd) · [packages](#packages) · [dictate](#dictate)
 
 ---
 
@@ -1595,5 +1595,192 @@ PATH line at all, the unit inherits the user manager's session PATH (which has
 declares quickshell as a dependency, so this is a nixpkgs gap, not a config mistake — worth an
 upstream issue if we keep hitting it.
 
+## dictate
+
+Push-to-talk dictation: hold **SUPER+CTRL+H**, speak, release → the segment is
+transcribed by Whisper on the Intel NPU and appended to `~/dictation/YYYY-MM-DD.md`,
+copied to the clipboard (`wl-copy`) and typed at the keyboard-focused cursor
+(`wtype`; replaced the DMS `notify-send` popup 2026-11-14 — text landing at the
+cursor is the feedback).
+
+- **Parts**: `dictatePkg` (a `unstable.python3.pkgs.buildPythonApplication` over the
+  in-tree source at `./dictation/` — daemon + thin socket CLI), a
+  `systemd.user.services.dictate` always-on daemon, and the press/release binds in
+  `~/.config/hypr/hyprland.lua` (homepc-gated). Everything lives in the **NixOS**
+  config, not home-manager: `home.nix` is shared with the macOS host, which has no
+  NPU/mic path for this.
+- **Why the `intel-npu-driver` overlay** (`nixpkgs.overlays`): the root `<nixpkgs>`
+  (nixos-26.05) channel ships intel-npu-driver **1.28.0**, which predates the Arrow
+  Lake-S NPU (`8086:ad1d`, Core Ultra 7 270K Plus) — OpenVINO then reports
+  `No available devices`. `<nixpkgs-unstable>` has 1.38.0 prebuilt. The overlay (not
+  `mkForce` on `hardware.graphics.extraPackages`) is used because
+  `hardware.cpu.intel.npu` consumes *three* outputs — `out` (via graphics
+  extraPackages), `.firmware` (via `hardware.firmware`) and `.validation` (system
+  package) — and the driver's own build pins `.out`'s patched store path for
+  `openvino-intel-npu-compiler` 2026.38-rc1, so all three stay consistent with one
+  override. Verified after switch: `libze_intel_npu.so.1.38.0` in
+  `/run/opengl-driver/lib`, `ov.Core().available_devices` lists `NPU`
+  (`Intel(R) AI Boost`). No PCI rebind/reboot was needed — the running `intel_vpu`
+  module accepted the new userspace/firmware pair as-is.
+- **Python stack pinned to `<nixpkgs-unstable>` too** (`openvino-genai`/`openvino`
+  2026.4.0): mixing 2026.4's NPU compiler with the root channel's older userland is
+  the UNSUPPORTED_FEATURE failure mode documented upstream; driver+compiler+python
+  all move together.
+- **Model is fetched at runtime, not in the store**: first start runs
+  `huggingface_hub.snapshot_download("OpenVINO/whisper-large-v3-turbo-int8-ov",
+  cache_dir=~/.cache/dictation/models)` (~790 MB) — keeps it out of the nix store.
+  Same `cache_dir` layout as `hf download --cache-dir`, so a CLI prefetch and the
+  daemon share one copy. NPU compile cache: `~/.cache/dictation/npu-cache`
+  (`WhisperPipeline(..., "NPU", CACHE_DIR=...)` — the key is **caps**, `cache_dir`
+  raises "Option 'cache_dir' is not supported"). First NPU compile took **80 s**;
+  cached reloads are much faster.
+- **Performance measured 2026-11-14**: 11.0 s sample (whisper `jfk.flac`) →
+  **1.71 s** on NPU, text perfect. `/sys/class/accel/accel0/device/npu_busy_time_us`
+  is the busy-time counter to benchmark with.
+- **Hyprland 0.56.2 Lua API has no `hl.bindz`** — the press+release pair is two
+  `hl.bind()` calls, the second with `{ release = true }` (verified against the
+  0.56.2 source: `LuaBindingsToplevel.cpp` `kb.release = getBool("release")`).
+  SUPER+CTRL+H was DMS's focus-monitor-left chord (`dms/binds.lua:76`); the
+  `hl.unbind("SUPER + CTRL + H")` in `hyprland.lua` (which loads *after*
+  `require "dms.binds"`) frees it — the same action remains on SUPER+CTRL+left.
+- **`path = lib.mkForce [ ]`** on the service — same dcal rationale (§ packages): no
+  PATH drop-in, so the unit keeps uwsm's session env (`WAYLAND_DISPLAY`,
+  `DBUS_SESSION_BUS_ADDRESS`), which `wl-copy`/`notify-send` need. The two tools
+  themselves aren't on the session PATH (`wtype` reaches interactive shells only
+  via the profile — systemd user PATH doesn't see it), so `postInstall`
+  `wrapProgram`s them from unstable onto the *daemon's* PATH.
+- **Capture design**: socket `$XDG_RUNTIME_DIR/dictate.sock` (start/stop/status,
+  0600); sounddevice 16 kHz mono float32; energy VAD with noise calibration at
+  hold start (first 0.1 s skipped, threshold = `clamp(4 × 30th-pct of window rms,
+  0.004, 0.05)` — low-quantile so speech during calibration can't inflate it, and
+  the cap keeps it below normal speech level; an earlier median+8·MAD + 0.12 ceiling
+  still went deaf when he talked from the press), auto-cuts a segment after 0.6 s
+  of silence once ≥1.2 s of speech, hard cap 25 s; a GenAI worker thread serializes
+  `pipe.generate(float32).texts[0]`. Manual stop with no speech = discarded.
+- **Language control / translate**: speak Spanish → English output via Whisper's
+  native translate task (`DICTATE_TASK=translate` → `WhisperGenerationConfig.task`,
+  applied through `get_generation_config()` → mutate → `set_generation_config()`).
+  **GenAI 2026.4.0 ignores the `<|translate|>` prefix token for every
+  `whisper-*-turbo-*-ov` export** (int8 AND fp16, NPU AND CPU): output stays source-
+  language verbatim even though the C++ `prepare_sot_tokens` inserts the token and the
+  config round-trips. Workarounds that DON'T work on turbo: `language="<|en|>"` +
+  transcribe (mostly English but short phrases leak Spanish; `<|en|>` is a prior, not
+  a lock), `initial_prompt` tricks, per-call config (crashes `vector::reserve`).
+  **Fix: `OpenVINO/whisper-medium-int8-ov` honors translate correctly on NPU**
+  ("Take a look right now, please." in 2.2 s warm) — that's the shipped model now.
+  `base-int8-ov` translates too (but mangles Spanish). `WhisperGenerationConfig.language`
+  keys are token-form (`'<|es|>'`, not `'es'`/`'Spanish'`). Startup still strips
+  `forced_decoder_ids` from the cached generation_config.json (export hard-pins
+  `<|transcribe|>`). NPU compile cache is per-model: medium's first compile ~1 min.
+- **Mic = C922 webcam** (only mic on this box; the USB-audio interface's front/rear
+  jacks have nothing in them). 2026-11-14 incident: the mic started emitting pure
+  digital zeros (even raw `arecord` from `hw:2,0` at full 50 dB gain; ALSA switch
+  on, kernel clean). Software USB reauthorize did **not** recover it — a physical
+  replug did, instantly. Also note `hw:2,0` is 2-channel only (mono `arecord` fails
+  "Channels count non available"). After a replug the PipeWire node id changes;
+  default re-follows, but verify with `wpctl status`. A "discarded (no speech)"
+  every time + VAD threshold stuck at the 0.004 floor = mic delivering silence.
+- **Insert-at-cursor (replaced the notification popup, 2026-11-14)**: publish
+  runs `wl-copy` **first** (text unlosable even with no focus), then
+  `wtype -- <text>` to type into whatever has keyboard focus. wtype = zwp
+  virtual-keyboard, so it lands in terminals too — a faked Ctrl+V wouldn't.
+  This wtype build has no stdin mode (usage-only arg); `--` guards the text
+  against its naive parser (a leading `-` else parses as an option:
+  `wtype '-x'` → "Missing argument to -x"). Insertion is best-effort: failure
+  logs, clipboard still has it. Knob: `DICTATE_INSERT=type|none`. Note
+  silence auto-cuts type each segment **during** a long hold, and typing goes
+  to the then-focused window — switching windows mid-hold redirects the rest.
+- **Cursor spinner while the NPU generates**: the worker types
+  `DICTATE_PLACEHOLDER` (default `…` rounded ellipsis, one codepoint = one
+  `wtype -k BackSpace` to erase; `""` disables) right before `pipe.generate`, and
+  publish() backspaces it out immediately before typing the real text — so
+  the pause after release shows progress at the cursor instead of nothing.
+  Re-shown between queued segments; cleared on transcription failure and on
+  empty (noise-only) results so a stray spinner never lingers. Only correct
+  while keyboard focus stays put — same caveat as the insert itself.
+- **Dim-while-listening overlay**: a *resident* quickshell instance (DMS's own
+  toolkit, 0.3.2) spawned warm by the daemon during model load
+  (`qs -p $DICTATE_DIM_QS &`), toggled on press/release via
+  `qs -p <cfgdir> ipc call dim -- show|hide`. Config: `./dictation/dim/shell.qml`
+  — one PanelWindow **per monitor** (`Instantiator { model: Quickshell.screens }`)
+  anchored on all four edges, `WlrLayershell.layer: Overlay`, `exclusiveZone: -1`
+  (no layout shift), `mask: Region {}` (empty input region → fully click-through).
+  **Dims the focused window only** (2026-11-14, was full-screen): on press the
+  daemon runs `hyprctl activewindow -j` (+`monitors -j` for the monitor name) and
+  writes the absolute rect to `$XDG_RUNTIME_DIR/dictate-focus.json`
+  (`DICTATE_FOCUS` knob, empty disables; `unstable.hyprland` added to the
+  wrapProgram PATH — the daemon inherits `HYPRLAND_INSTANCE_SIGNATURE` from uwsm,
+  so hyprctl just works from the unit). The surface stays full-screen
+  transparent and the dim is an **inner Rectangle** at the window's local coords
+  (hyprland layout coords == Qt logical coords at scale 1), waveform centered on
+  it; straddling windows clip per monitor for free. `activewindow` returns `{}`
+  (no window) or hyprctl fails → rect is `null` → Rectangle fills = old
+  full-screen dim. Geometry is sampled at press: a window dragged mid-sentence
+  keeps the stale rect. 40 % black + a live mic waveform (replaced the
+  "dictating" label; the trace itself now carries the "listening" signal, so the
+  dim dropped back from 75 % to 40 %).
+  `DICTATE_DIM_QS=${./dictation/dim}` (a nix path literal —
+  the QML isn't packaged into `dictatePkg`) in the unit's `Environment`;
+  `unstable.quickshell` added to `wrapProgram` PATH.
+  **Rejected alternatives**: DDC/CI backlight dimming (`ddcutil` — perceptible lag,
+  slow per-monitor I2C round trips, and it dims *physically* so photos/PIDs fight
+  it); spawn-per-press quickshell (0.3–1 s cold start — the dim must be instant);
+  positioning a *layer surface* over the window via unanchored + `margins` +
+  `implicitWidth/Height` (spec-correct per layer-shell but rendered misplaced in
+  0.3.2 — the inner-Rectangle approach works and clips for free).
+  quickshell 0.3.2 **CLI gotchas** (both cost real debugging time, verified
+  empirically): (1) instance-selection flags are *top-level* —
+  `qs -p DIR ipc call …`, `qs ipc -p DIR …` is a parse error; (2) `show` is also
+  an `ipc` **subcommand**, so `ipc call dim show` silently parses as bare
+  `ipc call dim` (prints the target listing, executes *nothing*, exit 0) —
+  the function name must be separated: `ipc call dim -- show`. `hide` happens to
+  work either way; the instance's own log
+  (`/run/user/1000/quickshell/by-id/<id>/log.log`) + a `console.log` in the
+  IpcHandler is how that was pinned down.
+  quickshell 0.3.2 **QML gotchas** (all cost a live test round): `Screens.all`
+  is a later API — use `Quickshell.screens`; no `Vars` context (the per-instance
+  `Vars.screen` idea doesn't exist — bind `screen: modelData` on the delegate
+  instead); setting PanelWindow `width`/`height` is deprecated (`implicit*`
+  instead); and the big one — **a `Repeater` delegate that is a Window is
+  silently never created** (zero warnings, zero output): use `Instantiator` for
+  window delegates, Repeater only for visual Items. Delegate ids are unreachable
+  from root-scope FileViews, so repaints go through root `signal waveTick` /
+  `paletteTick` + `Connections` in the delegate. Bonus: a running `qs -p DIR`
+  instance **auto-reloads when its config files change** — QML edits hot-swap
+  without a restart.
+- **Overlay waveform = direct stream from the capture callback, not cava**: the
+  callback appends `min`/`max` of every 32 ms block (the *actual mic signal*
+  being transcribed) to a 150-col ring (~4.8 s on screen, newest at right) and
+  rewrites `$XDG_RUNTIME_DIR/dictate-wave.txt` in place (~31 Hz, same inode,
+  tmpfs): two lines of 150 `%.3f` values (maxes, mins). QML side:
+  `FileView { watchChanges: true; onFileChanged: this.reload() }` → parse in
+  `onLoaded` → `Canvas` draws one vertical slice per block (fixed gain 2.5 +
+  hard clip; ~0.4 raw fills the view; faint center line = silent mic).
+  **cava rejected**: it opens its own mic capture (would race the daemon's)
+  and renders only to a terminal — nothing to embed in quickshell. Env knob
+  `DICTATE_WAVE` overrides the path (empty disables); the daemon seeds zeros
+  at qs spawn (file must exist before first press) and clears the trace at
+  each capture start. quickshell QML gotcha: **`Process` does not auto-start**
+  — `running: true` required (the `$XDG_RUNTIME_DIR` resolver sat dead with
+  zero log output because of exactly this). Visual-testing without a rebuild:
+  run `qs -p <src dir>` as a second instance — different config path =
+  different instance id, no clash with the store one — fed by a throwaway
+  wave generator.
+- **Waveform follows the DMS theme**: trace = palette role `primary` (ochre:
+  `#e07a3c`, same in both modes), baseline = `outline` at 25 % alpha. Sourcing
+  without touching dms internals: `~/.config/dms/settings.json` (FileView-
+  watched) gives `currentThemeName`/`customThemeFile` → that theme.json is
+  FileView-watched too, so a **theme switch re-skins the wave live**; the
+  light/dark mode is asked of the *running shell* — dms registers its own
+  quickshell IpcHandler `target: "theme"` with `getMode()` —
+  `qs -p $XDG_RUNTIME_DIR/dms-shell/* ipc call theme -- getMode`, at load and
+  on every `show()` (the mode is **not** persisted in settings.json). Stock/
+  dynamic themes (`currentThemeName != "custom"`) or no dms → plain white
+  fallback; the `t[mode] || t[other]` empty-block guard mirrors the
+  dux-empty-mode-palette patch semantics (§ dms-shell).
+- **First live run 2026-11-14**: hotkey press → speak → release; 1.6 s segment
+  transcribed in **1.52 s**, markdown + clipboard + notification all fired; dim
+  overlay confirmed on both monitors, click-through untouched.
+
 `imports`: `../common.nix` (shared config, `unstable` comes from its `_module.args`)
-and `./hardware-configuration.nix`; `./openvino.nix` is commented out.
+and `./hardware-configuration.nix`.
