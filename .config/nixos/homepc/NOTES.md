@@ -741,7 +741,8 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   1.38.0, same as the host overlay pin — npu-cache blobs key on the compiler, not on
   OpenVINO, so they stay warm across nix <-> container. Un-grouping notes that survive the
   move: it lives in the `persistent: true` `npu` group (only shield vs the `gpu` group's
-  `exclusive: true`); `ttl: 0` keeps it loaded once up (not preloaded — next bullet); no automatic `PORT` env — the port
+  `exclusive: true`); `ttl: 900` idles it out after 15 min quiet (was `ttl: 0` until
+  2026-11-15, next-but-one bullet); not preloaded — next bullet; no automatic `PORT` env — the port
   arrives via the `''${PORT}` macro in `cmd` (and per-model `env` wouldn't cross the podman
   socket, so `DICTATE_*` ride as `-e` flags). Routing of `/v1/audio/transcriptions`
   is by the multipart **form field `model`** (`swaputil.extractContext` parses
@@ -751,11 +752,31 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   synthetic `GET /` per name — each waits for the model's health check before
   `preloading model:` logs for the next. So the `hooks.on_startup.preload` list order
   **is** the boot ready order. Only qwen is preloaded (2026-11-14): whisper dropped
-  from the list — its first press after a boot swaps it in in ~6 s (warm npu-cache),
-  and it stays up after that (ttl 0). At runtime the FIFO scheduler
+  from the list — its first press after a boot swaps it in in 6–7.4 s (warm npu-cache;
+  and it stays up through a dictation burst (ttl 900; measured 2026-11-15: 6.35 s round
+  trip on a cold model = ~5.3 s swap-in + 1.07 s generate). At runtime the FIFO scheduler
   (internal/router/scheduler/fifo.go decision rule 6) starts swaps *in parallel* when
   their evict sets don't intersect — our persistent `npu` group is never in anyone's
   evict set, so a cold qwen swap and a dictation press load side by side.
+- **`persistent` is not "stays loaded"** (2026-11-15, whisper went to `ttl: 900`): the
+  group flag only says *other* groups may never evict it — upstream is explicit that it
+  "has no effect on swapping within the group" (docs/kb/guides/routing/groups-and-matrix.md).
+  What kept whisperd up 24/7 was its own `ttl: 0`, and the idle reaper is orthogonal to
+  the group: `persistent: true` + `ttl: 900` = nothing can kick it out, but it does
+  retire when quiet. Worth it because the container sits on **~4 GB** RSS
+  (`podman stats --no-stream`: 3.86 GB warm, 4.57 GB right after a cold load) for a
+  feature used a few times a day. Verified live: request at 12:43:06 → `Unloading model,
+  TTL of 900s reached` at 12:58:06 (the grep to reach for), container `exit=0` 1.4 s
+  later — the `podman stop -t 10` path, no SIGKILL — and ~3.6 GB back (available
+  8 → 11.4 GB). Next press after an idle-out pays the same 6–7.4 s as a cold-boot first
+  press (~5.3 s swap-in, incl. the `--pull newer` manifest check, + ~1 s generate),
+  against the daemon's 120 s POST timeout. `globalTTL: 0` stays: every GPU
+  model keeps `ttl: 0` since the `gpu` group's own swapping already reclaims VRAM.
+  Caveat for offline days: with a TTL the container starts often, and each start does a
+  ghcr.io manifest check (`--pull newer`) — if that errors the swap fails, so a no-network
+  boot makes the *first* dictation press fail rather than the resident model. Untested:
+  forcing a proxy failure on the client is a no-op here, rootless pulls run server-side in
+  `podman.service`, so it needs a real network-off repro.
 - Settings:
   - `logLevel = "info"`.
   - `logToStdout = "both"` — llama-swap always captures upstream (the `podman run`
@@ -1680,6 +1701,25 @@ cursor is the feedback).
   themselves aren't on the session PATH (`wtype` reaches interactive shells only
   via the profile — systemd user PATH doesn't see it), so `postInstall`
   `wrapProgram`s them from unstable onto the *daemon's* PATH.
+- **`After` + `BindsTo` + `PartOf = graphical-session.target`** (2026-11-15 outage):
+  that env trick only works if the service *execs after* uwsm has imported the vars —
+  a user service snapshots the user manager's environment at exec time, and `wantedBy`
+  alone adds no ordering. The cold boot lost the race (daemon exec 11:24:50, target
+  reached 11:24:52), so the daemon ran the whole session with no
+  `WAYLAND_DISPLAY`/`HYPRLAND_INSTANCE_SIGNATURE`: the dim quickshell instance
+  crash-looped (`qAbort` in `init_platform`, one coredump per press), `qs ipc`
+  answered `No running instances for …/shell.qml`, `write_focus`'s hyprctl left
+  `/run/user/1000/dictate-focus.json` = `null`, and `wtype`/`wl-copy` were dead. The
+  binds fired and the mic opened (`vad calibrated` in the log) but nothing appeared —
+  which reads exactly like a dead keybind. Mic/whisper were fine throughout; a
+  mid-session restart always works, which is why every 2026-11-14 test passed.
+  `BindsTo`/`PartOf` cover the sibling case: restarting Hyprland mints a new instance
+  signature, and a daemon that outlives it keeps a stale one forever. Check:
+  `tr '\0' '\n' < /proc/$(systemctl --user show dictate -p MainPID --value)/environ
+  | grep WAYLAND`; recover without rebooting: `systemctl --user restart dictate`.
+  Verified on the next cold boot: target entered t+27.347795 s, daemon exec
+  t+27.357447 s (**9.65 ms** margin), both vars present with the *new* instance
+  signature, dim instance resident, focus file a real rect, 4/4 presses transcribed.
 - **Capture design**: socket `$XDG_RUNTIME_DIR/dictate.sock` (start/stop/status,
   0600); sounddevice 16 kHz mono float32; energy VAD with noise calibration at
   hold start (first 0.1 s skipped, threshold = `clamp(4 × 30th-pct of window rms,
@@ -1813,7 +1853,8 @@ cursor is the feedback).
   the NPU pipeline. `whisperd` — a ~180-line stdlib HTTP server (console script), in
   its own repo **github.com/xavicampa/whisper-npu** since 2026-11-15 (was
   `dictation/dictate/whisperd.py`) — registered as the llama-swap model
-  **`whisper-medium-int8-npu`** — `ttl: 0`, persistent `npu` group, NOT in
+  **`whisper-medium-int8-npu`** — `ttl: 900` (retires after 15 min quiet; was `ttl: 0`
+  until 2026-11-15 — § llama-swap "persistent is not stays loaded"), persistent `npu` group, NOT in
   `on_startup.preload` (first press after a boot swaps it in ~6 s, warm npu-cache),
   `capabilities in:[audio] out:[text]` (renders
   `audio_transcriptions` in `/v1/models`). Contract: llama-swap proxies
@@ -1865,7 +1906,8 @@ cursor is the feedback).
    2026-11-14: ready in ~30 s with the host's npu-cache warm (blob key = NPU *compiler*
    1.38.0, identical in image and overlay — OpenVINO version doesn't matter), ru/es→en
    + en verbatim through the container's own :5812. Manual unload works despite
-   `ttl: 0`/`persistent` (those only shield idle/eviction) — but the first one ate
+   `ttl`/`persistent` (that pair only gates *idle* eviction and cross-group eviction,
+   never a manual unload) — but the first one ate
    the full `podman stop -t 35`: whisperd as container PID 1 never gets SIG_DFL
    signals (kernel rule), so SIGTERM was ignored and podman SIGKILLed at timeout.
    Fixed twice over: `--init` (tini forwards) + a SIGTERM handler in whisperd that

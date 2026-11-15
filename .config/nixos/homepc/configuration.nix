@@ -359,6 +359,19 @@ in
   systemd.user.services.dictate = {
     description = "Dictate — live microphone dictation on the Intel NPU";
     wantedBy = [ "graphical-session.target" ];
+    # Ordering is load-bearing, not decoration (2026-11-15 outage): a user service snapshots
+    # the user manager's environment at exec, and uwsm only puts WAYLAND_DISPLAY +
+    # HYPRLAND_INSTANCE_SIGNATURE into that environment as the session comes up. WantedBy
+    # alone adds no ordering, so on a cold boot the daemon won the race (exec 11:24:50, target
+    # reached 11:24:52) and ran the whole session without Wayland: dim overlay crash-looped
+    # (Qt qAbort in init_platform), write_focus's hyprctl wrote null, wtype/wl-copy dead —
+    # i.e. the keybind fired but nothing was visible. BindsTo/PartOf cover the sibling case:
+    # restarting Hyprland mints a new instance signature a long-lived daemon can't use.
+    unitConfig = {
+      After = [ "graphical-session.target" ];
+      BindsTo = [ "graphical-session.target" ];
+      PartOf = [ "graphical-session.target" ];
+    };
     serviceConfig = {
       ExecStart = "${dictatePkg}/bin/dictate daemon";
       Restart = "on-failure";
@@ -378,7 +391,8 @@ in
         "DICTATE_BACKEND_MODEL=whisper-medium-int8-npu"
       ];
     };
-    # same rationale as dcal: keep the session environment (Wayland/D-Bus vars come via uwsm's systemd import)
+    # same rationale as dcal: keep the session environment (Wayland/D-Bus vars come via uwsm's
+    # systemd import — which is why the unitConfig ordering above has to hold, too)
     path = lib.mkForce [ ];
   };
 
@@ -673,7 +687,13 @@ in
           '';
           cmdStop = ''podman stop -t 10 ''${MODEL_ID}''; # tini+SIGTERM handler stop in ~1 s; well inside unloadTimeout = 40
           checkEndpoint = "/health";
-          ttl = 0; # never idle-evicted; the npu group's persistent:true is what shields it from the gpu group
+          # idle timer, not a lifetime: 900 s without a request reclaims the ~4 GB the
+          # container sits on (2026-11-15: was ttl=0, resident 24/7 for a feature used a few
+          # times a day). Cost is the next press: ~6.3 s round trip cold (5.3 s swap-in incl.
+          # the --pull newer check + ~1 s generate), against the daemon's 120 s timeout. ttl is
+          # independent of the npu group's persistent:true — that flag only stops other groups
+          # from evicting it, it never keeps it loaded — NOTES.md § llama-swap, dictate/whisperd
+          ttl = 900;
           capabilities = {
             "in" = [ "audio" ];
             out = [ "text" ]; # -> capabilities.audio_transcriptions in /v1/models
@@ -755,8 +775,10 @@ in
           };
           # NPU whisper lives beside the GPU models, not in contention with them:
           # gpu's exclusive:true would otherwise unload whisperd on every chat model
-          # swap — persistent:true is the only shield. RAM-only footprint (~1 GB),
-          # NPU is multi-client (/dev/accel) — NOTES.md § dictate/whisperd
+          # swap — persistent:true is the only shield. It shields against *other groups'*
+          # eviction only; it never keeps the model loaded, that is the model's ttl (900 s
+          # idle now, since the container measures 3.86 GB). NPU is multi-client
+          # (/dev/accel) — NOTES.md § dictate/whisperd
           npu = {
             swap = false;
             exclusive = false;
