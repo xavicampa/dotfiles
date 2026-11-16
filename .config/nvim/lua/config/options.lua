@@ -1,4 +1,5 @@
 vim.g.mapleader = ','
+vim.g.maplocalleader = ','
 
 -- Highlights
 -- Use NonText color (muted by most themes) for comments and folds
