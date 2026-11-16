@@ -619,6 +619,11 @@ in
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
+          # stable public name the clients pin (opencode.json "model" = local/qwen3.8-flash-next): the
+          # backend key has been renamed twice; the alias outlives it. Globally unique — the parked
+          # llama.cpp block's ISTA names must never claim this one. Resolves to the key before macros
+          # and routing: ${MODEL_ID}, cmdStop and the gpu group all still see the key.
+          aliases = [ "qwen3.8-flash-next" ];
           # without this Strata under-reports to capability discovery
           capabilities = {
             # llama-swap advertises this as context_window / n_ctx to clients, so it must equal the engine's

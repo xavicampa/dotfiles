@@ -798,8 +798,8 @@ one backend holds the two cards at a time. Verified against llama-swap v249.
   - `unloadTimeout = 40` (graceful stop of the `podman run` client and the container),
     `startPort = 5800` (backends get 5800+; only 8080 stays open in the firewall),
     `sendLoadingState = true` (a client waiting through a swap sees "loading …" in the
-    reasoning field instead of a silent stall), `includeAliasesInList = true` (no
-    aliases right now, but keep them visible if a backend gets them back),
+    reasoning field instead of a silent stall), `includeAliasesInList = true` (the
+    `qwen3.8-flash-next` alias is listed too — § llama-swap/aliases),
     `globalTTL = 0` (nothing is evicted by a timer; the group swaps on demand).
 
 ### llama-swap/lact-temps — local patch (wired 2026-10-30, llama-swap 262)
@@ -906,8 +906,31 @@ builds here. The rest of the suite, including the new `internal/perf` tests, sti
   `supported_parameters: ["tools","tool_choice"]` (api.go `renderCapabilities`); without
   it Strata under-reports itself to clients doing capability discovery.
   `context = 262144`, in `text`+`image`, out `text`, `tools = true`.
-- No aliases: the key is the public name, and every alias is listed too
-  (`includeAliasesInList`) — so the old engine name "strata" is dropped.
+- No aliases on this entry: the key is the public name, and every alias is listed too
+  (`includeAliasesInList`) — so the old engine name "strata" is dropped. The batch entry carries
+  the stable client alias — § llama-swap/aliases.
+
+### llama-swap/aliases — stable client name (2026-11-16)
+
+`qwen3.8-flash-next-iq3_s-parallel` gained `aliases = [ "qwen3.8-flash-next" ]`. Rationale: clients
+pin model names — `~/.config/opencode/opencode.json` `"model": "local/qwen3.8-flash-next"` is what
+`opencode acp` uses as the initial model for new sessions (see § opencode defaults: without a
+top-level `"model"`, the server falls back to the newest free cloud model) — and the backend key has
+been renamed twice already (`-parallel5` → `-parallel`). With the alias, a rename/retarget touches
+only the nix key; the client pin survives.
+
+Semantics, verified against v262 source (`Config.RealModelName`, `internal/config/config.go:336`;
+listing `api.go:196`):
+- The requested name resolves to the **key** before everything: `${MODEL_ID}`, `cmdStop`, ttl and the
+  `gpu` group routing all still see the key — group members list real ids, never aliases.
+- With `includeAliasesInList`, `/v1/models` emits the alias as a full duplicate of the record
+  (caps/context/`meta.n_ctx` included) plus `meta.llamaswap = {type: "alias", modelID: <key>}`.
+  OpenCode's local-model-discovery therefore shows both names in pickers (accepted duplication).
+- Aliases must be **globally unique**: the parked llama.cpp entry's ISTA aliases (see
+  § llama-swap/llamacpp) must never claim `qwen3.8-flash-next`.
+
+Not used (yet): `profiles:` (v244+) can retarget aliases at runtime from the UI/API — an option if
+the default should flip between the single and parallel backends without a rebuild.
 
 ### llama-swap/strata-p3 — `qwen3.8-flash-next-iq3_s-p3` (PARKED 2026-10-25)
 

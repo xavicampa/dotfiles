@@ -177,7 +177,13 @@ function toModelInfo(providerID, options, raw) {
       id: effort,
       settings: { reasoningEffort: effort },
     })) ?? [],
-    time: { released: 0 },
+    // Models are listed ordered by release date; `0` would pin locals dead-last in
+    // pickers. Use the server-advertised `created` (epoch seconds, OpenAI
+    // convention) or the discovery time.
+    time: {
+      released:
+        typeof raw.created === "number" && raw.created > 0 ? raw.created * 1000 : Date.now(),
+    },
     cost: [],
     status: "active",
     enabled: true,

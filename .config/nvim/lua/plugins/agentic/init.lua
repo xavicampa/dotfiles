@@ -7,7 +7,8 @@ return {
     provider = "opencode-acp",
 
     -- Built-in definitions already work as-is:
-    --   opencode-acp -> `opencode acp`  (models: local/qwen3.8-flash-next-iq3_s*, glm-5.3-flash-maya-s24)
+    --   opencode-acp -> `opencode acp`  (models: local/qwen3.8-flash-next (alias, pinned as
+    --                opencode's default), local/qwen3.8-flash-next-iq3_s*, glm-5.3-flash-maya-s24)
     --   kiro-acp     -> `kiro-cli acp`  (uses the logged-in kiro-cli session)
     -- Override here only if you ever need absolute paths or extra env.
 
