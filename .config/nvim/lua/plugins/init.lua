@@ -46,9 +46,10 @@ return {
   {
     'MeanderingProgrammer/render-markdown.nvim',
     opts = {
-      file_types = { "markdown", "Avante" },
+      -- AgenticChat: agentic.nvim's chat buffer (see :h agentic-render-markdown)
+      file_types = { "markdown", "Avante", "AgenticChat" },
     },
-    ft = { "markdown", "Avante" },
+    ft = { "markdown", "Avante", "AgenticChat" },
     dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' },     -- if you prefer nvim-web-devicons
   },
   'direnv/direnv.vim',
