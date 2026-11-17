@@ -46,7 +46,7 @@
   "name": "docker",
   "no_key": true,
   "parallel": null,
-  "port": 5802,
+  "port": 5801,
   "schema": "strata.launch/1",
   "speed": null,
   "split_engine": null,
