@@ -4,6 +4,11 @@
   "plugins": [
     "./plugins/local-model-discovery"
   ],
+  "policies": [
+    { "action": "provider.use", "resource": "*", "effect": "deny" },
+    { "action": "provider.use", "resource": "anthropic", "effect": "allow" },
+    { "action": "provider.use", "resource": "local", "effect": "allow" }
+  ],
   "provider": {
     "omni": {
       "npm": "@ai-sdk/openai-compatible",
