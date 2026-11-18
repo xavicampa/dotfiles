@@ -1,6 +1,6 @@
 ---
 name: elevated-permissions
-description: Execute commands requiring elevated (root) permissions. Triggered when commands fail with access denied, permission denied, EACCES, or similar errors — OR when sudo is required or mentioned — OR when the task involves system administration, hardware inspection (lspci, lshw, dmidecode), package management, service control, disk/mount operations, firewall rules, or any operation that may need root. Always load this skill before running any command that might require elevated permissions. On macOS there is no pkexec — use `sudo` there.
+description: Execute commands requiring elevated (root) permissions. Triggered when commands fail with access denied, permission denied, EACCES, or similar errors — OR when sudo is required or mentioned — OR when the task involves system administration, hardware inspection (lspci, lshw, dmidecode), package management, service control, disk/mount operations, firewall rules, or any operation that may need root. Always load this skill before running any command that might require elevated permissions. On macOS there is no pkexec — use `osascript … with administrator privileges` from the tool shell, or `sudo` in the user's terminal.
 ---
 
 # Elevated permissions (pkexec)
@@ -34,7 +34,7 @@ The agent's shell is **not a terminal** (no stdin/stdout TTY). This changes ever
 - Elevation goes through **polkit**: `pkexec` asks the desktop's registered polkit agent to show a password dialog **on the user's desktop**, and the tool call **blocks** until the user answers it. Tell the user to expect a dialog, and bound the wait, e.g. `timeout 180 pkexec …` (or pass a `timeout` to the bash tool).
 - `pkexec`'s own fallback agent prompts on `/dev/tty`, which does not exist here — if no agent is reachable the call fails with `Not authorized` / `Failed to get authentication`. That error is a **result**, obtained by running `pkexec`, never by inspecting processes first.
 - `sudo` is **not** a fallback for a fresh prompt: with no TTY it cannot read a password. It is only usable when a timestamp is already cached from the user's own terminal — test with `sudo -n <cmd>` and fall back to asking the user if it fails.
-- On macOS `sudo` can never prompt from the tool at all → print the exact command and ask the user to run it in their own terminal.
+- On macOS `sudo` can never prompt from the tool (no TTY) — but `osascript -e 'do shell script … with administrator privileges'` shows the system **admin password dialog** on the user's desktop (password-only since Sonoma — no Touch ID in that dialog): the macOS pkexec equivalent (see the macOS section).
 
 ## No preflight — attempt, then diagnose
 
@@ -120,9 +120,12 @@ Then elevate only for the real privilege gap. Re-running a broken command as roo
 | Command hangs | Dialog is waiting on the desktop — tell the user, and use a timeout. |
 | Dialog dismissed / timed out | Treat as a decline: stop, report, don't retry. |
 
-## macOS — `sudo` instead of `pkexec`
+## macOS — `osascript` / `sudo` instead of `pkexec`
 
-`pkexec` does not exist on macOS. Use `sudo`, with the same ask-first rule; because the tool has no TTY, give the user the exact command to run locally (or use `sudo -n` if they've authenticated within the ~5 min timestamp window).
+`pkexec` does not exist on macOS. Two elevated paths, same ask-first rule:
+
+- **From the tool shell (the pkexec equivalent):** `osascript -e 'do shell script "<cmd> 2>&1" with administrator privileges'` — the system security agent shows the **admin password dialog on the user's desktop**, the tool call blocks until answered, and the command runs as root (verified 2026-11-18, macOS 27). **The prompt is password-only**: since Sonoma this dialog offers no Touch ID / Apple Watch — it authenticates through PAM's `authorization` stack (`pam_opendirectory.so`), which has no biometric module (`pam_localauthentication.so` lives in a different stack, `authorization_la`, unused here); `pam_tid` gates `sudo` only. For a **biometric-gated flow instead**: user runs `sudo -v` in their terminal (Touch ID prompt), then the tool shell uses `sudo -n <cmd>` inside the ~5-min cached-timestamp window (timestamp sharing depends on sudo's `timestamp_type=global` default — verify with `sudo -n true`). Gotchas: the script runs in a minimal environment — set `PATH` explicitly where needed (nix: `/nix/var/nix/profiles/default/bin`) and **root's home is `/var/root` — macOS has no `/root`** (sealed read-only root volume; writes there fail with `Read-only file system`). Batch root steps into one disposable script per prompt, same as the pkexec one-invocation rule.
+- **User's own terminal:** `sudo …` — Touch ID prompt available via the pam_tid setup below; from the tool shell `sudo` only works via `sudo -n` inside the ~5 min cached timestamp window, it can never prompt there.
 
 ### Biometric approval (recommended)
 
@@ -139,3 +142,4 @@ Notes:
 - Apple Watch works with the same prompt (double-click crown) when "Approve requests with your Apple Watch" is on (System Settings → Touch ID & Password) — even with the Mac locked.
 - Only works in a local GUI terminal session (tmux/SSH fall back to password); `sudo`'s timestamp still applies (~5 min).
 - Until enabled, `sudo` asks for the password.
+- `pam_tid` gates `sudo` **only** — the osascript `with administrator privileges` dialog uses the separate PAM `authorization` stack and always asks for the password (verified 2026-11-18 on macOS 27).

@@ -10,7 +10,7 @@ description: "Upgrade NixOS (root channels, NixOS host) and/or Home Manager (use
 | Flow | Moves | Activates | Hosts |
 |---|---|---|---|
 | **A — NixOS system upgrade** | root channels (`nixos`, `nixpkgs-unstable`) — scratch-fetched, committed only on confirmation | system toplevel via `nixos-rebuild switch --store-path` | NixOS host only |
-| **B — Home Manager upgrade** | user's channels (plain user); **macOS host also fetches the root channels** (sudo) | home-manager generation via `nix-env --set` + the built activate script | both hosts |
+| **B — Home Manager upgrade** | user's channels (plain user); **macOS host also fetches the root channels** (elevated — see B1) | home-manager generation via `nix-env --set` + the built activate script | both hosts |
 
 Shared discipline (both flows):
 
@@ -274,7 +274,7 @@ Gotchas learned the hard way (2026-09-22, nix 2.34.8, this host):
 The hm build and activation are always plain user (user channels + home-manager profile are user-owned). Channel elevation differs by host:
 
 - **NixOS host:** the root channels are **not** touched — Flow B is 100% plain user.
-- **macOS host:** `pkgs` resolves to the **root** channels, so Flow B fetches them too — under `sudo` (no pkexec on macOS; same ask-before-each-invocation rule as the `elevated-permissions` skill).
+- **macOS host:** `pkgs` resolves to the **root** channels, so Flow B fetches them too — elevated (no pkexec on macOS; `osascript … with administrator privileges` works from the tool shell — see B1 — same ask-before-each-invocation rule as the `elevated-permissions` skill).
 
 The system toplevel is never touched.
 
@@ -291,14 +291,17 @@ readlink -f ~/.local/state/nix/profiles/home-manager   # current hm generation =
 
 Record `M` (rollback target), both user-channel store paths (rollback verification), and the current hm generation (baseline for the diff).
 
-macOS host — same shape, **plus the root channels** (they're part of the upgrade here; the readlinks are world-readable, no elevation needed for the snapshot). On first use record the host's actual channels and paths (fill them into Background → macOS host, then the flow below is literal):
+macOS host — same shape, **plus the root channels** (they're part of the upgrade here; the readlinks are world-readable, no elevation needed for the snapshot). Host facts recorded 2026-11-18 (see Background → macOS host), so the flow below is literal:
 
 ```bash
-readlink /nix/var/nix/profiles/per-user/root/channels   # → channels-<N>-link ; record N (verify this path exists on the host)
-readlink -f /nix/var/nix/profiles/per-user/root/channels/<each root channel>
-nix-channel --list                                      # user channel names on this host
-readlink ~/.local/state/nix/profiles/channels           # (may be ~/.nix-defexpr/channels)
-readlink -f <user-channels-profile>/<each user channel>
+readlink /nix/var/nix/profiles/per-user/root/channels   # → channels-<N>-link ; record N
+ls /nix/var/nix/profiles/per-user/root/channels/        # root channels here: nixpkgs, nixpkgs-unstable
+readlink -f /nix/var/nix/profiles/per-user/root/channels/nixpkgs
+readlink -f /nix/var/nix/profiles/per-user/root/channels/nixpkgs-unstable
+nix-channel --list                                      # user channels: home-manager, unstable
+readlink ~/.local/state/nix/profiles/channels           # alias ~/.nix-defexpr/channels
+readlink -f ~/.local/state/nix/profiles/channels/home-manager
+readlink -f ~/.local/state/nix/profiles/channels/unstable
 readlink -f ~/.local/state/nix/profiles/home-manager    # current hm generation
 ```
 
@@ -306,11 +309,16 @@ Record `N` + root-channel store paths (root rollback target/verification), `M` +
 
 ### B1 — fetch channels + test build
 
-**macOS host — root channels first (sudo).** `pkgs` in `home.nix` resolves to the root channels, so they must move for a real package upgrade. **Ask the user for approval first** (same rule as Flow A):
+**macOS host — root channels first (elevated).** `pkgs` in `home.nix` resolves to the root channels, so they must move for a real package upgrade. **Ask the user for approval first** (same rule as Flow A). Two working paths (verified 2026-11-18):
 
-```bash
-sudo nix-channel --update > /tmp/hm-root-channels.log 2>&1   # root's channels
-```
+1. **From the agent's tool shell** — `sudo` can't prompt there (no TTY; `sudo -n` only works inside the user's ~5-min timestamp window), but `osascript` **with administrator privileges does work**: the system shows an **admin password dialog** on the user's desktop (password-only since Sonoma — no Touch ID in that dialog; see the elevated-permissions macOS section) and the command runs as root — the macOS equivalent of pkexec. root's home is **`/var/root`** (macOS has **no `/root`** — the root volume is sealed read-only), so root-side `nix-channel` **must get `HOME=/var/root`** with an explicit PATH: with a wrong HOME it finds no channel list, prints `unpacking 0 channels...`, and commits an **empty generation** that hijacks the `channels` symlink (recoverable via `nix-channel --rollback <N>`). Prefer batching the root steps into a disposable script run in one admin call (one password prompt):
+
+   ```bash
+   osascript -e 'do shell script "sh /private/var/folders/…/hm-root-steps.sh 2>&1" with administrator privileges'
+   # the script starts with:  PATH=/nix/var/nix/profiles/default/bin:/usr/bin:/bin; HOME=/var/root; export PATH HOME
+   ```
+
+2. **The user's own terminal** — plain `sudo nix-channel --update` (password, or Touch ID if the pam_tid setup from the elevated-permissions skill is enabled).
 
 Then the user side (plain user) on **both hosts**. Run in the background and poll (quick channel fetch; the build itself can take minutes if new packages need building — see **Probing for pre-built packages** for the dry-run check):
 
@@ -347,7 +355,7 @@ Same discipline as A4: **no activation without an explicit yes.** Ask:
 
 > "Home-manager build succeeded and the diff is as above. Shall I activate generation `<new-hm-generation>`? That keeps your channels at the new generation. If not, I'll roll them back to the pre-upgrade generation and nothing changes."
 
-**Declined:** roll back the user channels (plain user): `nix-channel --rollback <M>`; on the macOS host also the root channels (sudo): `sudo nix-channel --rollback <N>`. Verify `readlink -f` on every channel matches the B0 paths. Done. (Same rule: roll back to the recorded generation number, never bare "one back".)
+**Declined:** roll back the user channels (plain user): `nix-channel --rollback <M>`; on the macOS host also the root channels — `sudo nix-channel --rollback <N>` in the user's terminal, or from the tool shell via the B1 osascript pattern (script with `HOME=/var/root`). Verify `readlink -f` on every channel matches the B0 paths. Done. (Same rule: roll back to the recorded generation number, never bare "one back".)
 
 **Confirmed** — activate **exactly the generation built in B1** (plain user):
 
@@ -427,17 +435,23 @@ journalctl -u fstrim.service --since "2 min ago" --no-pager | grep -i trimmed
 
 ### macOS host
 
-- Classic home-manager (channels), no flakes.
-- `pkgs` in `home.nix` resolves to the **root** channels → Flow B must fetch them (sudo); that's what makes this the full home upgrade (module set **and** package versions).
-- Root channels are root-owned: fetch/rollback under `sudo` (no pkexec on macOS — apply the `elevated-permissions` ask-first rule to `sudo`). User channels + home-manager profile are user-owned → plain user.
-- **Biometric approval for `sudo` (recommended):** see the macOS section of the `elevated-permissions` skill — the Touch ID PAM module setup (plus Apple Watch approval) makes `sudo` show a Touch ID prompt instead of a password prompt.
-- **Fill in from first run** (run the B0 macOS checklist, then record here): root channels profile path + channel names, user channel names (`nix-channel --list`), CLI install source (`which home-manager`), user channels profile path, home-manager profile path.
+- Classic home-manager (channels), no flakes. macOS 27.x, classic single-user Nix install (verified 2026-11-18).
+- `pkgs` in `home.nix` resolves to the **root** channels → Flow B must fetch them (elevated); that's what makes this the full home upgrade (module set **and** package versions).
+- **root's home is `/var/root` — there is no `/root`** (root volume sealed read-only). root's channel list is `/var/root/.nix-channels` (recorded 2026-11-18):
+  ```
+  http://channels.nixos.org/nixos-26.05 nixpkgs
+  http://channels.nixos.org/nixos-unstable nixpkgs-unstable
+  ```
+  `/var/root/.nix-defexpr/channels` → root channels profile; `/var/root/.nix-profile` → `/nix/var/nix/profiles/per-user/root/profile`.
+- **Root channels**: profile `/nix/var/nix/profiles/per-user/root/channels` (root-owned), entries `nixpkgs` (nixos-26.05) + `nixpkgs-unstable` (nixos-unstable). Fetch/rollback elevated: `osascript … with administrator privileges` from the tool shell (see B1 — **always `HOME=/var/root` + explicit PATH**), or plain `sudo` in the user's terminal. User channels + home-manager profile are user-owned → plain user.
+- **Biometric approval (verified 2026-11-18):** the osascript admin call shows a **password** dialog — since Sonoma it never offers Touch ID (PAM `authorization` stack, no biometric module). Terminal `sudo` **does** use Touch ID on this host: `/etc/pam.d/sudo_local` enabled with `auth sufficient pam_tid.so`. Biometric-gated flow from the tool shell: user runs `sudo -v` in their terminal (Touch ID prompt), then `sudo -n …` works agent-side inside the ~5-min cached-timestamp window (verify with `sudo -n true`).
+- **Host paths** (recorded 2026-11-18): user channels profile `~/.local/state/nix/profiles/channels` (alias `~/.nix-defexpr/channels`; `~/.nix-defexpr/channels_root` → the root channels profile); user channels `home-manager` (release-26.05 tarball) + `unstable` (home-manager **master** tarball); home-manager profile `~/.local/state/nix/profiles/home-manager`; CLI `~/.nix-profile/bin/home-manager` (nix-env profile).
 
 ## Elevation — NixOS host (Flow A) + macOS host (Flow B root channels)
 
 - Flow A needs root for **only two steps**: committing the confirmed channel revisions into the root profile (`nix-env --install`, A4) and the activation (`nixos-rebuild switch --store-path`, A4). The scratch fetch (A1) and the build (A2) run as the plain user — the scratch profile is user-owned and the build touches only `/nix/store`. (A read-only `pkexec cat /root/.nix-channels` is only needed if the channel list recorded in Background → NixOS host turns out to be stale.)
 - `switch` updates the system profile and runs activation — root-only. The root channel profile is root-owned — hence those steps run under `pkexec` (per the `elevated-permissions` skill: **ask the user for approval before each pkexec invocation**).
-- NixOS host: Flow B never needs elevation (user channels only). macOS host: Flow B's **root channel fetch + rollback** run under `sudo` (pkexec doesn't exist on macOS — apply the same ask-before-each-invocation rule); everything else in Flow B is plain user.
+- NixOS host: Flow B never needs elevation (user channels only). macOS host: Flow B's **root channel fetch + rollback** are elevated (pkexec doesn't exist on macOS — apply the same ask-before-each-invocation rule); everything else in Flow B is plain user. `sudo` can't prompt from the agent's tool shell (no TTY, unless a timestamp is cached) — use the B1 `osascript … with administrator privileges` pattern (admin **password** dialog on the user's desktop — no Touch ID there, root-side env `HOME=/var/root` + explicit PATH) or hand the exact command to the user's terminal.
 - Running under pkexec resets parts of the environment, so **always set `PATH` (and `NIX_PATH` where evaluation happens) explicitly** — otherwise `<nixpkgs>`, `<nixos-config>` and `<nixpkgs-unstable>` may not resolve. For the Flow A pkexec steps:
 
 ```bash
@@ -466,3 +480,4 @@ NIX_PATH="nixpkgs=$NEW_NIXOS:nixpkgs-unstable=$NEW_UNSTABLE:nixos-config=/etc/ni
 - The user's channels profile and the home-manager profile live under `~/.local/state/nix/profiles/` (XDG state), not `/nix/var/nix/profiles/per-user/<user>/` — that directory does not exist on the NixOS host.
 - Root `nix-channel` **ignores `XDG_STATE_HOME`** (verified on nix 2.34.8): under pkexec it always commits to the real root channel profile, even with a scratch `XDG_STATE_HOME` exported. Plain-user `nix-channel` **honors** `XDG_STATE_HOME` (profile at `$XDG_STATE_HOME/nix/profiles/channels`) and reads its channel list from `$HOME/.nix-channels`. That asymmetry is why A1 fetches as the plain user with scratch `HOME` + `XDG_STATE_HOME`. Side effect: any `nix-channel` invocation (even read-only `--list-generations`) auto-creates a profile skeleton in the state dir it resolves to — with a scratch `XDG_STATE_HOME` that's harmless scratch state, but don't run plain `nix-channel` against a real state dir unless that's what you want.
 - The A1 scratch is user-owned: cleanup is a plain `rm -rf "$SCRATCH"`. If a leftover scratch is root-owned (e.g. from an aborted pkexec attempt), `pkexec rm -rf "$SCRATCH"` is needed instead.
+- macOS host: there is **no `/root`** — root's home is `/var/root`; the sealed root volume rejects writes to `/root/…` with `Read-only file system`. Running root's `nix-channel` with a HOME that has no `.nix-channels` prints `unpacking 0 channels...` and **commits an empty generation that moves the real `channels` symlink** (observed 2026-11-18: an osascript root fetch with `HOME=/root` left the profile pointing at a manifest-only env dir). Fix: `nix-channel --rollback <snapshot N>` (verified to work: "switching profile from version 5 to 4"), then re-fetch with `HOME=/var/root`.
