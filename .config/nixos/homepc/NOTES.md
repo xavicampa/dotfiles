@@ -591,6 +591,147 @@ it earns its keep only if a family that publishes real dark theme names lands (`
 re-break name resolution this way. `pkgs.adwaita-icon-theme` at `home.nix:152` stays the
 requirement either way — it is what the bar/OSD icon names resolve against.
 
+### dms-shell/prefer-light — light mode reports light (wired 2026-11-17)
+
+**What/why.** DMS's per-mode `org.gnome.desktop.interface color-scheme` write used the
+GNOME convention — `'default'` for light — which the portal serves as **no-preference
+(0)**, indistinguishable from "unknown". `./patches/dux-prefer-light.patch` (now the
+**fourth** dux patch in `postPatch`) makes both DMS writers emit
+`prefer-light` for light mode instead, so the portal reports `2` = *light* — a real
+signal for portal-followers (kitty auto-themes — see below — and per the Chrome notes
+above, a correct pref for Chrome's restart-time repaint). Dark side unchanged
+(`prefer-dark` → `1`).
+
+**The two writers (dux-shell 2.1.2, both patched).** QML
+`quickshell/Services/PortalService.qml setSystemColorScheme()` — the ternary the
+future-module notes above quote; its `preferLight` retention clause keys off DMS's own
+*cached* portal value, which is `1` right after a dark cycle, so it **always** re-wrote
+`'default'` on light (live-proved: wrote `'prefer-light'` via dconf, `dms ipc theme dark`
+→ `'prefer-dark'` at t+1s, `dms ipc theme light` → **`'default'`** at t+1s — retention
+never fires across a real toggle). Go matugen worker
+`core/internal/matugen/matugen.go colorSchemeTarget()` — same `'default'`-for-light
+target but a *correct* retention clause (`current == "prefer-light"` → skip); the QML
+write lands first and poisons the `current`, so the Go skip never mattered. The patch
+sets light → `prefer-light` in both. Applies clean under the existing `patch -p1 -d
+"$root" -N --batch` invocation; `gofmt` clean.
+
+**The chain, re-anchored live** (this is the mechanism the Chrome/XSETTINGS probes
+skirted): portal-gtk `1.15.3 src/settings.c get_color_scheme()` = `g_settings_get_enum`
+over `org.gnome.desktop.interface color-scheme` (gsettings-desktop-schemas 50.1 enum:
+`default`/`prefer-dark`/`prefer-light` → portal `0/1/2`) and its `on_settings_changed`
+emits SettingChanged for **both** `org.gnome.desktop.interface` and
+`org.freedesktop.appearance` namespaces; portal core fans it out. Read side today:
+`busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop
+org.freedesktop.portal.Settings Read ss org.freedesktop.appearance color-scheme`.
+**kitty ≥ 0.38** auto-theme contract (kitty docs `auto_color_scheme`): the *mere
+presence* of `light/dark/no-preference-theme.auto.conf` in `~/.config/kitty` makes kitty
+query the portal and swap **live** — no `include`/`theme` in kitty.conf, which is why the
+identical HM `programs.kitty` block "just works" on the macOS laptop (macOS queried
+natively, files generated there by `kitten themes`). All four kitty theme files are
+user-dropped **on purpose — stay out of HM** (decided 2026-11-17); `no-preference-theme.auto.conf`
+(carries the light palette) was added as the belt-and-braces so light mode stays right
+even if the key ever regresses to `'default'`/portal `0`.
+**Readers that must tolerate `prefer-light` — all checked:** DMS's own follower
+(`handlePortalColorScheme`: `shouldBeLight = scheme !== 1` → no feedback loop, `2` reads
+light); `core/internal/screenshot/theme.go` (`case "'prefer-light'", "'default'"`);
+`core/internal/server/freedesktop/manager.go` echo map (`prefer-light → 2`);
+portal-gtk's gsettings enum (50.1 knows the value — the old probe's "unknown string"
+worry does not apply to this schema).
+
+**After rebuild, verify by toggling:** light → expect dconf `'prefer-light'`, portal
+`u 2`, kitty on `light-theme.auto.conf` (live, no restart); dark → `'prefer-dark'`,
+`u 1`, `dark-theme.auto.conf`. If light ever shows `default` again, the QML writer is
+the suspect (its write fires first, ~t+0, with matugen present).
+
+### dms-shell/idle-dpms — a locked session's display-off, fixed twice (wired 2026-11-18)
+
+**What/why.** 2026-11-18 incident: auto-lock 14:12:29, DPMS off ~14:12:44, then at
+14:31:19-23 the panel power-cycled **by itself** — visible only **client-side** in
+`journalctl --user`: `WARN quickshell.hyprland.ipc: Got removal for monitor "DP-3" which was not
+previously tracked.` at 14:31:19 and the same for `"FALLBACK"` at 14:31:22 (that tracker runs
+inside `dms`), plus `INFO qt.qpa.wayland: There are no outputs - creating placeholder screen` from
+the Qt wayland plugin in `dcal` and `dms` at both timestamps. Hyprland's own
+`/run/user/1000/hypr/*/hyprland.log` has **no timestamps** and is block-buffered, so it is useless
+as evidence; use `journalctl --user` (clients) and `journalctl -k` (kernel). The kernel logged no
+DRM/connector event for this, but it did re-enumerate the panel's USB hub at
+14:31:24-26 (Ducky One 3, card reader, C922, MSI Gaming Controller;
+`/dev/input/event5`-`event13` recreated). HDMI-A-1 came back **lit** and stayed lit until the
+14:55:31 unlock. Two independent causes, hence two patches.
+
+**Fifth local patch** (`./patches/dux-locked-dpms-ignore-inhibitors.patch`, the wake-lock
+half). Hyprland freezes every ext-idle timer that obeys inhibitors while any
+`zwp_idle_inhibit`/Screensaver wake lock is held (`src/protocols/IdleNotify.cpp:41-44`,
+`:100 onGetNotification(…, bool obeyInhibitors)`), and the *post-lock* timer obeyed: all four
+timeout monitors in `Services/IdleService.qml` are bound to
+`respectInhibitors: root.respectInhibitors`, a property nothing anywhere ever writes (so always
+`true`). One Chrome tab was enough to keep a **locked** screen lit indefinitely. The patch adds a
+real setting — SPEC key `postLockMonitorIgnoreInhibitors` (bool, `def: false`; no ac/battery
+pair, it isn't a timeout) → `SettingsData.postLockMonitorIgnoreInhibitors` →
+`IdleService.postLockIgnoreInhibitors`, and re-binds only `postLockMonitorOffMonitor`:
+`respectInhibitors: root.respectInhibitors && !root.postLockIgnoreInhibitors`. Unlocked
+monitor/lock/suspend timers keep honouring wake locks, and `wakeMonitor` already ignored them.
+Plus `onPostLockIgnoreInhibitorsChanged: _rearmIdleMonitors()`, so flipping it takes effect on a
+locked, already-idle session without touching the keyboard. UI row: Settings → Power & sleep →
+*Ignore app wake locks after lock*, in the Idle card under "Turn off displays after lock"; the
+matching entry in `quickshell/translations/settings_search_index.json` is **generated, not
+hand-written** — `python3 quickshell/translations/extract_settings_index.py` on the patched tree,
+the same thing upstream's pre-commit hook runs.
+
+**Sixth local patch** (`./patches/dux-reapply-dpms-on-screen-change.patch`, the
+re-enumeration half — this is what the "screen woke with no input events" mystery was). A new
+`CMonitor` starts **DPMS-on** (`src/output/Monitor.hpp:107 m_dpmsStatus = true`), and the ext-idle
+timer that already fired is only re-armed by activity (`IdleNotify.cpp:112-116`); a USB/HDMI
+re-enumeration emits **no evdev events** (confirmed with a reader as an `input`-group member), so
+nothing ever blanked the fresh output again. DMS had the right helper and called it from exactly
+one place — `IdleService.reapplyDpmsIfNeeded()` from the Lock module's 100 ms `dpmsReapplyTimer`
+(`Modules/Lock/Lock.qml:502`). The patch adds the missing trigger, in `IdleService`: `Connections
+{ target: Quickshell; function onScreensChanged() }` → if `root.monitorsOff`, log and restart an
+800 ms `Timer` → `root.reapplyDpmsIfNeeded()` (the delay is the modeset settle, same order as
+ShellCore's 800 ms surface-recovery timer). No setting for this one: if the shell already believes
+the displays are off, re-asserting that is never a surprise.
+
+**Ordering matters:** the sixth is a diff **against the tree with the fifth applied** (both touch
+`IdleService.qml`), so the two `patch` lines sit in that order in `postPatch`. Verified: a fresh
+clone of `v2.1.2` takes both under the build's own `patch -p1 -N --batch` with no fuzz/offset,
+and the running `dms` binary's embedded `IdleService.qml` is byte-identical to that tag's file —
+the channel's 2.1.2 really is that tree.
+
+**Drop test.** Fifth: look for `postLockMonitorIgnoreInhibitors` (or any post-lock inhibitor
+opt-out) reaching `respectInhibitors` in `quickshell/Services/IdleService.qml` of the new tag.
+Sixth: look for a screens-changed → DPMS path; upstream has only the 100 ms post-lock
+`dpmsReapplyTimer`, and `IdleService.qml` was **byte-identical on `main`** to the v2.1.2 file when
+this was written — neither half is fixed upstream. Upstream issues were considered and
+deliberately skipped, so these two stay local.
+
+**Verified on the switch (2026-11-18), both halves end to end.** Fifth, control first: lock, hold
+a wake lock (`loginctl inhibit --what=sleep --who="wake lock test" …`), `acPostLockMonitorTimeout
+5` → `dpmsStatus` stayed `1` for 16 s, the bug reproduced; with
+`postLockMonitorIgnoreInhibitors true` the same setup took HDMI-A-1 `1 → 0` at +5 s, twice, wake
+lock still held. Runtime flipping of the setting works without input (the `_rearmIdleMonitors()`
+hook). Sixth: with the session locked and blanked, the HDMI cable was pulled and replugged. At
+15:56:34 the connector vanished (monitor set became `FALLBACK`, `dpmsStatus FALLBACK:0`) and at
+15:56:43 the replug gave `HDMI-A-1:1` — **lit** — which DMS put back to `HDMI-A-1:0` at 15:56:45,
+about 1.5 s later, with `[IdleService] Screens changed while displays are off, re-applying DPMS`
+logged repeatedly across both events. It lit again at 15:56:53 only because of real keyboard input
+at the lock screen, and the (then-5 s) post-lock timer blanked it again — correct behaviour, not a
+miss. Do **not** try to fake this with `hyprctl output DP-3 disable && enable`: it is a no-op,
+because DP-3 is a dead port — `connected` in sysfs (`card0-DP-3/status`) but `0x0@60`,
+`enabled: false` and `disabled: true` in Hyprland, with junk display identity (make/model
+`Microstep MPG321UX OLED`, serial `0x01010101`) — the same ghost shows up as a phantom display in
+`loginctl lock-session`'s blanking reply, and Hyprland 0.57.2 has no headless-output way to force
+`screensChanged`. Physical replug is the only real trigger here. What actually caused the 14:31
+link flap is still unknown (no kernel DRM/connector line for it), but the fix does not depend on
+knowing: any `screensChanged` while DMS thinks the displays are off re-asserts DPMS.
+Live state after testing: `postLockMonitorIgnoreInhibitors true`, `acPostLockMonitorTimeout` back
+to `15`, `lockScreenPowerOffMonitorsOnLock false`. Side observation from the same run: 33
+`WARN: attempted to use dangling screen object` lines, all from the fallback-output churn at
+15:56:34+ (zero at 14:31 on the pre-patch build) — quickshell-side noise, no crash and no DPMS
+miss, but worth watching on the next quickshell bump.
+
+**Deliberately unchanged:** `lockScreenPowerOffMonitorsOnLock` stays at its `false` default
+(power-off *at lock time*, different path, not what was broken here); `dell` runs hypridle +
+hyprlock and is untouched by any of this.
+
 ## hyprland
 
 Hyprland **0.56+** is needed for DMS compositor blur (`ext-background-effect-v1`).

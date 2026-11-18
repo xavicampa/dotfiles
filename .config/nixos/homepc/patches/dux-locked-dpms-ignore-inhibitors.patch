@@ -1,0 +1,142 @@
+diff --git a/quickshell/Common/SettingsData.qml b/quickshell/Common/SettingsData.qml
+index 62619ab..2ae4f6b 100644
+--- a/quickshell/Common/SettingsData.qml
++++ b/quickshell/Common/SettingsData.qml
+@@ -751,6 +751,7 @@ Singleton {
+     property int batterySuspendBehavior: SettingsData.SuspendBehavior.Suspend
+     property string batteryProfileName: Spec.SPEC.batteryProfileName.def
+     property int batteryPostLockMonitorTimeout: Spec.SPEC.batteryPostLockMonitorTimeout.def
++    property bool postLockMonitorIgnoreInhibitors: Spec.SPEC.postLockMonitorIgnoreInhibitors.def
+     property int batteryChargeLimit: Spec.SPEC.batteryChargeLimit.def
+     property bool batteryScaleToChargeLimit: Spec.SPEC.batteryScaleToChargeLimit.def
+     property bool batteryScaleAlertThresholds: Spec.SPEC.batteryScaleAlertThresholds.def
+diff --git a/quickshell/Common/settings/SettingsSpec.js b/quickshell/Common/settings/SettingsSpec.js
+index ccb8663..524bc80 100644
+--- a/quickshell/Common/settings/SettingsSpec.js
++++ b/quickshell/Common/settings/SettingsSpec.js
+@@ -1151,6 +1151,11 @@ var LOCAL_SPEC = {
+     batteryPostLockMonitorTimeout: {
+         def: 0
+     },
++    // Not a timeout, so no ac/battery pair: it is the policy for whether a *locked* session's
++    // display-off timer honors app idle inhibitors (zwp_idle_inhibit / Screensaver wake locks).
++    postLockMonitorIgnoreInhibitors: {
++        def: false
++    },
+     batteryChargeLimit: {
+         def: 100
+     },
+diff --git a/quickshell/Modules/Settings/PowerSleepTab.qml b/quickshell/Modules/Settings/PowerSleepTab.qml
+index c0376a0..289ea13 100644
+--- a/quickshell/Modules/Settings/PowerSleepTab.qml
++++ b/quickshell/Modules/Settings/PowerSleepTab.qml
+@@ -99,6 +99,16 @@ Item {
+                 onValueChanged: value => root.setTimeoutFromText(root.sourceKey("PostLockMonitorTimeout"), value)
+             }
+ 
++            SettingsToggleRow {
++                settingKey: "postLockMonitorIgnoreInhibitors"
++                tags: ["inhibit", "wake lock", "video", "player", "monitor", "display", "lock", "after", "post"]
++                text: I18n.tr("Ignore app wake locks after lock")
++                description: SettingsData.isManaged("postLockMonitorIgnoreInhibitors") ? root.managedNote : I18n.tr("Turn the displays off on schedule while locked, even if an app holds a wake lock", "post lock ignore inhibitors toggle description")
++                enabled: !SettingsData.isManaged("postLockMonitorIgnoreInhibitors")
++                checked: SettingsData.postLockMonitorIgnoreInhibitors
++                onToggled: checked => SettingsData.set("postLockMonitorIgnoreInhibitors", checked)
++            }
++
+             SettingsDropdownRow {
+                 settingKey: "suspendTimeout"
+                 tags: ["suspend", "sleep", "timeout", "idle", "system"]
+diff --git a/quickshell/Services/IdleService.qml b/quickshell/Services/IdleService.qml
+index bbbfaff..10ee074 100644
+--- a/quickshell/Services/IdleService.qml
++++ b/quickshell/Services/IdleService.qml
+@@ -22,6 +22,11 @@ Singleton {
+     readonly property int suspendTimeout: isOnBattery ? SettingsData.batterySuspendTimeout : SettingsData.acSuspendTimeout
+     readonly property int suspendBehavior: isOnBattery ? SettingsData.batterySuspendBehavior : SettingsData.acSuspendBehavior
+     readonly property int postLockMonitorTimeout: isOnBattery ? SettingsData.batteryPostLockMonitorTimeout : SettingsData.acPostLockMonitorTimeout
++    // A compositor-side idle inhibitor (a browser video, a media player) freezes every idle timer
++    // that obeys inhibitors, including the one that blanks the displays *after* the session locks,
++    // so a locked screen can stay lit indefinitely. This opts that one timer out; the unlocked
++    // monitor/lock/suspend timers keep honoring inhibitors.
++    readonly property bool postLockIgnoreInhibitors: SettingsData.postLockMonitorIgnoreInhibitors
+     readonly property bool postLockMonitorActive: isShellLocked && postLockMonitorTimeout > 0
+ 
+     onEnabledChanged: _applyMonitorEnableds()
+@@ -105,7 +110,7 @@ Singleton {
+     IdleMonitor {
+         id: postLockMonitorOffMonitor
+         timeout: root.postLockMonitorTimeout > 0 ? root.postLockMonitorTimeout : 86400
+-        respectInhibitors: root.respectInhibitors
++        respectInhibitors: root.respectInhibitors && !root.postLockIgnoreInhibitors
+         enabled: false
+         onIsIdleChanged: {
+             if (!enabled)
+@@ -219,6 +224,10 @@ Singleton {
+         _rearmIdleMonitors();
+     }
+ 
++    // Re-arm too when the policy itself changes, so it applies to a locked, already-idle
++    // session instead of waiting for the next user activity.
++    onPostLockIgnoreInhibitorsChanged: _rearmIdleMonitors()
++
+     onSleepBlockedChanged: {
+         log.info(sleepBlocked ? "Sleep blocked by logind inhibitor" : "Sleep inhibitor released");
+         if (sleepBlocked || !suspendMonitor.enabled || !suspendMonitor.isIdle)
+diff --git a/quickshell/translations/settings_search_index.json b/quickshell/translations/settings_search_index.json
+index ee8367b..0bbe720 100644
+--- a/quickshell/translations/settings_search_index.json
++++ b/quickshell/translations/settings_search_index.json
+@@ -9891,6 +9891,52 @@
+     "parentLabel": "Power & battery",
+     "icon": "schedule"
+   },
++  {
++    "section": "postLockMonitorIgnoreInhibitors",
++    "label": "Ignore app wake locks after lock",
++    "tabIndex": 21,
++    "category": "Power & sleep",
++    "keywords": [
++      "after",
++      "app",
++      "battery",
++      "charge",
++      "charging",
++      "display",
++      "displays",
++      "energy",
++      "even",
++      "hibernate",
++      "holds",
++      "ignore",
++      "inhibit",
++      "lock",
++      "locked",
++      "locks",
++      "monitor",
++      "monitors",
++      "output",
++      "outputs",
++      "player",
++      "post",
++      "power",
++      "reboot",
++      "restart",
++      "schedule",
++      "screen",
++      "screens",
++      "shutdown",
++      "sleep",
++      "suspend",
++      "turn",
++      "video",
++      "wake",
++      "wake lock",
++      "while"
++    ],
++    "parentLabel": "Power & battery",
++    "description": "Turn the displays off on schedule while locked, even if an app holds a wake lock"
++  },
+   {
+     "section": "fadeToLockGracePeriod",
+     "label": "Lock fade grace period",

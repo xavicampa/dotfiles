@@ -1,0 +1,34 @@
+diff --git a/quickshell/Services/IdleService.qml b/quickshell/Services/IdleService.qml
+index 10ee074..9f674a4 100644
+--- a/quickshell/Services/IdleService.qml
++++ b/quickshell/Services/IdleService.qml
+@@ -84,6 +84,29 @@ Singleton {
+             CompositorService.powerOffMonitors();
+     }
+ 
++    // A hot-plug, or a connector that drops and re-enumerates while the session is locked, hands
++    // the compositor a brand new output that starts out DPMS-on. The ext-idle timer that already
++    // fired is only re-armed by input activity, and a USB/HDMI re-enumeration emits none, so the
++    // panel lights up and stays lit until someone unlocks. Re-assert the current DPMS intent
++    // whenever the screen set changes.
++    Connections {
++        target: Quickshell
++
++        function onScreensChanged() {
++            if (!root.monitorsOff)
++                return;
++            root.log.info("Screens changed while displays are off, re-applying DPMS");
++            dpmsReapplyOnScreenChangeTimer.restart();
++        }
++    }
++
++    Timer {
++        id: dpmsReapplyOnScreenChangeTimer
++        interval: 800
++        repeat: false
++        onTriggered: root.reapplyDpmsIfNeeded()
++    }
++
+     IdleMonitor {
+         id: monitorOffMonitor
+         timeout: root.monitorTimeout > 0 ? root.monitorTimeout : 86400

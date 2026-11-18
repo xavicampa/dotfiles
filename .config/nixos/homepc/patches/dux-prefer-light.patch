@@ -1,0 +1,30 @@
+diff --git a/core/internal/matugen/matugen.go b/core/internal/matugen/matugen.go
+index 1b887de..400e5c7 100644
+--- a/core/internal/matugen/matugen.go
++++ b/core/internal/matugen/matugen.go
+@@ -1524,9 +1524,9 @@ func signalTerminals(opts *Options) {
+ func colorSchemeTarget(mode ColorMode, current string) (string, bool) {
+ 	scheme := "prefer-dark"
+ 	if mode == ColorModeLight {
+-		scheme = "default"
++		scheme = "prefer-light"
+ 	}
+-	if current == scheme || (mode == ColorModeLight && current == "prefer-light") {
++	if current == scheme {
+ 		return scheme, false
+ 	}
+ 	return scheme, true
+diff --git a/quickshell/Services/PortalService.qml b/quickshell/Services/PortalService.qml
+index a54811b..d530636 100644
+--- a/quickshell/Services/PortalService.qml
++++ b/quickshell/Services/PortalService.qml
+@@ -139,8 +139,7 @@ Singleton {
+     }
+ 
+     function setSystemColorScheme(isLightMode) {
+-        const preferLight = isLightMode && systemColorScheme === 2;
+-        const targetScheme = isLightMode ? (preferLight ? "prefer-light" : "default") : "prefer-dark";
++        const targetScheme = isLightMode ? "prefer-light" : "prefer-dark";
+ 
+         Quickshell.execDetached(["sh", "-c", GSettings.setCmd("org.gnome.desktop.interface", "color-scheme", targetScheme)]);
+     }
