@@ -584,6 +584,15 @@ Readings:
 - Watch `MemAvailable` (≈12–13 GiB under load): pinned footprint is ~27.3 GiB experts (including the 3,655 lend
   slots kept by `STRATA_SPLIT_RING`) + ~1.0 GiB K/V. Levers if it tightens: `--conversation-cache-mib`,
   `STRATA_RESIDENT_HEADROOM_GIB`, `STRATA_SPLIT_RING`, context, batch slots.
+- **`STRATA_ROUTE_TAIL_SKIP` (default 7) turns itself off at 90 % cached experts** — "not applied … when 90% or
+  more of the experts are cached (`STRATA_TAIL_SKIP_MAX_CACHED=<percent>` moves that line; it is 60% on an AMD
+  layer split)", `docs/DETAILS.md:1053`; also never applied with `--batch` slots, so **this tree (batch 3) has
+  never had it** and the 1slot tree always has. Measured on the 1slot tree 2026-11-19 (`BENCH-1slot.md`, six eras):
+  it skips ~22 experts per generated token (95.6-96.2 % of eligible entries) and is worth ~5 % decode at 61 %
+  residency — not the "+10..20 %" the boot line quotes, because that box profile is 12-16 GB cards that miss a lot.
+  **Interaction with any RAM upgrade:** more RAM raises residency, and past the 90 % line the feature disengages by
+  itself — so a RAM upgrade can show a decode *drop* on the first boot. Pin `STRATA_TAIL_SKIP_MAX_CACHED` above the
+  new residency and re-measure before blaming the memory.
 
 ## Revert points
 
@@ -1326,3 +1335,83 @@ final boot carries `--mtp … --batch-mtp --pipeline-windows 2 --spec 4 --batch 
 `1180 / 2597 MiB` free, and re-measures L4 159.1 / L1 131.7 — inside the control band. The 1slot tree reaches the same
 verdict (−8…−11 %, there the loss is the pipeline window DFlash2 forbids): **DFlash2 stays off on both trees** until
 something changes split-side tap gathering. Do not re-run this arm on this model/hardware pair.
+
+## 2026-11-19 — `--max-context 131072 -> 196608` at `parallel: 3`: **ACCEPTED, live** (era 298376, engine 0.1.62)
+
+Requested: 256K on this arm. What was actually applied is **196608 (192K)** — 262144 turned out to be already
+measured here (see "the arm nobody wrote up" below) and its cost is a RAM wall, not a speed knob. Run from a session
+served by this arm (`PI_MODEL=qwen3.8-flash-next-iq3_s-parallel` at `:8080`): edits + `podman stop -t 120` + `sleep 2`
++ the proxy-id reload curl in **one** tool call; `reload=200 t=40.9 s`, session survived.
+
+**Three layers moved together, and that is what prevented the regeneration damage** (`strata-iq3_s.json` args at
+`index+1`, preset `extra["--max-context"]`, preset `"context"`) — `ensure_model`'s `desc_matches` saw preset.context
+== config `--max-context`, so setup/`adopt_prepared_files` never ran and `vision` / `max_queue 3` / `queue_timeout 90`
+/ `--spec-min-p 0.70` all survived the boot (verified by re-reading both files after it, not before). Fourth layer =
+llama-swap `capabilities.context` (`~/.config/nixos/homepc/configuration.nix` ~639) — **a separate step needing
+`nixos-rebuild switch`**; until it lands, llama-swap still advertises `context_window: 131072`, pi still auto-compacts
+at **114,688**, and the extra 64K is *unused by the client* even though the engine takes it.
+
+### Boot (`.tune/ctx196k.boot.txt`), against the live 131072 boot of the same day (era 297534)
+
+| line | 131072 (was) | **196608 (live)** |
+|---|---|---|
+| argv | `--max-context 131072 … --batch 3` | `--max-context 196608 … --batch 3 --vision --spec-min-p 0.70` |
+| KV streaming | 20480 of 131072 cells, **1.03 GiB** pinned | 20480 of 196608 cells, **1.55 GiB** pinned |
+| slot sessions | 3 × 0.40 GiB CUDA0 (1.20) / 3 × 0.22 CUDA1 | **3 × 0.48 (1.44)** / **3 × 0.27** |
+| CUDA0 expert cache | 5233 slots (9.65 GiB), auto -> 3894 | **5062 slots (9.33 GiB)**, auto -> 3764 (**−171 slots, −3.3 %**) |
+| experts resident | 55 % | **54 %** |
+| free at boot | 1179 / 2621 MiB | **1179 / 2419 MiB** (CUDA1 −202) |
+| min free at a window capture | 1063-1173 | **1163** |
+| `8192 of its 8192 profiled pairs`, `LOW`/`WARNING` | 8192/8192, 0 | **8192/8192, 0** |
+
+Gate: PASS. `--kv-resident` is untouched (still the 20480 clamp), so the **resident KV fraction halves in
+practice**: 20480 of 196608 = 10.4 % of a slot's cells in VRAM vs 15.6 %.
+
+### Measured after the switch — no collapse, and no claim either
+
+`bench-util.py --levels 1 3 --rounds 2 --max-tokens 400` (artifact `.tune/ctx196k.csv`), **with this session on the
+arm**, so the comparison base is the § DFlash2 control band measured the same way (L1 131.7-146.9, L4 159.1-172.5),
+*not* the old pi-off tables:
+
+| | streams | agg | per-stream | engine CPU |
+|---|---|---|---|---|
+| level 1 | 1 | 132.6 | 101, 164 | 14.10-16.51 cores |
+| level 3 | 3 | **167.0** | 53-60 | 14.57-16.35 |
+
+Era (`erastats.py --pack iq3_s`, n=13): `accept 80.6 %`, `drafts/step 5.16`, `yield gen/fed 1.456`,
+long `gen>=400` med 131.1. Drafting alive, inside the band. **The ±1 %-stable cold-read control is absent** — the
+bench prompts are ~30 tokens (the era's "cold reads med 161.1 tok/s" is fixed overhead, do not quote it). Anyone who
+wants the speed question closed needs `probe=`/unique-nonce arms, n>=4.
+
+### The finding that decides the cap: RAM, and the Nov-12 arm nobody wrote up
+
+`.tune/ctx-arms2.txt` + `.tune/ctx-{131072,196608,262144}.csv` (2026-11-12, engine 0.1.59, `--batch 3`, one knob —
+**those boots silently ran without `--vision`/`max_queue`, the damage described above**): `--max-context 262144`
+boots clean (`warnings: 0`, free 1257/2121, residency 52 %), L1 141.7 vs 196608's 164.2 — but n=1 round/arm, inside
+the drift band. What is not noise is the RAM column: **one 185K cold prompt at 262144 took `MemAvailable 9 -> 3 GiB`
+(`VmRSS 54 GiB`)**, vs 9 GiB held at 196608.
+
+Pinned KV is **linear in `--max-context` at fixed `--kv-resident`, per slot**: 1.03 / 1.55 / 2.06 GiB for
+131072 / 196608 / 262144 — so multiply by `parallel`. The live boot confirms the direction and *understates* it:
+`Shmem 41.2 -> 45.2 GiB` (**+4.0 GiB**) for a step the pinned line prices at +1.6 GiB; the rest is per-slot KV/RAM
+tiers that also track the cap. MemAvailable today: **7.9 GiB**, swap already 2 GiB used, 27.7 GiB page-locked experts.
+Full-KV demand at 3 × 256K is ~21 GiB vs ~10.5 at 3 × 128K (§ the RAM wall measured ~3.5 GiB per 128K slot) —
+that does not fit this 62 GiB box, which is why **256K lives on the solo `1slot` tree (capacity 1, kv-resident 32768,
+cache 8192 MiB) and not here**.
+
+**Still true at 192K — the ceiling parking will not reach.** Live parking costs **~32 KB/token**
+(`parked 52809 tokens bytes=1697473808`), so a conversation snapshot at ~190K is **~6.1 GiB ≥ the whole
+`--conversation-cache-mib 6144` budget**, and the `min-free-mib 1536` admission floor is 7.9 GiB deep. The cap buys
+*one* long conversation kept warm, not three; past that, each turn is a cold re-read at the measured
+**4,570-4,609 tok/s** (~40 s for 185K). If real traffic starts sitting at 150K+, the knob to arm is the cache
+budget/floor, not the split — and there is no RAM to fund it without dropping a slot.
+
+**Watch list for this arm** (next session that reads these notes): `Shmem` and `MemAvailable` at 150K+ traffic,
+`KV streaming: …% … hit VRAM` on deep prompts (was 91.8 % at 122K with 20480-of-131072 resident — expect it to drop
+with the resident fraction now at 10.4 %), and `capabilities.context` in nix, which must be switched to 196608 or pi
+will keep compacting at 114,688 and the change does nothing for the client.
+
+Backups: `strata-iq3_s.json.bak-20261119-pre-ctx196k`, `strata/launch-presets/docker.json.bak-20261119-pre-ctx196k`.
+Artifacts: `.tune/ctx196k.boot.txt`, `.tune/ctx196k.csv`. Runner note: `tune-ctx.sh ctx=N` exists and does set the
+preset `context` half (line 104) — but it does **not** re-check `vision`/`max_queue` afterwards, so run that check by
+hand after any ctx arm.

@@ -596,9 +596,13 @@ in
         # clear-by-rebuild arm no longer clears these. None of the four is on the tuner's never list.
         # Context cap is NOT an env knob here: the number the engine obeys is --max-context in the preset extra
         # + the run config, "context" below only carries the reuse test, and capabilities.context below is what
-        # gets advertised - keep them and pi's contextWindow in step. 131072 with 3 slots (preset "parallel": 3)
-        # since 2026-10-31; the 98304 cap (2026-10-27) was the fix for the RAM wall in parallel/TUNING_NOTES.md - the
-        # lower slot count is what pays for going back up, so re-check parked-snapshot pressure if slots rise again.
+        # gets advertised - keep them and pi's contextWindow in step. **196608 with 3 slots (preset "parallel": 3)
+        # since 2026-11-19** (131072 from 2026-10-31; the 98304 cap of 2026-10-27 was the fix for the RAM wall - see
+        # parallel/TUNING_NOTES.md § 2026-11-19 max-context). Why not 262144 here: pinned KV is linear in this number
+        # *per slot* (1.03 / 1.55 / 2.06 GiB at 20480 kv-resident), and one 185K cold prompt at 262144 took
+        # MemAvailable 9 -> 3 GiB; 256K belongs on the solo 1slot tree (capacity 1). Parking costs ~32 KB/token, so a
+        # ~190K conversation snapshot (~6.1 GiB) already exceeds the 6144 MiB cache budget - if slots rise again, or
+        # MemAvailable dips under ~6 GiB in real use, this cap is the first knob to give, not the split.
         "qwen3.8-flash-next-iq3_s-parallel" = {
           # swap.max=0 keeps the anon arena resident; no comments inside cmd — NOTES.md § llama-swap/strata
           cmd = ''
@@ -632,11 +636,12 @@ in
           # without this Strata under-reports to capability discovery
           capabilities = {
             # llama-swap advertises this as context_window / n_ctx to clients, so it must equal the engine's
-            # --max-context in the parallel tree (131072 since 2026-10-31, with the preset's "parallel": 3; pi discovers
-            # this value and holds no modelOverrides contextWindow for this model). Cap rationale:
+            # --max-context in the parallel tree (196608 since 2026-11-19, with the preset's "parallel": 3; pi discovers
+            # this value and holds no modelOverrides contextWindow for this model, so it auto-compacts above
+            # 196608 - 16384 = 180224). Cap rationale:
             # ~/.config/strata/parallel/TUNING_NOTES.md § the RAM wall.
             # `verify: layer 32 never rang` fired 4x on 2026-11-12 at both 131072 and 196608; suspect is STRATA_PW_WITH_BATCH=1 (4/55 ON boots vs 0/466 OFF), so it is out of the container env and out of the preset's `extra` — .config/strata/parallel/.tune/issue-verify-never-rang.md
-            context = 131072;
+            context = 196608;
             "in" = [ "text" "image" ];
             out = [ "text" ];
             tools = true;
