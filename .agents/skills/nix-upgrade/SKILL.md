@@ -174,9 +174,11 @@ Also state explicitly: the real root channel profile is still at the A0 revision
 
 ### A4 — confirm, then commit + switch (or clean up)
 
-**Do not switch without an explicit yes.** Ask:
+**Do not switch without an explicit yes.** **Warn about desktop-session teardown in the same breath as the ask** (verified 2026-11-19: a switch activation restarted the greetd/DMS stack mid-confirmation, killing the running Hyprland session and every app in it — including the agent session that was running the switch, whose shell was interrupted by it). Activation restarts system-level services — display manager, desktop/portal/Wayland services — so a running graphical session (Hyprland/DMS) is very likely to be **closed**, along with all the user's apps. Ask:
 
-> "Build succeeded and the diff is as above. Shall I commit the root channels to the revisions this build used and run `nixos-rebuild switch --store-path <new-toplevel>`? That activates the new system. If not, I'll remove the scratch state and nothing on the system changes."
+> "Build succeeded and the diff is as above. Shall I commit the root channels to the revisions this build used and run `nixos-rebuild switch --store-path <new-toplevel>`? That activates the new system — **heads up: activation restarts the display manager and desktop services, so your Hyprland/DMS session and all open apps (possibly including this chat) will very likely be closed. Save any unsaved work first.** If not, I'll remove the scratch state and nothing on the system changes."
+
+If the user confirms, run the commit + switch in the same flow without pausing further — the teardown happens at activation regardless; leaving extra gaps only increases the chance something else touches the state mid-flight.
 
 **Declined:** clean up (nothing to roll back — the real root profile was never touched):
 
@@ -213,6 +215,8 @@ pkexec env PATH="/run/current-system/sw/bin:/run/current-system/bin:/run/wrapper
 ```
 
 `--store-path` skips the evaluation and build phases entirely and activates exactly the store path built in A2 — no drift, no re-evaluation. The root channels are left at the committed generation: a confirmed upgrade advances channel state, and later no-upgrade rebuilds (system or home) evaluate against them. (A plain `nixos-rebuild switch` would also work — it would re-evaluate against the just-committed channels and produce the same toplevel — but `--store-path` is faster and can't drift.)
+
+**The pkexec switch invocation may itself be torn down by the activation.** If the agent session runs inside the desktop session being killed (seen 2026-11-19: shell aborted mid-`switch`, Hyprland/DMS session closed, apps gone, machine later rebooted by the user), the tool call reports `aborted`/interrupted — that does **not** mean the switch failed: the system profile move and most of activation happen before the session-killing service restarts. After reconnection, **verify the actual end state before concluding anything**: `readlink -f /run/current-system` + the system profile point at the new toplevel, `systemctl is-system-running` is `running`/`degraded`, `systemctl --failed` is empty, greetd/display-manager is `active` (the greeter comes back on its own). Only if those disagree with the expected state treat it as a partial switch (escape hatch below). Also tell the user up front, at the A4 ask, that this chat itself may die during the switch and they'll need to reconnect afterwards.
 
 Then:
 
@@ -445,6 +449,8 @@ NIX_PATH="nixpkgs=$NEW_NIXOS:nixpkgs-unstable=$NEW_UNSTABLE:nixos-config=/etc/ni
 - Historical: `nixos-rebuild --upgrade/--upgrade-all` re-fetches **root's** channels and hard-errors as non-root ("you must also pass '--sudo' or run the command as root") — that's why Flow A fetches in a scratch profile (A1) instead. (`--upgrade-all` also refreshes `nixpkgs-unstable`, which plain `--upgrade` would skip; the A2 `NIX_PATH` pins both channels explicitly.)
 
 ## Gotchas
+
+- A Flow A `switch` **kills the running graphical session** (display manager + desktop services are restarted by activation): on this host the Hyprland/DMS session and every app in it were closed at activation (2026-11-19), including the agent session driving the switch — the pkexec invocation came back `aborted` while the switch itself had actually completed. Warn the user at the A4 ask, and after any such interruption verify end state (`/run/current-system`, failed units, greeter) rather than trusting the aborted tool call.
 
 - Flow A runs as a plain user **except** the commit and the switch (A4): the scratch fetch and the build need no root. If you ever reach for `--upgrade-all` (channel fetch via nixos-rebuild), it hard-errors as non-root — that's why A1 fetches into a scratch profile instead.
 - The global flake registry has `flake:nixpkgs` pinned to a live unstable tarball — irrelevant for this classic rebuild (which resolves via NIX_PATH/channels), don't let it confuse the summary.
