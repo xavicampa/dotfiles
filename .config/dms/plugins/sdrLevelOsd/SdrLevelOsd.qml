@@ -1,14 +1,15 @@
 // sdrLevelOsd — DMS-styled slider OSD for Hyprland's SDR white-level keybinds.
 // SHIFT+F11/F12 in hyprland.lua reprograms sdr_max_luminance, then calls:
-//   dms ipc call sdrLevelOsd show <value> <min> <max>
+//   dms ipc call sdrLevelOsd show <value> <min> <max> <label>
+// (the Go IPC layer is strict on arity — all 4 args are required).
 // This reuses DMS's OWN OSD chrome (qs.Modules.OSD LevelOSD -> qs.Widgets DOSD,
 // the exact widget the brightness/volume OSDs are), so it matches the stock OSD
 // pixel-for-pixel and follows the user's OSD position setting (osdKind
 // "brightness" inherits the brightness OSD's position).
 //
-// DMS 2.1.2 (dux-shell). The Repeater-of-Variants pattern mirrors DMSShell.qml's
-// per-screen BrightnessOSD instantiation; modelData (the Screen) is injected by
-// name into DOSD's `modelData` property.
+// DMS 2.1.2 (dux-shell). The Variants pattern mirrors DMSShell.qml's per-screen
+// BrightnessOSD instantiation; modelData (the Screen) is injected by name into
+// DOSD's `modelData` property.
 
 pragma ComponentBehavior: Bound
 

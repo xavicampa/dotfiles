@@ -408,20 +408,29 @@ end
 -- SDR-in-HDR tone mapping + SHIFT+F11/F12 keybinds for the SDR white level
 -- (the Shift twins of the F11/F12 panel-brightness keys).
 -- sdr_min_luminance 0.005 sits desktop black on the OLED's true black (default
--- 0.2 lifts it); sdr_max_luminance (80-400 nits) is the perceived desktop/SDR
--- brightness. SHIFT+F11/F12 step ±20 — plain F11/F12 stay panel DDC brightness
--- (VCP 0x10);
--- the two stack. The closure seeds from SDR_MAX because the HL.Monitor object
+-- 0.2 lifts it); sdr_max_luminance (bind range 80-200 nits) is the perceived
+-- desktop/SDR brightness. SHIFT+F11/F12 step ±20 — plain F11/F12 stay panel DDC
+-- brightness (VCP 0x10); the two stack. The closure seeds from SDR_MAX because
+-- the HL.Monitor object
 -- exposes no getter for these fields. hl.monitor() at runtime applies
 -- instantly (no reload/flicker); each press re-registers the rule (last one
 -- wins) and a config reload resets to SDR_MAX below.
-local SDR_MAX = 120
+-- Seed 203 = Hyprland's hard-coded reference white (HDR_REF_LUMINANCE) that it
+-- advertises to color-managed clients (verified in WAYLAND_DEBUG: preferred
+-- image description luminances(..., reference=203)). Chrome/Slack render SDR at
+-- exactly that and IGNORE sdr_max_luminance entirely (no client flag changes
+-- that — tested WaylandHdrSurface off + force-color-profile=srgb). So at the
+-- 200 cap the desktop matches Chrome/Slack by default (200 vs the apps' fixed
+-- 203 is visually identical); SHIFT+F11/F12 only dim from the match point —
+-- the bind range is deliberately capped at 80-200, brighter-than-apps is not
+-- offered. Upstream #16329 would unify it.
+local SDR_MAX = 200
 if HOST == "homepc" then
     hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
                  sdr_max_luminance = SDR_MAX, sdr_min_luminance = 0.005 })
     local sdr_max = SDR_MAX
     local function set_sdr_max(v)
-        sdr_max = math.max(80, math.min(400, v))
+        sdr_max = math.max(80, math.min(200, v))
         hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
                      sdr_max_luminance = sdr_max, sdr_min_luminance = 0.005 })
         -- DMS-styled slider OSD via the sdrLevelOsd daemon plugin
@@ -429,12 +438,12 @@ if HOST == "homepc" then
         -- chrome so it looks exactly like the brightness/volume OSD and follows
         -- the OSD position setting. Value/min/max travel as IPC args.
         hl.exec_cmd("dms ipc call sdrLevelOsd show " .. sdr_max ..
-                    " 80 400 'SDR white'")
+                    " 80 200 'SDR white'")
     end
     hl.bind("SHIFT + F11", function() set_sdr_max(sdr_max - 20) end,
             { repeating = true, description = "SDR white level -20 nits (floor 80)" })
     hl.bind("SHIFT + F12", function() set_sdr_max(sdr_max + 20) end,
-            { repeating = true, description = "SDR white level +20 nits (cap 400)" })
+            { repeating = true, description = "SDR white level +20 nits (cap 200 = app match)" })
 end
 
 -- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────
