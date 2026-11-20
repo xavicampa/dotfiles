@@ -405,8 +405,36 @@ end
 -- cycle of the display fully restored DDC/CI (VCP 2.1, writes verified). If
 -- brightness keys ever go dead again: power-cycle the monitor before suspecting
 -- Hyprland/Chrome.
+-- SDR-in-HDR tone mapping + SHIFT+F11/F12 keybinds for the SDR white level
+-- (the Shift twins of the F11/F12 panel-brightness keys).
+-- sdr_min_luminance 0.005 sits desktop black on the OLED's true black (default
+-- 0.2 lifts it); sdr_max_luminance (80-400 nits) is the perceived desktop/SDR
+-- brightness. SHIFT+F11/F12 step ±20 — plain F11/F12 stay panel DDC brightness
+-- (VCP 0x10);
+-- the two stack. The closure seeds from SDR_MAX because the HL.Monitor object
+-- exposes no getter for these fields. hl.monitor() at runtime applies
+-- instantly (no reload/flicker); each press re-registers the rule (last one
+-- wins) and a config reload resets to SDR_MAX below.
+local SDR_MAX = 120
 if HOST == "homepc" then
-    hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr" })
+    hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
+                 sdr_max_luminance = SDR_MAX, sdr_min_luminance = 0.005 })
+    local sdr_max = SDR_MAX
+    local function set_sdr_max(v)
+        sdr_max = math.max(80, math.min(400, v))
+        hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
+                     sdr_max_luminance = sdr_max, sdr_min_luminance = 0.005 })
+        -- DMS-styled slider OSD via the sdrLevelOsd daemon plugin
+        -- (~/.config/dms/plugins/sdrLevelOsd) — reuses DMS's own LevelOSD/DOSD
+        -- chrome so it looks exactly like the brightness/volume OSD and follows
+        -- the OSD position setting. Value/min/max travel as IPC args.
+        hl.exec_cmd("dms ipc call sdrLevelOsd show " .. sdr_max ..
+                    " 80 400 'SDR white'")
+    end
+    hl.bind("SHIFT + F11", function() set_sdr_max(sdr_max - 20) end,
+            { repeating = true, description = "SDR white level -20 nits (floor 80)" })
+    hl.bind("SHIFT + F12", function() set_sdr_max(sdr_max + 20) end,
+            { repeating = true, description = "SDR white level +20 nits (cap 400)" })
 end
 
 -- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────
