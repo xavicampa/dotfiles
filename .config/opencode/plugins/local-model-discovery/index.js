@@ -24,6 +24,13 @@
  *  - the catalog is fetched ONCE, in setup() at startup. No polling: the
  *    endpoint is only queried when OpenCode starts. (The server may swap its
  *    resident model afterwards; the published catalog stays as discovered.)
+ *  - reasoning levels: llama-swap never advertises them on its own — its
+ *    `capabilities` block has no reasoning key — so they are declared in the
+ *    homepc config as a per-model `metadata:` block and read back from
+ *    `meta.llamaswap.reasoning` (see ~/.config/nixos/homepc/NOTES.md
+ *    § llama-swap/reasoning). Editing this file reloads the plugin, which
+ *    re-fetches the catalog: after a llama-swap config change, touch a comment
+ *    here (or /reload) to pick up the new advertisement.
  *
  * Configuration (all optional):
  *   "plugin": [{ "package": "./plugins/local-model-discovery",
@@ -46,6 +53,29 @@ const DEFAULT_PACKAGE = "@opencode/ai/providers/openai-compatible";
 const DEFAULT_CONTEXT = 131072;
 const MAX_OUTPUT_TOKENS = 65536;
 const FETCH_TIMEOUT_MS = 10000;
+
+/**
+ * Discovery writes its own trail: OpenCode forwards plugin `console.*` output
+ * nowhere — verified 2026-11-20, the `efforts.map` crash that emptied the whole
+ * provider produced zero lines in ~/.local/share/opencode/log/opencode.log and
+ * zero on stderr. Same habit as the pi twin
+ * (~/.pi/agent/extensions/local-model-discovery.ts).
+ */
+const LOG_FILE = path.join(
+  process.env.XDG_STATE_HOME ?? path.join(os.homedir(), ".local", "state"),
+  "opencode",
+  "logs",
+  "local-model-discovery.log",
+);
+
+function log(message) {
+  try {
+    fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
+    fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} ${message}\n`);
+  } catch {
+    // Logging must never be the reason discovery fails.
+  }
+}
 
 /**
  * The endpoint declared for the provider in opencode.json: v2
@@ -132,16 +162,24 @@ function extractInputTypes(model) {
 
 /**
  * The reasoning a local model advertises: `{ thinks: true, efforts, default }`
- * (Splash), a bare `true`, or nothing at all. Returns undefined when the model
- * does not advertise reasoning.
+ * (Splash) either on the record itself or — for llama-swap — inside
+ * `meta.llamaswap`, where the server copies the per-model `metadata:` block
+ * verbatim (homepc declares `reasoning = { thinks, efforts, default }` there
+ * in ~/.config/nixos/homepc/configuration.nix), a bare `true`, or nothing at
+ * all. Returns `{ efforts, defaultEffort }`, or undefined when the model does
+ * not advertise reasoning.
  */
 function extractReasoning(model) {
-  const reasoning = model?.reasoning;
-  if (reasoning === true) return [];
+  const reasoning = model?.meta?.llamaswap?.reasoning ?? model?.reasoning;
+  if (reasoning === true) return { efforts: [], defaultEffort: undefined };
   if (reasoning && reasoning.thinks === true) {
-    return Array.isArray(reasoning.efforts)
-      ? reasoning.efforts.filter((effort) => typeof effort === "string")
-      : [];
+    return {
+      efforts: Array.isArray(reasoning.efforts)
+        ? reasoning.efforts.filter((effort) => typeof effort === "string")
+        : [],
+      defaultEffort:
+        typeof reasoning.default === "string" ? reasoning.default : undefined,
+    };
   }
   return undefined;
 }
@@ -149,7 +187,14 @@ function extractReasoning(model) {
 /** Turn one /v1/models entry into an OpenCode V2 model record. */
 function toModelInfo(providerID, options, raw) {
   const context = extractContextSize(raw);
-  const efforts = extractReasoning(raw);
+  // `reasoning` is `{ efforts, defaultEffort }` (or undefined); `efforts` is the
+  // array of level names. Kept apart on purpose: the 2026-11-20 "xhigh default"
+  // change made extractReasoning return an object while these call sites still
+  // treated it as the array, so `efforts.map(...)` threw inside discoverModels,
+  // the catch in setup() swallowed it, and NOTHING was published — the provider
+  // went empty rather than failing loudly.
+  const reasoning = extractReasoning(raw);
+  const efforts = reasoning?.efforts ?? [];
 
   return {
     id: raw.id,
@@ -158,25 +203,34 @@ function toModelInfo(providerID, options, raw) {
     name: raw.name ?? raw.id,
     package: options.package,
     // The endpoint that served this record, so the request layer cannot pick a
-    // different one than discovery used.
-    settings: { baseURL: options.baseURL },
+    // different one than discovery used. `reasoningEffort` here is the model
+    // default applied to every request unless a variant overrides it: the
+    // openai-compatible package flattens it to `reasoning_effort` in the body
+    // (shape fixed in OpenCode 2.0 — anomalyco/opencode#48183).
+    settings: {
+      baseURL: options.baseURL,
+      ...(reasoning?.defaultEffort !== undefined && {
+        reasoningEffort: reasoning.defaultEffort,
+      }),
+    },
     capabilities: {
       tools: true,
       input: extractInputTypes(raw),
       output: ["text"],
-      ...(efforts !== undefined && {
-        reasoning: { supported: true, effort: efforts },
-      }),
+      // No `reasoning` key here: it is a *config* shape (Config.Model.Reasoning,
+      // which OpenCode expands into variants itself), not a field of
+      // Model.Capabilities — publishing it would be stripped by the schema.
+      // The variants below are what make `/variant` offer the levels.
     },
     // Reasoning streams in the OpenAI Chat `delta.reasoning_content` field.
-    ...(efforts !== undefined && {
+    ...(reasoning !== undefined && {
       compatibility: { reasoningField: "reasoning_content" },
     }),
-    // One variant per advertised thinking effort: `local/<model>@low`, …
-    variants: efforts?.map((effort) => ({
+    // One variant per advertised thinking effort: `local/<model>#low`, …
+    variants: efforts.map((effort) => ({
       id: effort,
       settings: { reasoningEffort: effort },
-    })) ?? [],
+    })),
     // Models are listed ordered by release date; `0` would pin locals dead-last in
     // pickers. Use the server-advertised `created` (epoch seconds, OpenAI
     // convention) or the discovery time.
@@ -211,19 +265,50 @@ function fingerprint(models) {
     .join("|");
 }
 
-async function discoverModels(baseURL, providerID, options) {
-  const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+/**
+ * Fetch + map, keeping the two failure kinds apart:
+ *  - the endpoint being down/unreadable is normal operation (llama-swap may not
+ *    be up yet), so it returns undefined and the caller keeps the old catalog.
+ *  - a failure while mapping the records is a bug in this file. Rethrowing it
+ *    out of setup() makes OpenCode log a plugin error; swallowing it instead
+ *    empties the provider silently, which is how the 2026-11-20 regressions
+ *    looked like "the local models disappeared" with nothing in the log.
+ */
+async function tryDiscover(baseURL, providerID, options) {
+  let payload;
+  try {
+    const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    payload = await response.json();
+  } catch (error) {
+    log(
+      `could not read models from ${baseURL}: ${error?.message ?? error}`,
+    );
+    return undefined;
   }
 
-  const payload = await response.json();
-  return (Array.isArray(payload?.data) ? payload.data : [])
-    .filter((model) => typeof model?.id === "string" && model.id.length > 0)
-    .map((model) => toModelInfo(providerID, options, model));
+  const records = (Array.isArray(payload?.data) ? payload.data : []).filter(
+    (model) => typeof model?.id === "string" && model.id.length > 0,
+  );
+  try {
+    return records.map((model) => toModelInfo(providerID, options, model));
+  } catch (error) {
+    log(
+      `BUG: failed to map ${records.length} record(s) from ${baseURL}: ${
+        error?.stack ?? error
+      }`,
+    );
+    console.error(
+      `[local-model-discovery] failed to map ${records.length} record(s) from ${baseURL}: ${
+        error?.stack ?? error
+      }`,
+    );
+    throw error;
+  }
 }
 
 export default Plugin.define({
@@ -256,16 +341,12 @@ export default Plugin.define({
 
       let models;
       try {
-        models = await discoverModels(baseURL, providerID, options);
+        models = await tryDiscover(baseURL, providerID, options);
       } catch (error) {
-        console.warn(
-          `[local-model-discovery] could not read models from ${baseURL}: ${
-            error?.message ?? error
-          }`,
-        );
+        // Already reported by tryDiscover; leave the provider untouched.
         return;
       }
-      if (models.length === 0) return;
+      if (models === undefined || models.length === 0) return;
 
       const next = `${baseURL}\u0000${fingerprint(models)}`;
       if (next === published) return;
@@ -275,6 +356,22 @@ export default Plugin.define({
         editor.models.set(providerID, models);
       });
       await ctx.provider.reload();
+
+      // An empty catalog here is what "the plugin stopped working" looks like.
+      log(
+        `published ${models.length} model(s) for "${providerID}" from ${baseURL}: ` +
+          models
+            .map(
+              (model) =>
+                `${model.id} ctx=${model.limit.context} variants=[${model.variants
+                  .map((variant) => variant.id)
+                  .join(",")}]` +
+                (model.settings.reasoningEffort
+                  ? ` default=${model.settings.reasoningEffort}`
+                  : ""),
+            )
+            .join(" | "),
+      );
     };
 
     // One fetch at startup, nothing afterwards: setup() runs once per process.
