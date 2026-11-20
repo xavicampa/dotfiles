@@ -347,7 +347,13 @@ in
   };
 
   # root channel's intel-npu-driver 1.28 predates the Arrow Lake NPU (8086:ad1d) — pin driver+firmware+validation (all outputs the npu module consumes) to unstable — NOTES.md § dictate
-  nixpkgs.overlays = [ (final: prev: { intel-npu-driver = unstable.intel-npu-driver; }) ];
+  nixpkgs.overlays = [ (final: prev: {
+    intel-npu-driver = unstable.intel-npu-driver;
+    # Chrome HDR video on the ARL iGPU: VA-API decode + WaylandHdrSurface. The HDR lever turned out to be Hyprland's cm=hdr output preset (Chrome reads output color caps via color-management-v1), NOT Chrome Vulkan: Chromium's Wayland ozone hard-rejects browser-wide Vulkan (wayland_surface_factory.cc "not compatible with Vulkan" → white video surfaces), and --use-angle=vulkan once blacklisted the whole GPU process. ANGLE stays on GL = Intel iGPU. No VK pin needed without Vulkan features.
+    google-chrome = prev.google-chrome.override {
+      commandLineArgs = "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoDecoder,VaapiIgnoreDriverChecks,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo,Wayland,WaylandHdrSurface";
+    };
+  }) ];
 
   # DMS draws its own bar — NOTES.md § waybar
   systemd.user.services.waybar.wantedBy = lib.mkForce [ ];
