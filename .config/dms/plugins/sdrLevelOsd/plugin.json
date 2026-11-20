@@ -1,0 +1,15 @@
+{
+  "id": "sdrLevelOsd",
+  "name": "SDR Level OSD",
+  "description": "DMS-style slider OSD for the Hyprland SHIFT+F11/F12 SDR white-level keybinds (reuses the shell's own LevelOSD/DOSD chrome)",
+  "version": "0.1.0",
+  "author": "javi",
+  "license": "MIT",
+  "icon": "lightbulb",
+  "type": "daemon",
+  "capabilities": [
+    "ipc"
+  ],
+  "component": "./SdrLevelOsd.qml",
+  "requires_dms": ">=2.0.0"
+}

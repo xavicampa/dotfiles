@@ -5,5 +5,8 @@
   },
   "emojiPicker": {
     "enabled": true
+  },
+  "sdrLevelOsd": {
+    "enabled": true
   }
 }
