@@ -203,3 +203,85 @@ Also in arm 6, a real long session ran through the engine: 182,501-token cold re
 
 kv-resident 20480 vs 32768 at split 31: reads identical, CUDA0 +45 slots, CUDA1 +62 MiB margin,
 decode a little lower -> keep **32768** (setup's own value for ctx >= 64K).
+
+---
+
+# 2026-11-19 — `STRATA_ROUTE_TAIL_SKIP`: the default is ON here, unmeasured until now. **Keeper: leave it alone**
+
+Requested: price the flag the boot line advertises as "+10..20% decode on 12-16 GB cards that miss
+experts", which no arm had ever touched (`grep ROUTE_TAIL_SKIP` over this file and
+`../parallel/TUNING_NOTES.md`: 0 hits). Env-only, no CLI flag (`data/settings-register.json` →
+`src/core/expert_source.cpp:4924`, `src/program/generate.cpp:13819,15068-15070`).
+
+Six eras, arm interleaved with a control after every arm. Reload 37.0-37.8 s. Boot carries
+split 30 / pcie-frac 0.20 / kv-resident 32768 / pipeline-windows 2 / spec 4 / ctx 262144 throughout,
+`9215 of its 9216 profiled pairs`, 61% of the experts resident, 1019 / 1157 MiB free:
+
+| era | line | state | skipped / entries | skip per 1k generated |
+|---|---|---|---|---|
+| ctl-tail-a (warm, measure-only) | 295672 | ON rank 7 | 227 867 / 236 772 (96.2%) | 21 856 |
+| ctl-tail-b (fresh boot, default) | 295940 | ON rank 7 | 94 443 / 98 572 (95.8%) | 21 751 |
+| tail0-a (`=0`) | 296177 | off (no boot line, no counter) | 0 | 0 |
+| ctl-tail-c (default) | 296375 | ON rank 7 | 260 268 / 270 572 (96.2%) | 21 818 |
+| tail0-b (`=0`) | 296773 | off | 0 | 0 |
+| ctl-tail-d (default) | 297074 | ON rank 7 | 179 159 / 187 475 (95.6%) | 23 783 |
+
+Mechanism column (`./tail-stats.py`, in-era, near-noise-free): the default skips **~22 experts per
+generated token**, i.e. almost every decode-path miss — 48 layers x top-10 routing = 480 routed
+slots/token, a 4-5% cache miss rate is ~24 misses/token, and 95.6-96.2% of them are skipped. That is
+why the log's `read by the GPU over PCIe or from another GPU` stays at 0.1-0.3% of all routed.
+
+Speed, `bench-1slot.py` engine accounting, stage medians (adjacent boots):
+
+| stage | ctl-c (ON) | tail0-b (OFF) | ctl-d (ON) | control-to-control spread |
+|---|---|---|---|---|
+| B ~83K ctx decode | 133.4 | 131.3 | **143.6** | 7.6% |
+| C ~169K ctx decode | 124.1 | 121.4 | **131.7** | 6.1% |
+| D cold 84 673 read | 4777.0 | 5002.4 | 4976.2 | 4.2% |
+
+Same-era probe pairs (`ab-arm.sh` greedy, fresh nonce, decode tok/s at 4002 / 11602 prompt): ctl-a
+138.1 / 136.9 (144.8), ctl-b 136.2 / 133.9 (146.3), ctl-c 129.8 / 132.5 (151.7), tail0-a
+126.4 / 128.2 (137.6) — the single `=0` era sits ~5% under the three controls.
+
+**Read.** Turning it off costs ~5% decode at mid/deep context, not the 10-20% the boot line quotes,
+because this box is not the profile the number was measured on: 61% resident, 4-5% miss, 0.1-0.3%
+actually staged over PCIe. And 5% is inside the control-to-control spread (7.6% at B, 6.1% at C), so
+**no boot pair here can resolve it** — the honest result is "worth a few percent, keep the default,
+close the knob". Raising the rank (8/9) is capped arithmetically: 95.6-96.2% of eligible entries are
+already skipped, so the last ~4% of a ~5% mechanism cannot reach the drift floor; those arms were not
+run.
+
+**D is not a cross-boot column.** Two identical controls read 4777.0 and 4976.2 (+4.2%). The
++-0.03% reproducibility in the Oct notes is repetition *within* one era. Compare D only inside an era.
+
+## Traps this sweep found (each one cost a boot or a wrong readout)
+
+- **`env=` does not survive the relaunch on this tree.** It writes the *state* config
+  (`state/strata/launch/docker.json`), which the launch regenerates from the preset, so the pin is
+  gone the moment the container stops: era 295940 was a dead `=0` arm (kept as a control, it matches
+  the other controls byte-for-byte on the boot line). The durable layer is **preset `extra` with a
+  bare `STRATA_*` key** — how `STRATA_SPLIT_RING` / `PF_FUSED` / `ADAPT_LAG` / `EXCHANGE_ROTATE`
+  live. `ab-arm.sh` had no assertion for that layer at all; it now asserts `extra-env LIVE` for every
+  non-`--` extra key and stops on failure.
+- **Never write `"off"` for an env pin**: `strata_cli/launch/settings.py:as_argv_changes` reads
+  off/false/no/none as *removal*, so `"STRATA_ROUTE_TAIL_SKIP": "off"` deletes the pin and benches
+  the default 7 while you believe it is 0. Write `"0"`.
+- **`ab-arm.sh`'s env LIVE check was pinned to `components/engine/0.1.58*/strata`** — on the 0.1.62
+  image it would have declared every env arm dead. Now matches any version; the audit line also
+  gained ROUTE_TAIL_SKIP / TAIL_SKIP_MAX_CACHED.
+- **pgrep self-match**: `pgrep -f 'components/engine/.*--serve' | head -1` matches the `bash -c`
+  wrapper, whose own command line contains the pattern. `bench-1slot.py`'s `show_state()` printed
+  `resident-experts=off kv-resident=off max-context=None` for a boot that carried them all, and my
+  inline `/proc` assert came back empty the same way. Both now require argv[0] to be the `strata`
+  binary. **Check the era label line, not just the counters**: a `off/off/None` label means the probe
+  missed the process, not that the flags are gone.
+- **`bench-1slot.py` pointed at :5802**, the parallel tree's port (the parallel container is down, so
+  it would have benched nothing). Now `BENCH_URL`, default 5801 — which is what this file's own
+  header always said.
+
+Revert points: `ab-arm.sh.bak-20261119-pre-tailsweep`, `bench-1slot.py.bak-20261119-pre-tailsweep`,
+`strata/launch-presets/docker.json.bak-20261119-pre-tailsweep`, and the volume's
+`state/strata/launch/docker.json.bak-20261119-pre-tailsweep`. Live state after the sweep: preset
+identical to its backup, no tail key anywhere, four env pins present in `/proc/<engine>/environ`,
+boot argv unchanged. Artifacts: `.tune/{ctl-tail-a,ctl-tail-b,tail0-a,ctl-tail-c,tail0-b,ctl-tail-d}.{era,boot.txt,probes.txt}`,
+`.tune/tailsweep-stats.json`. New helper: `tail-stats.py`.

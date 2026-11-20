@@ -23,7 +23,9 @@ import threading
 import time
 import urllib.request
 
-URL = "http://127.0.0.1:5802/v1/chat/completions"
+# 5801 is THIS (1slot) tree; 5802 is the parallel tree. The hardcoded 5802 made bench-1slot.py bench
+# whatever else happened to be up (2026-11-19: nothing, the parallel container was down). Override: BENCH_URL.
+URL = os.environ.get("BENCH_URL", "http://127.0.0.1:5801/v1/chat/completions")
 LOG = ("/home/javi/.local/share/containers/storage/volumes/strata-data/_data/"
        "state/strata/launch/docker.engine.log")
 MODEL = "qwen3.8-flash-next-iq3_s"
@@ -63,9 +65,15 @@ def chat(messages, max_tokens):
 
 
 def engine_argv():
+    # pgrep -f matches the bash -c wrapper's OWN command line (it contains the pattern), so `head -1`
+    # sometimes returned that pid and show_state() printed "off/off/None" for a boot that carried the
+    # flags. Skip the shell itself and require argv[0] to be the engine binary. (2026-11-19 tailsweep.)
     return subprocess.run(
-        ["bash", "-c", "pid=$(pgrep -f 'components/engine/.*--serve' | head -1); "
-         "tr '\\0' '\\n' < /proc/$pid/cmdline"], capture_output=True, text=True).stdout.split()
+        ["bash", "-c", "for p in $(pgrep -f 'components/engine/.*--serve'); do "
+         "[ \"$p\" = \"$$\" ] && continue; "
+         "a0=$(tr '\\0' '\\n' < /proc/$p/cmdline 2>/dev/null | head -1) || continue; "
+         "[ \"${a0##*/}\" = strata ] || continue; "
+         "tr '\\0' '\\n' < /proc/$p/cmdline; done"], capture_output=True, text=True).stdout.split()
 
 
 def show_state(argv):

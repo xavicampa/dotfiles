@@ -24,6 +24,9 @@
 #   want=       substring(s) the boot argv must carry (assertion), e.g. want=--pipeline-windows 0
 #   p40k / p120k  probe rounds (default 2 and 1)
 # Artifacts: .tune/<label>.{era,boot.txt,probes.txt}. pi is served by this engine: no background sweeps.
+# 2026-11-19 (tailsweep): the `env LIVE` check matched only `components/engine/0.1.58*/strata`, so on the
+# 0.1.62 image it reported every env arm dead; it now matches any engine version. The env audit line also
+# gained ROUTE_TAIL_SKIP / TAIL_SKIP_MAX_CACHED. Backup: ab-arm.sh.bak-20261119-pre-tailsweep.
 set -u
 TREE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 P=$TREE/strata/launch-presets/docker.json
@@ -32,7 +35,7 @@ DCON=$VOL/state/strata/launch/docker.json
 L=$VOL/state/strata/launch/docker.engine.log
 C=qwen3.8-flash-next-iq3_s          # container name == llama-swap proxy id == PI_MODEL
 OUT=$TREE/.tune; mkdir -p "$OUT"
-MEASURE=0; EXTRA=(); EDEL=(); DRAFT=""; ENVSET=(); ENVCLEAR=0; WANT=(); N40=2; N120=1
+MEASURE=0; EXTRA=(); EXTRA_ORIG=(); EDEL=(); DRAFT=""; ENVSET=(); ENVCLEAR=0; WANT=(); N40=2; N120=1
 
 LABEL=${1:?label required}; shift || true
 WL=${WL:-11500}   # long-probe words ~ tokens for this word list (calibrated: 11500 words -> 11602 tokens)
@@ -53,6 +56,7 @@ for a in "$@"; do
 done
 
 if [ "$MEASURE" != 1 ]; then
+  EXTRA_ORIG=("${EXTRA[@]+"${EXTRA[@]}"}")
   EXTRA="${EXTRA[*]}" EDEL="${EDEL[*]}" DRAFT="$DRAFT" ENVSET="${ENVSET[*]}" ENVCLEAR="$ENVCLEAR" python3 - "$P" "$DCON" <<'PY'
 import json, os, sys
 P, DCON = sys.argv[1:3]
@@ -99,18 +103,32 @@ echo "$N" > "$OUT/$LABEL.era"; tail -n +$N "$L" > "$OUT/$LABEL.boot.txt"
 sed 's/^\[strata\] [0-9 :-]*//' "$OUT/$LABEL.boot.txt" | grep -aE "layer split: CUDA1 runs|of the experts resident|MiB of VRAM free with everything loaded|draft layer|dflash2|drafter|mtp:|LOW |WARNING|out of memory" | cut -c1-190
 
 echo "--- engine child argv+env (what the arm ACTUALLY runs) ---"
-podman exec "$C" sh -c 'for p in $(ls /proc | grep -E "^[0-9]+$"); do grep -qa components/engine /proc/$p/cmdline 2>/dev/null && grep -av vision /proc/$p/cmdline >/dev/null 2>/dev/null && { echo "  argv:"; tr "\0" "\n" < /proc/$p/cmdline | grep -E "^--(draft|mtp|pipeline-windows|spec|spec-min-p)$|^--(draft|mtp|pipeline-windows|spec|spec-min-p) " | tr "\n" " "; echo; echo "  env:"; tr "\0" "\n" < /proc/$p/environ | grep -E "^STRATA_(ADAPT_FETCH|SELECT_TWO_PASS|GDN|CKPT_POOL|PF_FUSED|SPLIT_RING|ADAPT_LAG|EXCHANGE_ROTATE)" | sort | tr "\n" " "; echo; }; done' 2>/dev/null
+podman exec "$C" sh -c 'for p in $(ls /proc | grep -E "^[0-9]+$"); do grep -qa components/engine /proc/$p/cmdline 2>/dev/null && grep -av vision /proc/$p/cmdline >/dev/null 2>/dev/null && { echo "  argv:"; tr "\0" "\n" < /proc/$p/cmdline | grep -E "^--(draft|mtp|pipeline-windows|spec|spec-min-p)$|^--(draft|mtp|pipeline-windows|spec|spec-min-p) " | tr "\n" " "; echo; echo "  env:"; tr "\0" "\n" < /proc/$p/environ | grep -E "^STRATA_(ADAPT_FETCH|SELECT_TWO_PASS|GDN|CKPT_POOL|PF_FUSED|SPLIT_RING|ADAPT_LAG|EXCHANGE_ROTATE|ROUTE_TAIL_SKIP|TAIL_SKIP_MAX_CACHED)" | sort | tr "\n" " "; echo; }; done' 2>/dev/null
 
 if [ "${#ENVSET[@]}" -gt 0 ] || [ "$ENVCLEAR" = 1 ]; then
   for kv in "${ENVSET[@]+"${ENVSET[@]}"}"; do
     k=${kv%%=*}
-    if podman exec "$C" sh -c 'for p in $(ls /proc | grep -E "^[0-9]+$"); do grep -qa components/engine/0.1.58[^/]*/strata /proc/$p/cmdline 2>/dev/null && tr "\0" "\n" < /proc/$p/environ | grep -qxF "$1" && echo yes; done' _ "$kv" | grep -q yes; then
+    if podman exec "$C" sh -c 'for p in $(ls /proc | grep -E "^[0-9]+$"); do grep -qa components/engine/[^/]*/strata /proc/$p/cmdline 2>/dev/null && tr "\0" "\n" < /proc/$p/environ | grep -qxF "$1" && echo yes; done' _ "$kv" | grep -q yes; then
       echo "  env LIVE: $kv"
     else
       echo "  env NOT LIVE: $kv — the relaunch did not carry it (launch regenerates the state config). Arm dead, STOP." >&2; exit 1
     fi
   done
 fi
+
+# 2026-11-19 (tailsweep): an STRATA_* pin written with env= lands in the state config, which the launch
+# regenerates from the preset — it is gone after the stop/reload. The durable layer is preset `extra`
+# (a key without a leading `--`). Those arms had NO assertion, so a dead arm benched silently; assert here.
+for kv in "${EXTRA_ORIG[@]+"${EXTRA_ORIG[@]}"}"; do
+  k=${kv%%|*}
+  case "$k" in --*) continue;; esac
+  v=${kv#*|}
+  if podman exec "$C" sh -c 'for p in $(ls /proc | grep -E "^[0-9]+$"); do grep -qa components/engine/[^/]*/strata /proc/$p/cmdline 2>/dev/null && tr "\0" "\n" < /proc/$p/environ | grep -qxF "$1" && echo yes; done' _ "$k=$v" | grep -q yes; then
+    echo "  extra-env LIVE: $k=$v"
+  else
+    echo "  extra-env NOT LIVE: $k=$v — preset extra never reached the engine child. Arm dead, STOP." >&2; exit 1
+  fi
+done
 
 echo "--- probes: greedy, unique prefix (nonce first, so no reuse); long probe words=$WL ---"
 python3 - "$LABEL" "$N40" "$N120" "$WL" <<'PY' > "$OUT/$LABEL.probes.txt" 2>&1
