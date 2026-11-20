@@ -1073,6 +1073,32 @@ listing `api.go:196`):
 Not used (yet): `profiles:` (v244+) can retarget aliases at runtime from the UI/API — an option if
 the default should flip between the single and parallel backends without a rebuild.
 
+### llama-swap/reasoning — thinking levels for clients (wired 2026-11-20)
+
+Both qwen entries carry `metadata = { reasoning = { thinks = true; efforts = [ "low" "medium"
+"xhigh" ]; }; }`. This is the same freeform pass-through as `capabilities` (nixpkgs module is
+`freeformType`); llama-swap copies `metadata` **verbatim** into `/v1/models` under
+`meta.llamaswap.reasoning` (docs § model listings; `metadata` key exists since the #264 feature,
+present in v262 and v268 sources).
+
+- **Why here, not in the opencode plugin**: llama-swap's `capabilities` renderer has **no
+  reasoning key** — context/in/out/tools/embeddings/reranker/voices only — so the model's
+  thinking levels have nowhere to live except `metadata`. Declaring it at the serving layer keeps
+  one source of truth for every client, not just OpenCode.
+- **Levels from the base card, not invented**: Qwen/Qwen3.8-Flash-Next model card § thinking
+  control: `reasoning_effort`, "**xhigh by default; supported levels are xhigh, medium, and
+  low**" — there is no `high`. The GSQ-RCO GGUF card is silent on reasoning; the GGUF inherits
+  the base's chat template. Strata honors the parameter live (2026-11-20, same prompt run to
+  finish): low ~480 thinking tokens / 1160 completion vs xhigh ~3.4k / 3561; the `medium` level
+  is accepted too.
+- **Who reads it**: `~/.config/opencode/plugins/local-model-discovery` publishes one OpenCode
+  variant per effort (`local/qwen3.8-flash-next#low|medium|xhigh`, each setting
+  `reasoningEffort`) plus `capabilities.reasoning` and `compatibility.reasoningField =
+  reasoning_content`. Without it OpenCode reported "the current model supports no effort
+  variants" — it only trusts catalog metadata, and llama-swap advertises no reasoning on its own.
+- Alias: `meta.llamaswap.reasoning` rides the `qwen3.8-flash-next` alias record too (the alias
+  loop in v262 `api.go` passes `mc.Metadata` verbatim; § llama-swap/aliases "full duplicate").
+
 ### llama-swap/strata-p3 — `qwen3.8-flash-next-iq3_s-p3` (PARKED 2026-10-25)
 
 **Dropped 2026-10-25:** the backend and its launch preset are both out (it lost its `gpu` group

@@ -571,6 +571,17 @@ in
             out = [ "text" ];
             tools = true;
           };
+          # thinking levels for clients: llama-swap copies `metadata` verbatim into
+          # /v1/models as meta.llamaswap.reasoning (capabilities has no reasoning key —
+          # docs/kb/guides/model-runtime/capabilities-and-model-listings.md). Levels from the
+          # base card (Qwen/Qwen3.8-Flash-Next: `reasoning_effort`; xhigh is the default,
+          # supported levels are xhigh, medium, low — there is no "high"); `default` pins that
+          # explicitly so a no-variant client cannot drift if the engine's own default moves.
+          # Strata obeys:
+          # measured 2026-11-20, same prompt, thinking tokens ~480 (low) vs ~3.4k (xhigh).
+          # opencode's local-model-discovery plugin reads this and publishes #low/#medium/#xhigh
+          # variants — NOTES.md § llama-swap/reasoning.
+          metadata = { reasoning = { thinks = true; efforts = [ "low" "medium" "xhigh" ]; default = "xhigh"; }; };
         };
 
         # Strata - batch engine (only batched tree now; the 3slots fork was removed 2026-10-26 —
@@ -646,6 +657,10 @@ in
             out = [ "text" ];
             tools = true;
           };
+          # same reasoning levels as the solo entry; v262's alias loop (internal/server/api.go)
+          # passes this mc.Metadata verbatim to the qwen3.8-flash-next alias record too, so the
+          # name clients pin carries meta.llamaswap.reasoning as well.
+          metadata = { reasoning = { thinks = true; efforts = [ "low" "medium" "xhigh" ]; default = "xhigh"; }; };
         };
 
         # Maya: GLM-5.3-Flash MoE, images built locally; model bytes stay in /hf-cache — NOTES.md § llama-swap/maya
