@@ -2,12 +2,19 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "local/qwen3.8-flash-next",
   "plugins": [
-    "./plugins/local-model-discovery"
+    "./plugins/local-model-discovery",
+    {
+      "package": "./plugins/bedrock-scope-filter",
+      "options": {
+        "keep": ["eu.", "global."]
+      }
+    }
   ],
   "policies": [
     { "action": "provider.use", "resource": "*", "effect": "deny" },
     { "action": "provider.use", "resource": "anthropic", "effect": "allow" },
-    { "action": "provider.use", "resource": "local", "effect": "allow" }
+    { "action": "provider.use", "resource": "local", "effect": "allow" },
+    { "action": "provider.use", "resource": "amazon-bedrock", "effect": "allow" }
   ],
   "provider": {
     "omni": {
@@ -157,6 +164,14 @@
       "name": "Local",
       "options": {
         "baseURL": "http://localhost:8080/v1"
+      }
+    }
+  },
+  "providers": {
+    "amazon-bedrock": {
+      "settings": {
+        "profile": "javier-personal-dev-inference",
+        "region": "eu-north-1"
       }
     }
   },
