@@ -1415,3 +1415,140 @@ Backups: `strata-iq3_s.json.bak-20261119-pre-ctx196k`, `strata/launch-presets/do
 Artifacts: `.tune/ctx196k.boot.txt`, `.tune/ctx196k.csv`. Runner note: `tune-ctx.sh ctx=N` exists and does set the
 preset `context` half (line 104) — but it does **not** re-check `vision`/`max_queue` afterwards, so run that check by
 hand after any ctx arm.
+
+## The batch-slot pipeline: `--batch-groups 3` + `STRATA_PIPED_MTP=2` is +21…+26 % at 2–3 streams (2026-11-20 08:00–08:18, engine 0.1.62 / image 0.2.16)
+
+**LIVE since 2026-11-20 09:07** (era 306027): the preset now carries exactly three new keys —
+`"--batch-groups": "3"`, `"STRATA_PIPED_MTP": "2"`, `"STRATA_BATCH_SELF_COMMIT": "0"` — verified against
+`docker.json.bak-20261119-pre-grpsweep` by diff, and in the live engine (`/proc/<pid>/environ` carries the two
+`STRATA_*`, argv carries `--batch-groups 3`). Everything else is the keeper. Revert = delete those three keys:
+`./grp-arm.sh revert unset=--batch-groups,STRATA_PIPED_MTP,STRATA_BATCH_SELF_COMMIT`.
+Depth (`=2` vs `=3`) was probed after the first verdict — see § depth below.
+
+Runner: `grp-arm.sh` (new, this tree) — same shape as `tune-ctx.sh` but every knob goes into the **preset
+`extra`** (bare `STRATA_*` keys and `--flag`/value pairs), because the run config is regenerated from the
+preset each start. It fails loudly when a pin does not reach the engine (`/proc/<pid>/environ` for
+`STRATA_*`, argv for flags) and asserts the boot-log line the knob is supposed to print. Artifacts:
+`.tune/{ctl-a,ctl-b,pw,grp2,ctl-x,grp3,grp3b,grp3pw,ctl-d}.{era,boot.txt,assert.txt,bench.txt,csv}`.
+Bench: `bench-util.py --levels 1 2 3 --rounds 3 --max-tokens 400`, medians. All boots at **ctx 196608**
+(the 2026-11-19 23:58 bump, `bak-20261119-pre-ctx196k`), `--batch 3`, keeper otherwise unchanged.
+
+### agg tok/s (medians of 3 rounds), 9 boots
+
+| boot | config delta vs the keeper | streams 1 | streams 2 | streams 3 |
+|---|---|---|---|---|
+| ctl-a 08:00 | — | 145.9 | 159.0 | 171.3 |
+| ctl-b 08:02 | — (the `pw` boot that lost its pin, see the runner note) | 143.3 | 161.9 | 177.8 |
+| pw 08:04 | `STRATA_PW_WITH_BATCH=1` | **161.6** | 159.0 | 173.4 |
+| grp2 08:06 | `--batch-groups 3` (drafts refused — see below) | 148.7 | 146.0 | 143.8 |
+| ctl-x 08:09 | `--adapt-async 0` (blocking tier) | 145.1 | 159.3 | 170.6 |
+| **grp3 08:10** | `--batch-groups 3` + `STRATA_PIPED_MTP=2` + `STRATA_BATCH_SELF_COMMIT=0` | **153.8** | **199.8** | **211.5** |
+| **grp3b 08:13** | same, second boot | **154.4** | **205.8** | **210.2** |
+| grp3pw 08:15 | grp3 + `STRATA_PW_WITH_BATCH=1` | 153.9 | 195.3 | 200.0 |
+| ctl-d 08:17 | — | 138.2 | 155.8 | 176.4 |
+
+Controls: 138.2–145.9 / 155.8–161.9 / 170.6–177.8 → a ±4 % boot-to-boot spread at 2–3 streams (±5.6 % at 1).
+**grp3 vs the four controls: +6.5 % solo, +26 % at two streams, +21 % at three**, and it reproduces to ±3 %
+across its own two boots. Per-stream at 3 streams: 70.3–70.8 vs 57.5–59.1 tok/s.
+
+### Why the earlier `--batch-groups 2 (−15 %)` rejection read the way it did, and what it does not cover
+
+Two gates, both printed by 0.1.62 and both unknown to the notes:
+
+- `WARNING: --batch-groups 3 runs the pipelined path, which builds one row per slot: --batch-mtp's per-slot MTP
+  drafts do not run there (their drafters still hold VRAM, about 0.9 GB per slot).` → pipelined groups **without**
+  `STRATA_PIPED_MTP` lose the drafts. grp2 is exactly that boot: 148.7 / 146.0 / **143.8** = the old −15 % reproduced.
+- `WARNING: STRATA_PIPED_MTP is off: it does not combine with STRATA_BATCH_SELF_COMMIT (the window would keep
+  its rows itself)` → `STRATA_BATCH_SELF_COMMIT` is an **engine default on** for ≥2 batch slots on Linux CUDA
+  (`arch_defaults.cpp:parallel_default_env_cuda`), and it silently refuses `PIPED_MTP`. Arm B therefore needs
+  `STRATA_BATCH_SELF_COMMIT=0` in the preset, which is a deviation from the tested parallel stack — that is the price.
+- `--adapt-async 1 is off (not with --batch-groups (the pipelined slot groups)): the blocking adaptive tier` —
+  the § "Other measured decisions" guardrail is real and 0.1.62 has no async tier for the pipelined groups
+  (`STRATA_PIPE_ADAPT_EVERY` exists but is blocking). So the honest control for a groups boot is ctl-x
+  (blocking tier): grp3 beats ctl-x by +25 % / +24 %, and it also beats the keeper **with** its async tier.
+
+Live proof the arm reached the engine (grp3 / grp3b): `STRATA_PIPED_MTP: 3 pipelined groups of 1 slot draft up to
+2 MTP proposals per slot each window`; `strata verify: pipelined batch windows commit after the verdict
+(layers [0, 32), 9 rows, 28.6 MiB saved rows)` and the same for `[32, 48)` — **28.6 MiB per stage**, no cache
+shrink (`window capture: min 1105–1141 MiB free`, same as control). Mechanism, from the engine's own counters:
+serial `228–229 windows, avg 5.22 rows, 27.4 ms/window` = 190 rows/s, while
+`strata batch (pipelined, 3 groups of 1): 530 group-steps, 1196 rows in 5.5 s` = **218–219 rows/s (+15 %)** at
+**2.26 rows per slot-step instead of 1.74** — the window carries the token *and* its proposals, so a token costs
+fewer round trips and both cards stay filled (GPU0 87–89 % util under load vs 53–58 % serial).
+Decode expert cache hit rate falls to 66–73 % (vs 81–83 %) — visible cost, not a cause: more experts get touched
+per unit of wall-clock time.
+
+`--batch-groups` must divide `--batch`, so on `--batch 3` the only pipelined shape is **3 groups of 1 slot**;
+`groups 2` would print `WARNING: --batch-groups 2 needs a layer split and to divide --batch 3`. Upstream's
+measured shape (4 slots / 2 groups, `docs/BATCHING.md`) is reachable only by moving `parallel` to 4, which also
+moves serve `--parallel` / `--max-queue` — not touched here.
+
+### `STRATA_PW_WITH_BATCH=1` — worth it on the serial path, and it does not stack with the groups path
+
+Solo 161.6 vs 145.9 / 143.4 controls (+12 %), 2–3 streams flat; GPU0 util 52→90 %, GPU0 power 110→144 W;
+cost `--pipeline-windows 2: 309 MiB of CUDA0 kept out of the expert cache`. Live line: `--pipeline-windows 2
+stays on the solo path beside 3 batch slots (STRATA_PW_WITH_BATCH=1); batch windows run without it`.
+This had **already been measured and never written up**: `.tune/pw-on{1,2,3}` / `pw-off{,2}` (2026-11-12,
+engine 0.1.59, ctx 131072) — solo 156.0 / 164.2 / 163.7 with it vs 142.9 / 154.2 without (≈ +10 %), streams 3
+175.7 / 180.1 vs 181.4, streams 4 175.1 / 169.9 vs 166.0. Same verdict, same shape, two eras apart.
+grp3pw (both knobs): solo 153.9 = grp3 alone → the pipeline is already overlapping the cards, so the solo
+windows only pay the 309 MiB. **Choose one: groups for concurrency, PW_WITH_BATCH for the solo path.**
+
+### Not tested (upstream deltas below this box's ±4 % floor), and what is closed by arithmetic
+
+`STRATA_BATCH_SLOT_RUNS=1` 78.4 vs 78.1 tok/s @4 clients (register: "whether its run path was taken is not
+verified"); `STRATA_PIPED_LOOKUP=1` 77.9 vs 78.1; `STRATA_PIPELINE_HIT_MIN=0.35` / `LAZY_CHAIN=1` /
+`LOOKUP_RUN=1` 58.3 / 58.6 / 58.3 vs 58.1 (and `LAZY_CHAIN` is already −5 % here). Dead without a boot:
+`STRATA_SLOT_READ*` needs a non-resident cache (this tree runs `--resident-experts`); the NUMA trio is a no-op
+(1 NUMA node, both GPUs `numa_node -1`); `STRATA_MEM_CREDIT_INACTIVE` is a no-op (container `Memory=0`);
+route-tail-skip never applies with `--batch`; `--lookup-max-t >8` is gated to one conversation on one GPU.
+
+### Runner notes (bugs fixed in `grp-arm.sh` the same morning)
+
+- The first `pw` boot wrote nothing: the edit script crashed on `k.decode()` and the script did not check the
+  edit landed. It booted as a clean control under the arm's label. Fixed twice over: a post-edit preset
+  re-read that aborts before the restart, plus the `extra-env LIVE` / argv assertions. The wasted boot is kept
+  as **ctl-b**.
+- Flags (`--batch-groups`) must be asserted in argv, not `/proc/environ`; env keys (`STRATA_PIPED_MTP`) the
+  other way. The want/forbid log patterns are derived from the **preset**, so a re-run of the same config
+  (grp3b) is judged by the same assertions.
+
+### Depth: `STRATA_PIPED_MTP=1 / 2 / 3` (2026-11-20 08:54–09:08, eras 303610 / 303999 / 304398 / 304811 / 305622 / 306027)
+
+Same shape, only the proposal cap in the pipelined window changes (`--spec 4` already caps it at 3). Medians of
+`bench-util.py --levels 1 2 3 --rounds 3 --max-tokens 400`; the control line is the four serial boots
+(138.2–145.9 / 155.8–161.9 / 170.6–177.8).
+
+| `PIPED_MTP` | boots | solo | 2 streams | 3 streams | rows/s | rows per slot-step | saved-row buffer | capture floor |
+|---|---|---|---|---|---|---|---|---|
+| 1 | grp_p1 | 145.5 | 185.2 | 190.8 | 201.5 | 1.79 | 25.5 MiB | 1109 MiB |
+| **2 (live)** | grp3, grp3b, grp3c, piped2-live | **154.2** | **206.4** | **210.4** | 217–220 | 2.26 | 28.6 MiB | 1105–1141 MiB |
+| 3 | grp_p3, grp_p3b, piped3-adopt | 142.3 | 218.6 | 222.7 | 230–241 | 2.68 | 38.2 MiB | 1083–1095 MiB |
+
+`=1` is simply worse. **`=2` vs `=3` is a real trade, not noise:** `=3` is +6 % at two streams and +6 % at three,
+but −8 % solo (three `=3` boots read 142.3 / 156.6 / 141.9 — solo at depth 3 is both slower and much noisier;
+the `=2` solo reads are 151.0–154.9). Mechanism is visible in the rows column: a deeper window costs rows when
+there is no other group to overlap with, and buys rows/s when there is. So:
+
+- **`=2` is live** because it beats the serial keeper at every level: +7 % solo, +30 % at two streams, +21 % at
+  three. Nothing to give up.
+- `=3` is the concurrency-maxing variant: keeper-equal solo (142.3 vs the 138.2–145.9 controls), +38 % at two
+  streams, +28 % at three. Switch with `./grp-arm.sh piped3 envk=STRATA_PIPED_MTP=3` if several pi sessions +
+  subagents are the normal shape; `--spec 4` is what caps the depth at 3.
+
+### Quality smoke for the new path (new tool `probe-quality.py`, this tree)
+
+There was no smoke instrument in either tree, so this one exists now: four temperature-0 probes (code with a
+fixed literal, JSON that must parse with 4 deps == 4 licenses, a needle at ~4-5k tokens, a 1600-token technical
+continuation with a loop detector: duplicate lines and the longest repeated 8-gram). Outputs are hashed, so two
+configs can be lined up afterwards. Artifacts `.tune/smoke-keeper.txt`, `.tune/smoke-piped-mtp3.txt`.
+
+Both pass every flag, and the retrieval answer is **bit-identical** across the two paths
+(`needle sha=f839e3ff241f5e88` under the serial keeper and under `--batch-groups 3 + PIPED_MTP=3`), which is what
+verified speculative decoding should give; the other three hashes differ, as expected once the window carries a
+different number of rows (batched matmuls are not bit-identical to separate ones), and the loop detector stayed
+quiet in both (max 8-gram repeat 1–3).
+
+A second thing to remember about this model on this tree: a non-streaming request answers mostly in
+`reasoning_content`, with `content` empty — a probe that reads only `content` sees zero characters and reports a
+false FAIL (it did, on the first run of `probe-quality.py`).

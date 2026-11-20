@@ -112,7 +112,8 @@ class Sampler:
             cores = None
             if cpu is not None and self._prev and self._prev[2] == self.pid:
                 dt = t - self._prev[0]
-                if dt > 0 and cpu >= self._prev[1]:
+                # _prev[1] is None when the engine restarted and one sample found no pid
+                if dt > 0 and self._prev[1] is not None and cpu >= self._prev[1]:
                     cores = (cpu - self._prev[1]) / dt
             self._prev = (t, cpu, self.pid)
             self.rows.append((t, cpu, cores) + sum(gpu_state(), ()))
