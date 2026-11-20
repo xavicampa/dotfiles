@@ -390,6 +390,25 @@ if HOST == "homepc" then
     hl.monitor({ output = "DP-3", disabled = true })
 end
 
+-- ─── HDR output (homepc only) ─────────────────────────────────────────────
+-- The MPG321UX is HDR10-capable (hyprctl hardwareDetails: hdr/bt2020 yes) but the
+-- default cm preset is srgb, so clients never see PQ/BT2020 — Chrome's HDR-video
+-- path (WaylandHdrSurface) reads output color caps via color-management-v1, and on
+-- srgb YouTube only ever serves vp9 profile0 (SDR). cm=hdr programs the output with
+-- the PQ transfer function (10-bit already: DMS's rule sets bitdepth=10, confirmed
+-- by currentFormat XRGB2101010). Kept AFTER require("dms.outputs") so the field
+-- override wins and it survives DMS regenerating outputs.lua; do NOT merge it into
+-- outputs.lua (regenerated, manual edits there are lost).
+-- GOTCHA 2026-11-20: the panel's DDC/CI MCU wedged after the output reprogramming
+-- during HDR enable (ddcutil: comms dead on i2c-11, i2c-16 reads but writes fail
+-- DDCRC_VERIFY). NOT the preset itself — identical failure under cm=srgb — a power
+-- cycle of the display fully restored DDC/CI (VCP 2.1, writes verified). If
+-- brightness keys ever go dead again: power-cycle the monitor before suspecting
+-- Hyprland/Chrome.
+if HOST == "homepc" then
+    hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr" })
+end
+
 -- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────
 -- The NixOS config (~/.config/nixos/homepc/configuration.nix, systemd.user.services.dictate)
 -- runs an always-on daemon (Whisper on the Intel NPU via OpenVINO GenAI); these
