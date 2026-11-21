@@ -48,13 +48,15 @@ DMS rewrites that file and drops comments.
 | `SUPER + SHIFT + code:61` (printed `-`) | `movetoworkspace special:magic` | window → scratch — the only one now (`SUPER+S` / `SUPER+SHIFT+S` unbound). **Must** be the `code:` form: on `no` the printed `-` key emits keysym `underscore` with Shift down, so `SUPER + SHIFT + minus` is unreachable — see [the shift trap](#the-shift-trap-why-supershiftminus-is-dead-on-no) |
 | `SUPER + Z` | `dms ipc call keybinds toggle hyprland` | keybind cheatsheet overlay |
 | `SUPER + CTRL + Space` | `dms ipc call emojiPicker toggle` | emoji picker — the DMS `emojiPicker` plugin, **not** rofimoji; same key as the dell's rofi path, different backend ([why](#emoji-picker-dms-plugin-not-rofimoji)) |
-| `F11` / `F12` | `dms ipc call brightness decrement/increment 5 "ddc:i2c-11"` | = **Fn + `-` / `=`** on the Ducky One 3 Mini |
-| `XF86MonBrightnessDown/Up` | same two brightness commands | unreachable on this keyboard — kept for a laptop |
+| `F11` / `F12` | brightness **ladder**: SDR white (400→80, `reference_luminance`+`sdr_max`) → DMS software brightness; UP is the reverse — **panel DDC intentionally skipped** | = **Fn + `-` / `=`** on the Ducky One 3 Mini. Bound in `hyprland.lua`: the SDR segment is Lua-only (`hl.monitor`), the software lane is `scripts/bright-hybrid.sh soft-down/soft-up`; the Lua detects the lane by `io.open()`-ing the script's `dms.service.d/override.conf` mode marker (DMS shell restart at lane entry/exit — flicker) |
+| `SHIFT + F11` / `SHIFT + F12` | `scripts/bright-hybrid.sh down/up` — the pure DDC lane | old plain-F11/F12 behavior: DDC ±10, crosses into DMS software brightness at the DDC floor (shell restart, flicker), crosses back at software 100 |
+| `XF86MonBrightnessDown/Up` | same ladder as `F11`/`F12` | unreachable on this keyboard — kept for a laptop |
 
 **Unbound on purpose** (`hl.unbind()` entries in the same file, so they stay dead across DMS
 updates): `SUPER + T`, `SUPER + grave`, `SUPER + code:61`, `SUPER + SHIFT + Slash`, `SUPER + S`,
 `SUPER + SHIFT + S`, `F11`, `F12`, `XF86MonBrightness*` — the last four are re-bound to the
-commands above — plus `SUPER + minus` and `SUPER + SHIFT + code:61`, re-bound to scratch. The two
+brightness ladder in `hyprland.lua` (required after `dms/binds-user.lua`, so its binds win) —
+plus `SUPER + minus` and `SUPER + SHIFT + code:61`, re-bound to scratch. The two
 `S` entries are kept as bare `hl.unbind()`s so they stay dead even though `hosts/dell.lua:149-150`
 binds that same pair on the laptop.
 

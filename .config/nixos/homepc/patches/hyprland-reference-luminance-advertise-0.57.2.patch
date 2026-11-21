@@ -1,0 +1,232 @@
+diff -ruN Hyprland-0.57.2/src/Compositor.cpp Hyprland-0.57.2-v2/src/Compositor.cpp
+--- Hyprland-0.57.2/src/Compositor.cpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/Compositor.cpp	2026-11-21 14:55:53.881561115 +0100
+@@ -982,8 +982,19 @@
+     }
+     LOG(Log::WARN, "FIXME: color management protocol is enabled, determine correct preferred image description");
+     // should determine some common settings to avoid unnecessary transformations while keeping maximum displayable precision
+-    return State::monitorState()->monitors().size() == 1 ? State::monitorState()->monitors()[0]->m_imageDescription :
+-                                                           CImageDescription::from(SImageDescription{.primaries = NColorPrimaries::BT709});
++    if (State::monitorState()->monitors().size() != 1)
++        return CImageDescription::from(SImageDescription{.primaries = NColorPrimaries::BT709});
++
++    // advertise the per-output reference override to clients without touching the render-side description
++    const auto MON  = State::monitorState()->monitors()[0];
++    const auto DESC = MON->m_imageDescription;
++    if (DESC->value().transferFunction == NColorManagement::CM_TRANSFER_FUNCTION_ST2084_PQ &&
++        DESC->value().luminances.reference != sc<uint32_t>(MON->referenceLuminance())) {
++        auto lum      = DESC->value().luminances;
++        lum.reference = sc<uint32_t>(MON->referenceLuminance());
++        return DESC->with(lum);
++    }
++    return DESC;
+ }
+ 
+ PImageDescription CCompositor::getHDRImageDescription() {
+@@ -993,7 +1004,7 @@
+     }
+ 
+     return State::monitorState()->monitors().size() == 1 && State::monitorState()->monitors()[0]->m_output &&
+-            State::monitorState()->monitors()[0]->m_output->parsedEDID.hdrMetadata.has_value() ?
++            State::monitorState()->monitors()[0]->m_output ?
+         CImageDescription::from(SImageDescription{.transferFunction    = NColorManagement::CM_TRANSFER_FUNCTION_ST2084_PQ,
+                                                   .primariesNameSet    = true,
+                                                   .primariesNamed      = NColorManagement::CM_PRIMARIES_BT2020,
+@@ -1001,7 +1012,7 @@
+                                                   .masteringPrimaries  = State::monitorState()->monitors()[0]->getMasteringPrimaries(),
+                                                   .luminances          = {.min       = State::monitorState()->monitors()[0]->minLuminance(HDR_MIN_LUMINANCE),
+                                                                           .max       = State::monitorState()->monitors()[0]->maxLuminance(HDR_MAX_LUMINANCE),
+-                                                                          .reference = HDR_REF_LUMINANCE},
++                                                                          .reference = sc<uint32_t>(State::monitorState()->monitors()[0]->referenceLuminance())},
+                                                   .masteringLuminances = State::monitorState()->monitors()[0]->getMasteringLuminances(),
+                                                   .maxCLL              = State::monitorState()->monitors()[0]->maxCLL(),
+                                                   .maxFALL             = State::monitorState()->monitors()[0]->maxFALL()}) :
+diff -ruN Hyprland-0.57.2/src/config/lua/bindings/LuaBindingsConfigRules.cpp Hyprland-0.57.2-v2/src/config/lua/bindings/LuaBindingsConfigRules.cpp
+--- Hyprland-0.57.2/src/config/lua/bindings/LuaBindingsConfigRules.cpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/config/lua/bindings/LuaBindingsConfigRules.cpp	2026-11-21 12:38:53.402490095 +0100
+@@ -1,3 +1,4 @@
++#include <limits>
+ #include "LuaBindingsInternal.hpp"
+ #include "Check.hpp"
+ 
+@@ -170,6 +171,14 @@
+              p.rule().m_maxLuminance = sc<int>(*sc<const Config::INTEGER*>(v->data()));
+              return true;
+          }},
++        {"reference_luminance", []() -> ILuaConfigValue* { return new CLuaConfigInt(-1, -1, std::numeric_limits<int>::max()); },
++         [](ILuaConfigValue* v, CMonitorRuleParser& p) {
++             const auto value = sc<int>(*sc<const Config::INTEGER*>(v->data()));
++             if (value == 0)
++                 return false;
++             p.rule().m_referenceLuminance = value;
++             return true;
++         }},
+         {"max_avg_luminance", []() -> ILuaConfigValue* { return new CLuaConfigInt(-1); },
+          [](ILuaConfigValue* v, CMonitorRuleParser& p) {
+              p.rule().m_maxAvgLuminance = sc<int>(*sc<const Config::INTEGER*>(v->data()));
+diff -ruN Hyprland-0.57.2/src/config/shared/monitor/MonitorRule.cpp Hyprland-0.57.2-v2/src/config/shared/monitor/MonitorRule.cpp
+--- Hyprland-0.57.2/src/config/shared/monitor/MonitorRule.cpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/config/shared/monitor/MonitorRule.cpp	2026-11-21 12:38:53.402555194 +0100
+@@ -20,7 +20,7 @@
+     const auto SAME_CM = other.m_cmType == m_cmType && other.m_sdrSaturation == m_sdrSaturation && other.m_sdrBrightness == m_sdrBrightness &&
+         other.m_sdrMinLuminance == m_sdrMinLuminance && other.m_sdrMaxLuminance == m_sdrMaxLuminance && other.m_supportsWideColor == m_supportsWideColor &&
+         other.m_supportsHDR == m_supportsHDR && other.m_minLuminance == m_minLuminance && other.m_maxLuminance == m_maxLuminance && other.m_maxAvgLuminance == m_maxAvgLuminance &&
+-        other.m_iccFile == m_iccFile;
++        other.m_iccFile == m_iccFile && other.m_referenceLuminance == m_referenceLuminance;
+     const auto SAME_POS       = m_offset == other.m_offset;
+     const auto SAME_TRANSFORM = m_transform == other.m_transform;
+     const auto SAME_AUTO_DIR  = m_autoDir == other.m_autoDir;
+diff -ruN Hyprland-0.57.2/src/config/shared/monitor/MonitorRule.hpp Hyprland-0.57.2-v2/src/config/shared/monitor/MonitorRule.hpp
+--- Hyprland-0.57.2/src/config/shared/monitor/MonitorRule.hpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/config/shared/monitor/MonitorRule.hpp	2026-11-21 12:38:53.402576259 +0100
+@@ -55,10 +55,11 @@
+         Desktop::CReservedArea       m_reservedArea;
+         std::string                  m_iccFile;
+ 
+-        int                          m_supportsWideColor = 0;    // 0 - auto, 1 - force enable, -1 - force disable
+-        int                          m_supportsHDR       = 0;    // 0 - auto, 1 - force enable, -1 - force disable
+-        float                        m_sdrMinLuminance   = 0.2F; // SDR -> HDR
+-        int                          m_sdrMaxLuminance   = 80;   // SDR -> HDR
++        int                          m_supportsWideColor  = 0;    // 0 - auto, 1 - force enable, -1 - force disable
++        int                          m_supportsHDR        = 0;    // 0 - auto, 1 - force enable, -1 - force disable
++        float                        m_sdrMinLuminance    = 0.2F; // SDR -> HDR
++        int                          m_referenceLuminance = -1;   // -1 preserves the default HDR reference white
++        int                          m_sdrMaxLuminance    = 80;   // SDR -> HDR
+ 
+         // Incorrect values will result in reduced luminance range or incorrect tonemapping. Shouldn't damage the HW. Use with care in case of a faulty monitor firmware.
+         float              m_minLuminance    = -1.F; // >= 0 overrides EDID
+diff -ruN Hyprland-0.57.2/src/output/Monitor.cpp Hyprland-0.57.2-v2/src/output/Monitor.cpp
+--- Hyprland-0.57.2/src/output/Monitor.cpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/output/Monitor.cpp	2026-11-21 14:55:53.882576607 +0100
+@@ -614,8 +614,11 @@
+ 
+         m_sdrEotf = m_activeMonitorRule.m_sdrEotf;
+ 
+-        m_sdrMinLuminance = m_activeMonitorRule.m_sdrMinLuminance;
+-        m_sdrMaxLuminance = m_activeMonitorRule.m_sdrMaxLuminance;
++        const auto OLD_REFERENCE_LUMINANCE = m_referenceLuminance;
++
++        m_sdrMinLuminance    = m_activeMonitorRule.m_sdrMinLuminance;
++        m_sdrMaxLuminance    = m_activeMonitorRule.m_sdrMaxLuminance;
++        m_referenceLuminance = m_activeMonitorRule.m_referenceLuminance;
+ 
+         m_minLuminance    = m_activeMonitorRule.m_minLuminance;
+         m_maxLuminance    = m_activeMonitorRule.m_maxLuminance;
+@@ -623,6 +626,10 @@
+ 
+         applyCMType(m_cmType, m_sdrEotf);
+ 
++        // the reference override only lives in the advertised descriptions: nudge CM clients to re-fetch
++        if (m_referenceLuminance != OLD_REFERENCE_LUMINANCE && PROTO::colorManagement)
++            PROTO::colorManagement->onMonitorImageDescriptionChanged(m_self);
++
+         m_sdrSaturation = m_activeMonitorRule.m_sdrSaturation;
+         m_sdrBrightness = m_activeMonitorRule.m_sdrBrightness;
+     } else {
+@@ -2330,6 +2337,10 @@
+     return m_minLuminance >= 0 ? m_minLuminance : (m_output->parsedEDID.hdrMetadata.has_value() ? m_output->parsedEDID.hdrMetadata->desiredContentMinLuminance : defaultValue);
+ }
+ 
++int CMonitor::referenceLuminance() const {
++    return m_referenceLuminance > 0 ? m_referenceLuminance : HDR_REF_LUMINANCE;
++}
++
+ int CMonitor::maxLuminance(int defaultValue) {
+     return m_maxLuminance >= 0 ? m_maxLuminance : (m_output->parsedEDID.hdrMetadata.has_value() ? m_output->parsedEDID.hdrMetadata->desiredContentMaxLuminance : defaultValue);
+ }
+diff -ruN Hyprland-0.57.2/src/output/Monitor.hpp Hyprland-0.57.2-v2/src/output/Monitor.hpp
+--- Hyprland-0.57.2/src/output/Monitor.hpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/output/Monitor.hpp	2026-11-21 12:38:53.402848267 +0100
+@@ -104,17 +104,18 @@
+ 
+         CMonitorZoomController      m_zoomController;
+ 
+-        bool                        m_dpmsStatus       = true;
+-        bool                        m_vrrActive        = false; // this can be TRUE even if VRR is not active in the case that this display does not support it.
+-        bool                        m_enabled10bit     = false; // as above, this can be TRUE even if 10 bit failed.
+-        NCMType::eCMType            m_cmType           = NCMType::CM_SRGB;
+-        NTransferFunction::eTF      m_sdrEotf          = NTransferFunction::TF_DEFAULT;
+-        float                       m_sdrSaturation    = 1.0f;
+-        float                       m_sdrBrightness    = 1.0f;
+-        float                       m_sdrMinLuminance  = 0.2f;
+-        int                         m_sdrMaxLuminance  = 80;
+-        bool                        m_createdByUser    = false;
+-        bool                        m_isUnsafeFallback = false;
++        bool                        m_dpmsStatus         = true;
++        bool                        m_vrrActive          = false; // this can be TRUE even if VRR is not active in the case that this display does not support it.
++        bool                        m_enabled10bit       = false; // as above, this can be TRUE even if 10 bit failed.
++        NCMType::eCMType            m_cmType             = NCMType::CM_SRGB;
++        NTransferFunction::eTF      m_sdrEotf            = NTransferFunction::TF_DEFAULT;
++        float                       m_sdrSaturation      = 1.0f;
++        float                       m_sdrBrightness      = 1.0f;
++        float                       m_sdrMinLuminance    = 0.2f;
++        int                         m_referenceLuminance = -1;
++        int                         m_sdrMaxLuminance    = 80;
++        bool                        m_createdByUser      = false;
++        bool                        m_isUnsafeFallback   = false;
+ 
+         SP<CEventLoopTimer>         m_dpmsRetryTimer;
+ 
+@@ -329,6 +330,7 @@
+         bool                                                        supportsWideColor();
+         bool                                                        supportsHDR();
+         float                                                       minLuminance(float defaultValue = 0);
++        int                                                         referenceLuminance() const;
+         int                                                         maxLuminance(int defaultValue = 80);
+         int                                                         maxAvgLuminance(int defaultValue = 80);
+         float                                                       maxFALL();
+diff -ruN Hyprland-0.57.2/src/protocols/ColorManagement.cpp Hyprland-0.57.2-v2/src/protocols/ColorManagement.cpp
+--- Hyprland-0.57.2/src/protocols/ColorManagement.cpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/protocols/ColorManagement.cpp	2026-11-21 14:55:53.881843261 +0100
+@@ -269,7 +269,16 @@
+         if (!m_output || !m_output->m_monitor.valid())
+             RESOURCE->m_resource->sendFailed(WP_IMAGE_DESCRIPTION_V1_CAUSE_NO_OUTPUT, "No output");
+         else {
+-            RESOURCE->m_settings = m_output->m_monitor->m_imageDescription;
++            // advertise the per-output reference override to clients without touching the render-side description
++            const auto MON  = m_output->m_monitor;
++            const auto DESC = MON->m_imageDescription;
++            if (DESC->value().transferFunction == CM_TRANSFER_FUNCTION_ST2084_PQ &&
++                DESC->value().luminances.reference != sc<uint32_t>(MON->referenceLuminance())) {
++                auto lum             = DESC->value().luminances;
++                lum.reference        = sc<uint32_t>(MON->referenceLuminance());
++                RESOURCE->m_settings = DESC->with(lum);
++            } else
++                RESOURCE->m_settings = DESC;
+ 
+             RESOURCE->sendMaybeReady();
+         }
+diff -ruN Hyprland-0.57.2/src/protocols/core/Compositor.cpp Hyprland-0.57.2-v2/src/protocols/core/Compositor.cpp
+--- Hyprland-0.57.2/src/protocols/core/Compositor.cpp	2026-11-09 12:05:46.000000000 +0100
++++ Hyprland-0.57.2-v2/src/protocols/core/Compositor.cpp	2026-11-21 14:55:53.882029976 +0100
+@@ -729,7 +729,15 @@
+         return g_pCompositor->getPreferredImageDescription();
+ 
+     // auto HDR only switches once a fullscreen client submits HDR content, so offer it the description it would switch to
+-    return monitor->getAutoHDRImageDescription(parent.lock()).value_or(monitor->m_imageDescription);
++    const auto DESC = monitor->getAutoHDRImageDescription(parent.lock()).value_or(monitor->m_imageDescription);
++    // advertise the per-output reference override to clients without touching the render-side description
++    if (DESC->value().transferFunction == NColorManagement::CM_TRANSFER_FUNCTION_ST2084_PQ &&
++        DESC->value().luminances.reference != sc<uint32_t>(monitor->referenceLuminance())) {
++        auto lum      = DESC->value().luminances;
++        lum.reference = sc<uint32_t>(monitor->referenceLuminance());
++        return DESC->with(lum);
++    }
++    return DESC;
+ }
+ 
+ void CWLSurfaceResource::sortSubsurfaces() {
+diff -ruN Hyprland-0.57.2/tests/helpers/MonitorReferenceLuminance.cpp Hyprland-0.57.2-v2/tests/helpers/MonitorReferenceLuminance.cpp
+--- Hyprland-0.57.2/tests/helpers/MonitorReferenceLuminance.cpp	1970-01-01 01:00:00.000000000 +0100
++++ Hyprland-0.57.2-v2/tests/helpers/MonitorReferenceLuminance.cpp	2026-11-21 12:38:53.402880618 +0100
+@@ -0,0 +1,10 @@
++#include <config/shared/monitor/MonitorRule.hpp>
++#include <gtest/gtest.h>
++
++TEST(MonitorReferenceLuminance, DefaultsRemainOptInAndChangesAreSoft) {
++    Config::CMonitorRule original, changed;
++    EXPECT_EQ(original.m_referenceLuminance, -1);
++    EXPECT_EQ(original.compare(changed), Config::COMPARISON_FULL_MATCH);
++    changed.m_referenceLuminance = 450;
++    EXPECT_EQ(original.compare(changed), Config::COMPARISON_SOFT_MISMATCH);
++}

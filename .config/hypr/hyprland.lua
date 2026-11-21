@@ -59,7 +59,14 @@ end
 -- rewrites the whole file, normalizes [[...]] strings to escaped quotes, adds an
 -- hl.unbind() before every bind, and DROPS all comments. Keep prose here.
 --
--- Brightness (DDC/CI) binds now living in dms/binds-user.lua:
+-- Brightness (DDC/CI) — 2026-11-21 remap, see the SDR block below (~"SDR-in-HDR"):
+--   plain F11/F12 + XF86MonBrightness* = ladder SDR white 400->80, then DMS
+--   software brightness (bright-hybrid.sh soft-down/soft-up — DDC intentionally
+--   skipped); SHIFT+F11/F12 = the DDC lane (bright-hybrid.sh up/down, with its
+--   software crossover at the DDC floor). binds-user.lua only unbinds
+--   DMS's default F11/F12/XF86 keys now; the binds themselves live here (this
+--   file is required after dms.binds-user, so its binds win regardless of what
+--   `dms keybinds` regenerates there).
 --   No /sys/class/backlight on this box — both MSI MPG321UX panels are DDC-only
 --   (ddc:i2c-11 = HDMI-A-1, ddc:i2c-16 = DP-3). DMS's default binds pass "" as the
 --   device, which lands on the wrong default device and, with DMS 1.6.2, on a stale
@@ -405,45 +412,107 @@ end
 -- cycle of the display fully restored DDC/CI (VCP 2.1, writes verified). If
 -- brightness keys ever go dead again: power-cycle the monitor before suspecting
 -- Hyprland/Chrome.
--- SDR-in-HDR tone mapping + SHIFT+F11/F12 keybinds for the SDR white level
--- (the Shift twins of the F11/F12 panel-brightness keys).
+-- SDR-in-HDR tone mapping + the brightness ladder (2026-11-21 final): plain
+-- F11/F12 (+XF86MonBrightness*) walk SDR white 400->80, then continue into
+-- DMS software brightness (bright-hybrid.sh soft-down/soft-up; entering or
+-- leaving that lane restarts the DMS shell). Panel DDC is intentionally
+-- skipped there — it lives exclusively on SHIFT+F11/F12 (the original
+-- up/down hybrid with the software crossover at the DDC floor).
 -- sdr_min_luminance 0.005 sits desktop black on the OLED's true black (default
--- 0.2 lifts it); sdr_max_luminance (bind range 80-200 nits) is the perceived
--- desktop/SDR brightness. SHIFT+F11/F12 step ±20 — plain F11/F12 stay panel DDC
--- brightness (VCP 0x10); the two stack. The closure seeds from SDR_MAX because
+-- 0.2 lifts it); sdr_max_luminance (bind range 80-400 nits) is the
+-- perceived desktop/SDR brightness. The closure seeds from SDR_MAX because
 -- the HL.Monitor object
 -- exposes no getter for these fields. hl.monitor() at runtime applies
 -- instantly (no reload/flicker); each press re-registers the rule (last one
--- wins) and a config reload resets to SDR_MAX below.
--- Seed 203 = Hyprland's hard-coded reference white (HDR_REF_LUMINANCE) that it
--- advertises to color-managed clients (verified in WAYLAND_DEBUG: preferred
--- image description luminances(..., reference=203)). Chrome/Slack render SDR at
--- exactly that and IGNORE sdr_max_luminance entirely (no client flag changes
--- that — tested WaylandHdrSurface off + force-color-profile=srgb). So at the
--- 200 cap the desktop matches Chrome/Slack by default (200 vs the apps' fixed
--- 203 is visually identical); SHIFT+F11/F12 only dim from the match point —
--- the bind range is deliberately capped at 80-200, brighter-than-apps is not
--- offered. Upstream #16329 would unify it.
-local SDR_MAX = 200
+-- wins) and the value survives config reloads/restarts via the state file.
+-- 2026-11-21: the running Hyprland carries the local #16329 reference_luminance patch
+-- v2 — "advertise" variant (NOTES.md § hyprland): reference_luminance replaces the
+-- hard-coded HDR_REF_LUMINANCE ONLY in what clients are told (output + surface
+-- preferred descriptions + wp_color_management_output), never in the render-side
+-- description, so HDR video tonemapping (which scales by dstRef/srcRef — the v1
+-- incident that crushed video shadows at low values) is untouched.
+-- The slider drives sdr_max_luminance (untagged/XWayland SDR) AND reference_luminance
+-- (Chrome/Slack SDR anchoring, re-advertised live) together, so one knob moves the
+-- whole desktop. Range 80-400 (400 ≈ this panel's TrueBlack-400 sustained white);
+-- seed 200 keeps the old HDR_REF_LUMINANCE-anchored look.
+local SDR_MAX = 200            -- fallback seed only; the state file below wins
+local SDR_MAX_CAP = 400
 if HOST == "homepc" then
+    -- sdr_max is PERSISTED: the soft-lane crossover restarts the DMS shell, which
+    -- rewrites the required dms/*.lua fragments (colors.lua, layout.lua), which
+    -- Hyprland's config watcher auto-reloads mid-ladder — a bare closure got
+    -- re-seeded to 200 right at the crossover ("climbing from software lands at
+    -- 200"). With the state file, ANY reload/restart resumes where you left off.
+    local SDR_STATE = (os.getenv("HOME") or "") .. "/.local/state/hypr/sdr-max"
+    local function sdr_state_read()
+        local f = io.open(SDR_STATE, "r")
+        if not f then return nil end
+        local v = tonumber(f:read("*a") or "")
+        f:close()
+        return v
+    end
+    local sdr_max = math.max(80, math.min(SDR_MAX_CAP, sdr_state_read() or SDR_MAX))
     hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
-                 sdr_max_luminance = SDR_MAX, sdr_min_luminance = 0.005 })
-    local sdr_max = SDR_MAX
+                 sdr_max_luminance = sdr_max, reference_luminance = sdr_max,
+                 sdr_min_luminance = 0.005 })
     local function set_sdr_max(v)
-        sdr_max = math.max(80, math.min(200, v))
+        sdr_max = math.max(80, math.min(SDR_MAX_CAP, v))
         hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
-                     sdr_max_luminance = sdr_max, sdr_min_luminance = 0.005 })
+                     sdr_max_luminance = sdr_max,
+                     reference_luminance = sdr_max, sdr_min_luminance = 0.005 })
+        local sf = io.open(SDR_STATE, "w")
+        if sf then sf:write(tostring(sdr_max)); sf:close() end
         -- DMS-styled slider OSD via the sdrLevelOsd daemon plugin
         -- (~/.config/dms/plugins/sdrLevelOsd) — reuses DMS's own LevelOSD/DOSD
         -- chrome so it looks exactly like the brightness/volume OSD and follows
         -- the OSD position setting. Value/min/max travel as IPC args.
         hl.exec_cmd("dms ipc call sdrLevelOsd show " .. sdr_max ..
-                    " 80 200 'SDR white'")
+                    " 80 " .. SDR_MAX_CAP .. " 'SDR white'")
     end
-    hl.bind("SHIFT + F11", function() set_sdr_max(sdr_max - 20) end,
-            { repeating = true, description = "SDR white level -20 nits (floor 80)" })
-    hl.bind("SHIFT + F12", function() set_sdr_max(sdr_max + 20) end,
-            { repeating = true, description = "SDR white level +20 nits (cap 200 = app match)" })
+    -- TRAP 2026-11-21: inside Lua callbacks use hl.exec_cmd (runs immediately).
+    -- hl.dsp.exec_cmd is a DEFERRED bind-action constructor (bind(key, ...) form;
+    -- Emergency.hpp shows the calling form hl.dispatch(hl.dsp.exec_cmd(x)));
+    -- calling it bare in a callback is a silent no-op — that was the dead-keybind bug.
+    local BRIGHT_SCRIPT = "/home/javi/.config/hypr/scripts/bright-hybrid.sh"
+    -- "software mode" marker = the systemd user override bright-hybrid.sh writes
+    -- when it restarts dms.service with DMS_NO_DDC=1. io.open is the only way the
+    -- Lua config can see the mode (no io.popen/os.execute).
+    local SOFT_OVERRIDE = (os.getenv("HOME") or "") .. "/.config/systemd/user/dms.service.d/override.conf"
+    local function soft_mode_on()
+        local f = io.open(SOFT_OVERRIDE, "r")
+        if f then f:close(); return true end
+        return false
+    end
+    local function bright_down()
+        if sdr_max > 80 then
+            set_sdr_max(sdr_max - 20)                      -- SDR white segment
+        else
+            hl.exec_cmd(BRIGHT_SCRIPT .. " soft-down")     -- DMS software lane, DDC skipped
+        end
+    end
+    local function bright_up()
+        if soft_mode_on() then
+            hl.exec_cmd(BRIGHT_SCRIPT .. " soft-up")       -- climb; leaves the lane at 100 (DMS restart)
+        else
+            set_sdr_max(sdr_max + 20)                      -- SDR white segment
+        end
+    end
+    hl.unbind("F11")
+    hl.unbind("F12")
+    hl.bind("F11", bright_down, { locked = true, repeating = true,
+              description = "brightness down: SDR white 400->80, then DMS software (DDC skipped)" })
+    hl.bind("F12", bright_up, { locked = true, repeating = true,
+              description = "brightness up: DMS software, then SDR white (cap 400; DDC skipped)" })
+    hl.bind("XF86MonBrightnessDown", bright_down, { locked = true, repeating = true,
+              description = "brightness down lane (laptop keys; unreachable on the Ducky)" })
+    hl.bind("XF86MonBrightnessUp", bright_up, { locked = true, repeating = true,
+              description = "brightness up lane (laptop keys; unreachable on the Ducky)" })
+    hl.bind("SHIFT + F11", function() hl.exec_cmd(BRIGHT_SCRIPT .. " down") end,
+            { locked = true, repeating = true,
+              description = "panel DDC -10 (crosses into DMS software at the DDC floor)" })
+    hl.bind("SHIFT + F12", function() hl.exec_cmd(BRIGHT_SCRIPT .. " up") end,
+            { locked = true, repeating = true,
+              description = "panel DDC +10 (crosses back from DMS software at 100)" })
 end
 
 -- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────

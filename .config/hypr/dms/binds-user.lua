@@ -1,9 +1,11 @@
 -- DMS user keybind overrides (edit via Control Center or dms; do not remove this header)
 
+-- F11/F12 deliberately left unbound here: the brightness ladder (SDR white ->
+-- DDC -> DMS software) and the SHIFT+F11/F12 pure-DDC lane are bound in
+-- hyprland.lua (required after this file, so its binds always win; see its
+-- "SDR-in-HDR" block). If `dms keybinds set` re-adds F11/F12 they stay inert.
 hl.unbind("F11")
-hl.bind("F11", hl.dsp.exec_cmd("/home/javi/.config/hypr/scripts/bright-hybrid.sh down"), { locked = true, repeating = true })
 hl.unbind("F12")
-hl.bind("F12", hl.dsp.exec_cmd("/home/javi/.config/hypr/scripts/bright-hybrid.sh up"), { locked = true, repeating = true })
 hl.unbind("SUPER + B")
 hl.bind("SUPER + B", hl.dsp.exec_cmd("dms ipc call bar toggle index 0"), { description = "toggle DMS bar" })
 hl.unbind("SUPER + CTRL + Space")
@@ -14,10 +16,8 @@ hl.unbind("SUPER + Y")
 hl.bind("SUPER + Y", hl.dsp.exec_cmd("dms ipc call dash toggle overview"), { description = "dash -> overview tab" })
 hl.unbind("SUPER + Z")
 hl.bind("SUPER + Z", hl.dsp.exec_cmd("dms ipc call keybinds toggle hyprland"))
-hl.unbind("XF86MonBrightnessDown")
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("/home/javi/.config/hypr/scripts/bright-hybrid.sh down"), { locked = true, repeating = true })
+hl.unbind("XF86MonBrightnessDown")   -- re-bound to the ladder in hyprland.lua
 hl.unbind("XF86MonBrightnessUp")
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("/home/javi/.config/hypr/scripts/bright-hybrid.sh up"), { locked = true, repeating = true })
 hl.unbind("SUPER + SHIFT + code:61")
 hl.bind("SUPER + SHIFT + code:61", hl.dsp.window.move({ workspace = "special:magic" }), { description = "move window to scratch" })
 hl.unbind("SUPER + minus")

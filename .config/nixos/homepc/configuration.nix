@@ -339,9 +339,13 @@ in
       # enableAudioWavelength: leave at default (true) — NOTES.md § dms-shell
     };
 
-    # 0.56.2 for DMS blur; compositor + portal from unstable as a pair — NOTES.md § hyprland
+    # 0.56+ for DMS blur; compositor + portal from unstable as a pair; local #16329 reference_luminance patch v2 — advertise-only override, HDR video untouched (NOTES.md § hyprland)
     hyprland = {
-      package = unstable.hyprland;
+      package = unstable.hyprland.overrideAttrs (final: prev: {
+        postPatch = (prev.postPatch or "") + ''
+          patch -p1 -N --batch < ${./patches/hyprland-reference-luminance-advertise-0.57.2.patch}
+        '';
+      });
       portalPackage = unstable.xdg-desktop-portal-hyprland;
     };
   };

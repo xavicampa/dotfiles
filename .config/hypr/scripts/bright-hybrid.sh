@@ -5,6 +5,13 @@
 # DMS registers a software:<output> device) and keep dimming there.
 # An INCREASE while the software device is at 100 flips back to DDC.
 # Never touches the gamma/contrast settings.
+#
+# 2026-11-21: plain F11/F12 (+XF86) reach this script via the soft-* subcommands
+# once the SDR-white segment (hyprland.lua, floor 80) bottoms out — that ladder
+# SKIPS DDC entirely (software crossover only). SHIFT+F11/F12 run the original
+# up/down hybrid: DDC stepping with the software crossover at the floor.
+# The plain keys detect "software mode" by io.open()-ing the OVERRIDE file
+# below (the Lua config can't shell out), so keep this file as the mode marker.
 set -u
 DDC_STEP=${DDC_STEP:-10}
 SOFT_STEP=${SOFT_STEP:-10}
@@ -82,8 +89,28 @@ case "${1:-}" in
       dms ipc call brightness increment "$DDC_STEP" ""
     fi
     ;;
+  soft-down)
+    # plain-key lane: software brightness only, never touches DDC values
+    if in_software_mode; then
+      dms ipc call brightness decrement "$SOFT_STEP" ""
+    else
+      to_software_mode
+      dms ipc call brightness set $((100 - SOFT_STEP)) ""
+    fi
+    ;;
+  soft-up)
+    if in_software_mode; then
+      before=$(soft_pct); before=${before:-100}
+      if [ "$before" -ge 100 ]; then
+        # software at full -> leave the lane (DDC devices get re-registered)
+        to_ddc_mode
+      else
+        dms ipc call brightness increment "$SOFT_STEP" ""
+      fi
+    fi
+    ;;
   *)
-    echo "usage: $(basename "$0") up|down" >&2
+    echo "usage: $(basename "$0") up|down|soft-up|soft-down" >&2
     exit 2
     ;;
 esac

@@ -752,6 +752,62 @@ Note this also moves the **DMS greeter's** compositor, because
 `config.programs.hyprland.package`. If 0.56 misbehaves at the login screen, drop these
 two lines and rebuild to get 0.55.4 back.
 
+- **`reference_luminance` local patch, v2 "advertise" (2026-11-21).** `patches/hyprland-reference-luminance-advertise-0.57.2.patch`
+  (v1 `hyprland-reference-luminance-0.57.2.patch` kept as history, no longer applied; applied via
+  `postPatch` in `programs.hyprland.package`, after nixpkgs's own `postPatch`) implements
+  upstream Hyprland issue #16329: a per-monitor `reference_luminance` rule that replaces the hard-coded
+  `HDR_REF_LUMINANCE = 203` as the reference white Hyprland advertises to color-managed clients
+  (`wp_color_management_v1`). Without it, Chromium/Electron (Chrome, Slack, VS Code…) anchor their SDR
+  UI at 203 nits and **ignore `sdr_max_luminance` entirely** — only untagged/XWayland surfaces get the
+  SDR→HDR tonemap those knobs drive (Hyprland discussions #14999/#15578; still open upstream).
+  It is the PR from issue #16329 (author `gfhdhytghd`, against `main`) **rebased to tag v0.57.2**: two
+  hunks failed as-is — `CCompositor::getHDRImageDescription` formatting, and `applyCMType`'s HDR branch
+  having moved into `CMonitor::getHDRImageDescription` — plus the EDID-metadata gate relax from the
+  second commit. Dry-run clean against the exact 0.57.2 source. Includes the PR's
+  `tests/helpers/MonitorReferenceLuminance.cpp` (not registered in CMake, never compiled — provenance).
+  **Rebase on every hyprland bump** and watch for `.rej` (`patch -N --batch` keeps going on partial
+  fails!). **First wiring (same day) drove `reference_luminance` from the SHIFT+F11/F12 slider — it
+  unified SDR brightness but broke HDR video**: `getCMSettings` (Renderer.cpp) scales every HDR
+  surface's tonemap by `dstRef/srcRef`, so with reference=80 a 203-nit-mastered video came out
+  `×80/203` — highlights survived, shadows crushed. Chrome's SDR looked fine because both sides moved
+  together (ratio 1). **v2 decouples**: the Lua drives `reference_luminance = sdr_max` from the slider
+  again, but the patch now applies the override **only in the advertise sites**
+  (`wp_color_management_output_v1 get_image_description`, both `getPreferredImageDescription`s, and
+  `CCompositor::getHDRImageDescription` for the prefer_hdr quirk); `applyCMType`/`getHDRImageDescription`
+  keep 203 in the render-side `m_imageDescription`, so the compositor's HDR-video math never sees the
+  slider. `applyMonitorRuleSoft` fires `onMonitorImageDescriptionChanged` when the rule value changes —
+  clients re-anchor live (the soft-reapply, no-modeset path stays). If upstream #16329 ever merges (it puts the
+  reference into the monitor description like v1 did), revisit this split.
+  Verified (2026-11-21, v1): Chrome SDR follows `reference_luminance` live, no restart;
+  `WAYLAND_DEBUG` shows `luminances(..., <value>)`; HDR video fine at 203, crushed at low values.
+  Verified (2026-11-21, v2, post-relogin): the open check resolved as **Chrome client-side anchoring**
+  — at slider 80 Chrome's HDR video dims *with* the knob but shadows stay correct (the v1 crush is
+  gone: render-side 203 confirmed working). Chrome reads the advertised description and runs its own
+  video tonemap against the advertised reference, so its UI and video move together; a native
+  pass-through player (mpv) never reads it and stays fixed. Trade-off knob in hyprland.lua:
+  `reference = sdr_max` (current) = fully unified dimming incl. Chrome video;
+  `math.max(203, sdr_max)` = Chrome fixed below 203, desktop-only dimming; `203` = fully fixed.
+- **Brightness key remap (2026-11-21, final after two iterations).** Plain F11/F12 (+XF86) step
+  SDR white 400→80 (Lua `set_sdr_max`) and then continue into **DMS software brightness**
+  (`scripts/bright-hybrid.sh soft-down/soft-up`); UP is the reverse (soft lane → exit at 100 →
+  SDR white). **Panel DDC is deliberately off the plain keys** — SHIFT+F11/F12 own the DDC lane
+  (`bright-hybrid.sh up/down`, software crossover at the DDC floor as before). An intermediate
+  design that threaded DDC into the plain ladder (with a `~/.cache/bright-hybrid/state` export
+  so Lua could pick lanes) was dropped the same day — SDR+software covers daily dimming, DDC
+  changes are rare hardware moves. Lane entry/exit = `dms.service` restart (flicker); the Lua
+  detects the lane via `io.open` on the script's `dms.service.d/override.conf` marker (DMS_NO_DDC).
+  TRAP (fixed same day): the DMS restart rewrites the required `dms/colors.lua` + `layout.lua`,
+  Hyprland's config watcher auto-reloads mid-ladder, and a closure-seeded `sdr_max` jumped back
+  to 200 exactly at the crossover ("climbing from software lands at 200") — `sdr_max` is now
+  PERSISTED in `~/.local/state/hypr/sdr-max` (read at config load, written on every press),
+  which also kills the older "config reload resets the slider to seed" gotcha for good.
+  `binds-user.lua` only unbinds DMS's defaults now; hyprland.lua is required after
+  it, so its binds always win even if `dms keybinds` regenerates that file.
+  GOTCHA (same day, fixed): the script lanes went dead ("keybind dead past the SDR floor")
+  because `hl.dsp.exec_cmd(cmd)` called bare inside a Lua callback is a DEFERRED bind-action
+  constructor (bind-action form; calling form is `hl.dispatch(hl.dsp.exec_cmd(x))`) — a silent
+  no-op. Use `hl.exec_cmd` (immediate) in callbacks.
+
 ## waybar
 
 DMS draws its own bar, so homepc drops the waybar unit's `WantedBy`
