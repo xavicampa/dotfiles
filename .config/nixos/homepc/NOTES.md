@@ -753,7 +753,8 @@ Note this also moves the **DMS greeter's** compositor, because
 two lines and rebuild to get 0.55.4 back.
 
 - **`reference_luminance` local patch, v2 "advertise" (2026-11-21).** `patches/hyprland-reference-luminance-advertise-0.57.2.patch`
-  (v1 `hyprland-reference-luminance-0.57.2.patch` kept as history, no longer applied; applied via
+  (v1 `hyprland-reference-luminance-0.57.2.patch` kept as history, no longer applied — moved to
+  `patches/archive/` (2026-11-21, see its README) so nothing unreferenced sits in `patches/`; applied via
   `postPatch` in `programs.hyprland.package`, after nixpkgs's own `postPatch`) implements
   upstream Hyprland issue #16329: a per-monitor `reference_luminance` rule that replaces the hard-coded
   `HDR_REF_LUMINANCE = 203` as the reference white Hyprland advertises to color-managed clients
