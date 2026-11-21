@@ -787,15 +787,28 @@ two lines and rebuild to get 0.55.4 back.
   pass-through player (mpv) never reads it and stays fixed. Trade-off knob in hyprland.lua:
   `reference = sdr_max` (current) = fully unified dimming incl. Chrome video;
   `math.max(203, sdr_max)` = Chrome fixed below 203, desktop-only dimming; `203` = fully fixed.
-- **Brightness key remap (2026-11-21, final after two iterations).** Plain F11/F12 (+XF86) step
-  SDR white 400→80 (Lua `set_sdr_max`) and then continue into **DMS software brightness**
-  (`scripts/bright-hybrid.sh soft-down/soft-up`); UP is the reverse (soft lane → exit at 100 →
-  SDR white). **Panel DDC is deliberately off the plain keys** — SHIFT+F11/F12 own the DDC lane
-  (`bright-hybrid.sh up/down`, software crossover at the DDC floor as before). An intermediate
-  design that threaded DDC into the plain ladder (with a `~/.cache/bright-hybrid/state` export
-  so Lua could pick lanes) was dropped the same day — SDR+software covers daily dimming, DDC
-  changes are rare hardware moves. Lane entry/exit = `dms.service` restart (flicker); the Lua
-  detects the lane via `io.open` on the script's `dms.service.d/override.conf` marker (DMS_NO_DDC).
+- **Brightness key remap (2026-11-21, final after three iterations).** Only F11/F12 (+XF86);
+  SHIFT+F11/F12 unbound again. Mode-aware ladder, bottom lane always **DMS software brightness**:
+  **HDR output** → top segment SDR white 400→80 (Lua `set_sdr_max`, soft monitor rule);
+  **SDR output** → top segment panel DDC (`bright-hybrid.sh up/down`, its software crossover at
+  the DDC floor). Iterations: full SDR→DDC→software ladder with a state-file lane hint (dropped:
+  DDC shouldn't move while in HDR), then plain-keys SDR+software with SHIFT keeping the DDC lane
+  (dropped: single-key UX). HDR/SDR detection + switch: DMS 2.1.2's Displays page HAS a
+  "Color gamut" picker (UI: Auto (Wide) / Wide (BT2020) / DCI-P3 / Apple P3 / Adobe RGB /
+  EDID / HDR / HDR (EDID); stored values `auto|wide|dcip3|dp3|adobe|edid|hdr|hdredid` —
+  NO "srgb" option in the UI even though Hyprland accepts it; all DMS values are valid
+  Hyprland `cm=` values per v0.57.2 CMType.cpp). Only hdr/hdredid start with "hdr" =>
+  HDR ladder; every other pick is SDR => DDC ladder. DMS writes non-auto values as `cm=`
+  into `dms/outputs.lua` and the choice into `~/.local/state/dms/session.json` under
+  `hyprlandOutputSettings` (plus a separate "SDR transfer function" picker = `sdr_eotf`:
+  auto/srgb/gamma22 — unused here). `hyprland.lua`'s SDR block reads session.json at config load
+  (`dms_cm_value`, io.open + pattern match — no JSON lib), `MON_CM` feeds the monitor rule and
+  `MON_HDR` the ladder; the DMS UI's outputs.lua rewrite triggers the config watcher, so the
+  whole chain re-syncs with no manual reload. `auto`/absent = HDR default (this config always
+  set cm=hdr; session.json sits at auto). Verified 2026-11-21: session srgb→reload→
+  `colorManagementPreset: srgb`, back to auto→hdr. Lane entry/exit = `dms.service`
+  restart (flicker); the Lua detects the software lane via `io.open` on the script's
+  `dms.service.d/override.conf` marker (DMS_NO_DDC).
   TRAP (fixed same day): the DMS restart rewrites the required `dms/colors.lua` + `layout.lua`,
   Hyprland's config watcher auto-reloads mid-ladder, and a closure-seeded `sdr_max` jumped back
   to 200 exactly at the crossover ("climbing from software lands at 200") — `sdr_max` is now

@@ -59,11 +59,11 @@ end
 -- rewrites the whole file, normalizes [[...]] strings to escaped quotes, adds an
 -- hl.unbind() before every bind, and DROPS all comments. Keep prose here.
 --
--- Brightness (DDC/CI) — 2026-11-21 remap, see the SDR block below (~"SDR-in-HDR"):
---   plain F11/F12 + XF86MonBrightness* = ladder SDR white 400->80, then DMS
---   software brightness (bright-hybrid.sh soft-down/soft-up — DDC intentionally
---   skipped); SHIFT+F11/F12 = the DDC lane (bright-hybrid.sh up/down, with its
---   software crossover at the DDC floor). binds-user.lua only unbinds
+-- Brightness — 2026-11-21, mode-aware ladder, see the SDR block below (~"SDR-in-HDR"):
+--   only F11/F12 + XF86MonBrightness* (SHIFT+F11/F12 unbound again). Bottom lane
+--   is always DMS software brightness; the TOP segment follows the output's cm
+--   (HDR -> SDR white 400->80 nits, SDR -> panel DDC via scripts/bright-hybrid.sh
+--   up/down + soft-down/soft-up). HDR/SDR is toggled in DMS Displays. binds-user.lua only unbinds
 --   DMS's default F11/F12/XF86 keys now; the binds themselves live here (this
 --   file is required after dms.binds-user, so its binds win regardless of what
 --   `dms keybinds` regenerates there).
@@ -412,12 +412,14 @@ end
 -- cycle of the display fully restored DDC/CI (VCP 2.1, writes verified). If
 -- brightness keys ever go dead again: power-cycle the monitor before suspecting
 -- Hyprland/Chrome.
--- SDR-in-HDR tone mapping + the brightness ladder (2026-11-21 final): plain
--- F11/F12 (+XF86MonBrightness*) walk SDR white 400->80, then continue into
--- DMS software brightness (bright-hybrid.sh soft-down/soft-up; entering or
--- leaving that lane restarts the DMS shell). Panel DDC is intentionally
--- skipped there — it lives exclusively on SHIFT+F11/F12 (the original
--- up/down hybrid with the software crossover at the DDC floor).
+-- SDR-in-HDR tone mapping + the brightness ladder (2026-11-21, mode-aware):
+-- only F11/F12 (+XF86MonBrightness*) — SHIFT+F11/F12 is unbound again. The
+-- ladder follows the output's color-management mode; the SWITCH is DMS
+-- Settings -> Displays ("Color gamut" picker; see dms_cm_value below —
+-- "auto" keeps the HDR default). Both modes end at DMS software brightness:
+--   HDR (cm=hdr/hdredid): SDR white 400->80 (top) -> DMS software (soft-down/soft-up).
+--   SDR (cm=wide/dcip3/dp3/adobe/edid): panel DDC (top, bright-hybrid.sh
+--                    up/down, software crossover at the DDC floor) -> DMS software.
 -- sdr_min_luminance 0.005 sits desktop black on the OLED's true black (default
 -- 0.2 lifts it); sdr_max_luminance (bind range 80-400 nits) is the
 -- perceived desktop/SDR brightness. The closure seeds from SDR_MAX because
@@ -438,6 +440,32 @@ end
 local SDR_MAX = 200            -- fallback seed only; the state file below wins
 local SDR_MAX_CAP = 400
 if HOST == "homepc" then
+    -- HDR detection: DMS Settings -> Displays has a per-output "Color gamut"
+    -- picker (values auto/wide/dcip3/dp3/adobe/edid/hdr/hdredid — no "srgb" in
+    -- this UI); it stores hyprlandOutputSettings.<out>.colorManagement in
+    -- ~/.local/state/dms/session.json AND (when non-auto) writes cm= into the
+    -- required dms/outputs.lua — whose rewrite Hyprland's config watcher picks up,
+    -- re-running this block. So the DMS UI IS the HDR switch; read session.json
+    -- here so rule + ladder follow it. nil/"auto" keeps the historical default
+    -- (this config used to hardcode cm=hdr, session.json sat at auto). All these
+    -- values are valid Hyprland cm= values (v0.57.2 CMType.cpp), so MON_CM can
+    -- go straight into the rule.
+    local function dms_cm_value()
+        local f = io.open((os.getenv("HOME") or "") .. "/.local/state/dms/session.json", "r")
+        if not f then return nil end
+        local s = f:read("*a")
+        f:close()
+        return s and s:match('"HDMI%-A%-1".-colorManagement"%s*:%s*"([^"]+)"')
+    end
+    local CM_VALUE = dms_cm_value()
+    local MON_CM = (CM_VALUE and CM_VALUE ~= "auto") and CM_VALUE or "hdr"
+    local MON_HDR = MON_CM:find("^hdr") ~= nil   -- hdr / hdredid only; the rest are SDR gamuts
+    local function mon_rule(v)
+        return { output = "HDMI-A-1", bitdepth = 10,
+                 cm = MON_CM,
+                 sdr_max_luminance = v, reference_luminance = v,
+                 sdr_min_luminance = 0.005 }
+    end
     -- sdr_max is PERSISTED: the soft-lane crossover restarts the DMS shell, which
     -- rewrites the required dms/*.lua fragments (colors.lua, layout.lua), which
     -- Hyprland's config watcher auto-reloads mid-ladder — a bare closure got
@@ -452,14 +480,10 @@ if HOST == "homepc" then
         return v
     end
     local sdr_max = math.max(80, math.min(SDR_MAX_CAP, sdr_state_read() or SDR_MAX))
-    hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
-                 sdr_max_luminance = sdr_max, reference_luminance = sdr_max,
-                 sdr_min_luminance = 0.005 })
+    hl.monitor(mon_rule(sdr_max))
     local function set_sdr_max(v)
         sdr_max = math.max(80, math.min(SDR_MAX_CAP, v))
-        hl.monitor({ output = "HDMI-A-1", bitdepth = 10, cm = "hdr",
-                     sdr_max_luminance = sdr_max,
-                     reference_luminance = sdr_max, sdr_min_luminance = 0.005 })
+        hl.monitor(mon_rule(sdr_max))
         local sf = io.open(SDR_STATE, "w")
         if sf then sf:write(tostring(sdr_max)); sf:close() end
         -- DMS-styled slider OSD via the sdrLevelOsd daemon plugin
@@ -484,35 +508,33 @@ if HOST == "homepc" then
         return false
     end
     local function bright_down()
-        if sdr_max > 80 then
-            set_sdr_max(sdr_max - 20)                      -- SDR white segment
+        if not MON_HDR then
+            hl.exec_cmd(BRIGHT_SCRIPT .. " down")          -- SDR ladder: DDC, crosses to software at its floor
+        elseif sdr_max > 80 then
+            set_sdr_max(sdr_max - 20)                      -- HDR ladder: SDR white segment
         else
-            hl.exec_cmd(BRIGHT_SCRIPT .. " soft-down")     -- DMS software lane, DDC skipped
+            hl.exec_cmd(BRIGHT_SCRIPT .. " soft-down")     -- bottom lane: DMS software (DDC skipped in HDR)
         end
     end
     local function bright_up()
         if soft_mode_on() then
             hl.exec_cmd(BRIGHT_SCRIPT .. " soft-up")       -- climb; leaves the lane at 100 (DMS restart)
+        elseif MON_HDR then
+            set_sdr_max(sdr_max + 20)                      -- HDR ladder: SDR white segment
         else
-            set_sdr_max(sdr_max + 20)                      -- SDR white segment
+            hl.exec_cmd(BRIGHT_SCRIPT .. " up")            -- SDR ladder: DDC
         end
     end
     hl.unbind("F11")
     hl.unbind("F12")
     hl.bind("F11", bright_down, { locked = true, repeating = true,
-              description = "brightness down: SDR white 400->80, then DMS software (DDC skipped)" })
+              description = "brightness down: (HDR) SDR white 400->80 / (SDR) panel DDC, then DMS software" })
     hl.bind("F12", bright_up, { locked = true, repeating = true,
-              description = "brightness up: DMS software, then SDR white (cap 400; DDC skipped)" })
+              description = "brightness up: DMS software, then (HDR) SDR white (cap 400) / (SDR) panel DDC" })
     hl.bind("XF86MonBrightnessDown", bright_down, { locked = true, repeating = true,
-              description = "brightness down lane (laptop keys; unreachable on the Ducky)" })
+              description = "brightness down ladder (laptop keys; unreachable on the Ducky)" })
     hl.bind("XF86MonBrightnessUp", bright_up, { locked = true, repeating = true,
-              description = "brightness up lane (laptop keys; unreachable on the Ducky)" })
-    hl.bind("SHIFT + F11", function() hl.exec_cmd(BRIGHT_SCRIPT .. " down") end,
-            { locked = true, repeating = true,
-              description = "panel DDC -10 (crosses into DMS software at the DDC floor)" })
-    hl.bind("SHIFT + F12", function() hl.exec_cmd(BRIGHT_SCRIPT .. " up") end,
-            { locked = true, repeating = true,
-              description = "panel DDC +10 (crosses back from DMS software at 100)" })
+              description = "brightness up ladder (laptop keys; unreachable on the Ducky)" })
 end
 
 -- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────

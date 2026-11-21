@@ -14,8 +14,8 @@
 .config/hypr/dms/windowrules.lua
 
 # EXCEPTION — do NOT ignore .config/hypr/dms/outputs.lua: DMS's Settings -> Displays
-# page writes monitor mode/position/scale/VRR only there (and in the untracked
-# ~/.local/state/dms/session.json under hyprlandOutputSettings), never
+# page writes monitor mode/position/scale/VRR and (when non-auto) cm= only there (and in
+# the untracked ~/.local/state/dms/session.json under hyprlandOutputSettings), never
 # in settings.json. It is the only durable, source-controllable record of the display
 # scale (HDMI-A-1 scale = 1.3333). hyprland.lua require()s it behind a hostname guard
 # (HOST == "homepc") because this generated file is per-host — expect a dirty diff
