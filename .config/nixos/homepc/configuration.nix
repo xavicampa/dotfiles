@@ -311,13 +311,14 @@ in
           root=..
           [ -f ../quickshell/Modules/Settings/ThemeBrowser.qml ] || root=.
           chmod -R u+w "$root"
-          patch -p1 -d "$root" -N --batch < ${./patches/dux-preview-path.patch}
-          patch -p1 -d "$root" -N --batch < ${./patches/dux-registry-filter.patch}
-          patch -p1 -d "$root" -N --batch < ${./patches/dux-empty-mode-palette.patch}
-          patch -p1 -d "$root" -N --batch < ${./patches/dux-prefer-light.patch}
+          # --fuzz=0 on every patch: a stale hunk must fail the build loudly, not land fuzzy on drifted code — NOTES.md § dms-shell
+          patch -p1 -d "$root" -N --batch --fuzz=0 < ${./patches/dux-preview-path.patch}
+          patch -p1 -d "$root" -N --batch --fuzz=0 < ${./patches/dux-registry-filter.patch}
+          patch -p1 -d "$root" -N --batch --fuzz=0 < ${./patches/dux-empty-mode-palette.patch}
+          patch -p1 -d "$root" -N --batch --fuzz=0 < ${./patches/dux-prefer-light.patch}
           # order matters: the last patch is a diff against the tree with the one before it applied — NOTES.md § dms-shell
-          patch -p1 -d "$root" -N --batch < ${./patches/dux-locked-dpms-ignore-inhibitors.patch}
-          patch -p1 -d "$root" -N --batch < ${./patches/dux-reapply-dpms-on-screen-change.patch}
+          patch -p1 -d "$root" -N --batch --fuzz=0 < ${./patches/dux-locked-dpms-ignore-inhibitors.patch}
+          patch -p1 -d "$root" -N --batch --fuzz=0 < ${./patches/dux-reapply-dpms-on-screen-change.patch}
         '';
       });
       quickshell.package = unstable.quickshell;
@@ -343,7 +344,7 @@ in
     hyprland = {
       package = unstable.hyprland.overrideAttrs (final: prev: {
         postPatch = (prev.postPatch or "") + ''
-          patch -p1 -N --batch < ${./patches/hyprland-reference-luminance-advertise-0.57.2.patch}
+          patch -p1 -N --batch --fuzz=0 < ${./patches/hyprland-reference-luminance-advertise-0.57.2.patch}
         '';
       });
       portalPackage = unstable.xdg-desktop-portal-hyprland;

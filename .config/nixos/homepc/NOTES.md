@@ -263,7 +263,15 @@ hyprlock) instead of having `dms.service`, matugen theming and DMS's
   2.0.0 installs the QML into the output (no `share/quickshell/dms/…` in either package;
   the tree is compiled into `bin/dms`, `tags = [ "withshell" ]`), so verify it took by the
   build log printing `patching file quickshell/Modules/Settings/ThemeBrowser.qml` — a failed
-  hunk fails the build outright, since `patch -N --batch` exits non-zero on a reject.
+  hunk fails the build outright, since `patch -N --batch` exits non-zero on a reject
+  (measured 2026-11-21: unplaceable hunk → rc=2 + `.rej`; already-applied/upstreamed hunk →
+  `-N` prints "Reversed (or previously applied)" and exits 1 — so an upstream fix *also*
+  breaks the build until the patch is deleted from `postPatch`). **All seven patch invocations
+  (six here + hyprland) now carry `--fuzz=0` (2026-11-21)**, same as the llama-swap one: without
+  it a hunk whose *context* drifted applied "with fuzz 2" at rc=0 — a silent, possibly-wrong
+  binary instead of a build error. `patch` still tolerates plain *offsets* (the 2.0.0-anchored
+  hunks land on 2.1.2 with `succeeded at N (offset …)`), so drift that keeps the context intact
+  stays a non-event.
 - **Second local patch** (`./patches/dux-registry-filter.patch`, added 2026-10-30; it applies after
   the preview one, with its hunks 4–6 landing on a 6-line offset): Browse Themes merges every
   configured registry into **one flat list** and the theme JSON carried no registry name at all
@@ -766,8 +774,11 @@ two lines and rebuild to get 0.55.4 back.
   having moved into `CMonitor::getHDRImageDescription` — plus the EDID-metadata gate relax from the
   second commit. Dry-run clean against the exact 0.57.2 source. Includes the PR's
   `tests/helpers/MonitorReferenceLuminance.cpp` (not registered in CMake, never compiled — provenance).
-  **Rebase on every hyprland bump** and watch for `.rej` (`patch -N --batch` keeps going on partial
-  fails!). **First wiring (same day) drove `reference_luminance` from the SHIFT+F11/F12 slider — it
+  **Rebase on every hyprland bump**: a hunk that no longer fits exits non-zero and fails the
+  build outright (measured 2026-11-21; `patch -N --batch` does *not* "keep going" on partial
+  fails — it writes `.rej`s and the failing exit code aborts the build). Since 2026-11-21 the
+  invocation carries `--fuzz=0`, so context drift is also a hard error rather than a fuzzy
+  silent apply. **First wiring (same day) drove `reference_luminance` from the SHIFT+F11/F12 slider — it
   unified SDR brightness but broke HDR video**: `getCMSettings` (Renderer.cpp) scales every HDR
   surface's tonemap by `dstRef/srcRef`, so with reference=80 a 203-nit-mastered video came out
   `×80/203` — highlights survived, shadows crushed. Chrome's SDR looked fine because both sides moved
