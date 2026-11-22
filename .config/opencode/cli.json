@@ -6,7 +6,12 @@
   "session": {
     "sidebar": "hide",
     "scrollbar": false,
-    "thinking": "hide"
+    "thinking": "hide",
+    "grouping": "auto"
   },
-  "animations": true
+  "animations": true,
+  "tabs": {
+    "mode": "off",
+    "indicators": "status"
+  }
 }
