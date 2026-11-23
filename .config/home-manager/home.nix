@@ -203,6 +203,15 @@ in {
         remember_window_size = "no";
         initial_window_width = "80c";
         initial_window_height = "25c";
+        # Hyprland tiles the OS window to an arbitrary pixel size, rarely an
+        # exact multiple of the cell size, so kitty adds thin strips of
+        # compensatory padding inside the window (the remainder is < 1 cell,
+        # which is why the gap scales with font_size). Paint those strips with
+        # the background of the cell next to them, so a full-screen app's own
+        # background covers them instead of the window background. Needs
+        # kitty 0.49+ (homepc has 0.49.1); resize_in_steps, the other way to
+        # shrink the strips, is a no-op on Wayland.
+        padding_fill_strategy = "neighboring_cell";
         # Transparency: kitty paints its own background at this alpha (text
         # stays fully opaque), so whatever is behind the window shows through.
         # background_blur is the client-side request for the blur: kitty asks
