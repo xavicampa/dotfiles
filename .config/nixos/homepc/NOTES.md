@@ -848,6 +848,20 @@ two lines and rebuild to get 0.55.4 back.
   instead of rolling off — user confirmed video looks better (less dark). Verified
   2026-11-23: fresh test Slack with the rule = same brightness as terminal/untagged at
   knob 80; Chrome UI matches too; rules re-apply to existing windows on reload.
+  GOTCHA #2 (2026-11-23, power-cycle): powering the panel off/on drops HDMI HPD and Hyprland
+  destroys the output entirely (journal: quickshell "There are no outputs - creating
+  placeholder screen") — the wl_output global is destroyed and a new one created on
+  re-plug. Chromium/Slack do NOT re-establish their wp_color_management_output_v1 binding
+  for EXISTING windows, so those apps stop receiving `image_description_changed` and freeze
+  at their last anchored level (untagged apps keep following via `sdr_max_luminance`).
+  A software output cycle does NOT revive them (`hl.monitor disabled=true` + reload — tried,
+  Chromium still deaf; also note a partial `hl.monitor` rule can drop the output to FALLBACK,
+  recover with `hyprctl reload`). Fix = restart the apps (Chrome: `chrome://restart` keeps
+  tabs; Slack: full quit). Fresh instances bind the new output and follow the ladder again.
+  So after any display power-cycle (the DDC-MCU un-wedge move), expect to restart the
+  Electron/Chrome set. Diagnostic that pinned it: fresh WAYLAND_DEBUG test Slack receives
+  `image_description_changed` + re-tags `set_luminances(0,1000,knob)` + repaints within
+  ~30 ms of a runtime `hl.monitor` bump, while the pre-cycle instances sit still.
   Related dead ends from the same day: `hyprctl dispatch keybind F12` is broken under the Lua
   config (dispatch is Lua-evaluated: `return hl.dispatch(keybind F12)` syntax error) and
   `wtype -k F12` does not fire binds — to exercise the runtime ladder path from a shell, call
