@@ -535,6 +535,26 @@ if HOST == "homepc" then
               description = "brightness down ladder (laptop keys; unreachable on the Ducky)" })
     hl.bind("XF86MonBrightnessUp", bright_up, { locked = true, repeating = true,
               description = "brightness up ladder (laptop keys; unreachable on the Ducky)" })
+
+    -- Chromium/Electron HDR retag fix (2026-11-23): on a PQ output, Chromium
+    -- re-tags its UI surface as BT2020/PQ with luminances (0, 1000, ref=knob)
+    -- (WAYLAND_DEBUG dump: set_primaries_named(6) set_tf_named(11)
+    -- set_luminances(0,1000,knob) ~36ms after the plain sRGB tag). Hyprland's
+    -- getCMSettings then treats the UI as HDR content: needsSDRmod=false (so
+    -- sdr_max_luminance never applies) and the declared 1000-nit volume gets
+    -- tone-mapped into the panel's 455 — at knob 150 that lands white at ~101
+    -- nits, ~1/3 darker than untagged apps sitting exactly at the knob.
+    -- tonemap="clamp" (the parser takes names, not digits: on/off/clamp/limited,
+    -- WindowRule.cpp) is the shader's clamp-passthrough (tonemap.glsl guard):
+    -- PQ passes 1:1, so Electron white lands at the knob like everything else.
+    -- google-chrome included: it tags EVERY surface PQ (0,1000,ref=knob) from
+    -- startup, and inline YouTube video is composited into the same surface, so
+    -- no per-surface split is possible. On this 455-nit panel clamp is also the
+    -- more faithful video path: content <=455 nits renders at true nits instead
+    -- of being compressed (a 300-nit highlight: ~163 nits tonemapped vs 300
+    -- clamped); only >455-nit speculars hard-clip instead of rolling off.
+    -- No-op in SDR modes (no tonemap triggers there).
+    hl.window_rule({ match = { class = "^(slack|empower-electron|google-chrome)$" }, tonemap = "clamp" })
 end
 
 -- ─── Dictate: push-to-talk dictation (homepc only) ────────────────────────

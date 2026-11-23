@@ -828,6 +828,31 @@ two lines and rebuild to get 0.55.4 back.
   which also kills the older "config reload resets the slider to seed" gotcha for good.
   `binds-user.lua` only unbinds DMS's defaults now; hyprland.lua is required after
   it, so its binds always win even if `dms keybinds` regenerates that file.
+- **Electron/Chromium UI darker than the rest — `tonemap clamp` window rule (2026-11-23).**
+  WAYLAND_DEBUG dump of Slack 4.49.89: on a PQ output Chromium tags the UI surface plain
+  sRGB first, then ~36 ms later **re-tags it BT2020/PQ with `set_luminances(0, 1000, ref=knob)`**
+  (primaries_named 6, tf_named 11 — enum values per wayland.app color-management-v1).
+  Hyprland v0.57.2 `getCMSettings` then treats the UI as HDR content: `needsSDRmod=false`
+  (so `sdr_max_luminance` never applies) and the declared 1000-nit volume tone-maps into the
+  panel's 455 with the ref ratio `dstRef/srcRef` = 203/knob — at knob 150 white lands ~101 nits
+  vs exactly 150 for untagged surfaces: Electron ~1/3 darker, still following the ladder.
+  Fix: `hl.window_rule({ match = { class = "^(slack|empower-electron|google-chrome)$" }, tonemap = "clamp" })`
+  in the SDR block — window-rule `tonemap` maps `clamp`→mode 2, and tonemap.glsl's guard
+  (`tonemapMode == 2` → clamp passthrough) makes PQ pass 1:1, white = knob exactly.
+  TRAP: the rule value is parsed by name (`on/off/1/0/clamp/limited`, WindowRule.cpp) —
+  `tonemap = "2"` is NOT accepted, use `"clamp"`. Chrome included: it tags EVERY surface
+  (UI from startup, dump: one shared PQ desc `(0,1000,ref=knob)`) and inline YouTube video
+  is composited into the same surface — no per-surface split possible. On the 455-nit panel
+  clamp is also the more faithful video path: <=455-nit content renders at true nits (a
+  300-nit highlight: ~163 tonemapped vs 300 clamped); only >455-nit speculars hard-clip
+  instead of rolling off — user confirmed video looks better (less dark). Verified
+  2026-11-23: fresh test Slack with the rule = same brightness as terminal/untagged at
+  knob 80; Chrome UI matches too; rules re-apply to existing windows on reload.
+  Related dead ends from the same day: `hyprctl dispatch keybind F12` is broken under the Lua
+  config (dispatch is Lua-evaluated: `return hl.dispatch(keybind F12)` syntax error) and
+  `wtype -k F12` does not fire binds — to exercise the runtime ladder path from a shell, call
+  the Lua directly through the dispatch evaluator: `hyprctl dispatch 'hl.monitor({...})'`
+  (the arg is evaluated before hl.dispatch errors; side effect lands).
   GOTCHA (same day, fixed): the script lanes went dead ("keybind dead past the SDR floor")
   because `hl.dsp.exec_cmd(cmd)` called bare inside a Lua callback is a DEFERRED bind-action
   constructor (bind-action form; calling form is `hl.dispatch(hl.dsp.exec_cmd(x))`) — a silent
