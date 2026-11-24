@@ -2,6 +2,12 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "local/qwen3.8-flash-next",
   "default_agent": "plan",
+  "permissions": [
+    { "action": "subagent", "resource": "*", "effect": "ask" }
+  ],
+  "instructions": [
+    "/home/javi/.config/opencode/instructions/subagent-model-rule.md"
+  ],
   "plugins": [
     "./plugins/local-model-discovery",
     {
