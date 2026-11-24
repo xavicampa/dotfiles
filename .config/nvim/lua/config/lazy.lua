@@ -37,3 +37,11 @@ require("lazy").setup({
       border = "rounded"
     }
 })
+
+-- automatically install, clean, and update plugins at startup (async, non-blocking)
+vim.api.nvim_create_autocmd("User", {
+    pattern = "VeryLazy",
+    callback = function()
+        require("lazy").sync({ show = false })
+    end,
+})
