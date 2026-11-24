@@ -3,18 +3,18 @@ return {
     "klen/nvim-config-local",
     opts = {},
   },
-  {
-    "mfussenegger/nvim-dap",
-    keys = {
-      { '<leader>db', '<cmd>DapToggleBreakpoint<CR>' },
-      { '<leader>dn', '<cmd>DapNew<CR>' },
-      { '<leader>dc', '<cmd>DapContinue<CR>' },
-      { '<leader>dt', '<cmd>DapTerminate<CR>' },
-      { '<leader>dl', '<cmd>DapStepInto<CR>' },
-      { '<leader>dh', '<cmd>DapStepOut<CR>' },
-      { '<leader>dj', '<cmd>DapStepOver<CR>' },
-    },
-  },
+  -- {
+  --   "mfussenegger/nvim-dap",
+  --   keys = {
+  --     { '<leader>db', '<cmd>DapToggleBreakpoint<CR>' },
+  --     { '<leader>dn', '<cmd>DapNew<CR>' },
+  --     { '<leader>dc', '<cmd>DapContinue<CR>' },
+  --     { '<leader>dt', '<cmd>DapTerminate<CR>' },
+  --     { '<leader>dl', '<cmd>DapStepInto<CR>' },
+  --     { '<leader>dh', '<cmd>DapStepOut<CR>' },
+  --     { '<leader>dj', '<cmd>DapStepOver<CR>' },
+  --   },
+  -- },
   {
     "saghen/blink.cmp",
     version = '1.*',
@@ -33,7 +33,6 @@ return {
     "lewis6991/gitsigns.nvim",
     opts = {},
   },
-  "kdheepak/lazygit.nvim",
   {
     "folke/which-key.nvim",
     event = "VeryLazy",
