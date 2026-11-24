@@ -575,6 +575,11 @@ in
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
+          # stable public name the clients pin (opencode.json "model" = local/qwen3.8-flash-next): the
+          # backend key has been renamed twice; the alias outlives it. Globally unique — the parked
+          # llama.cpp block's ISTA names must never claim this one. Resolves to the key before macros
+          # and routing: ${MODEL_ID}, cmdStop and the gpu group all still see the key.
+          aliases = [ "qwen3.8-flash-next" ];
           # without this Strata under-reports to capability discovery
           capabilities = {
             context = 262144;
@@ -650,11 +655,6 @@ in
           cmdStop = ''${strataLogStop}/bin/strata-log-stop ''${MODEL_ID}'';
           checkEndpoint = "/health";
           ttl = 0;
-          # stable public name the clients pin (opencode.json "model" = local/qwen3.8-flash-next): the
-          # backend key has been renamed twice; the alias outlives it. Globally unique — the parked
-          # llama.cpp block's ISTA names must never claim this one. Resolves to the key before macros
-          # and routing: ${MODEL_ID}, cmdStop and the gpu group all still see the key.
-          aliases = [ "qwen3.8-flash-next" ];
           # without this Strata under-reports to capability discovery
           capabilities = {
             # llama-swap advertises this as context_window / n_ctx to clients, so it must equal the engine's
@@ -838,7 +838,7 @@ in
       # preload is strictly sequential (startPreload: one goroutine, blocking GET / per name,
       # apigroup.go:383) so order = ready order; their evict sets never intersect so
       # runtime loads DO run parallel (fifo rule 6).
-      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s-parallel" ];
+      hooks.on_startup.preload = [ "qwen3.8-flash-next-iq3_s" ];
     };
   };
 
