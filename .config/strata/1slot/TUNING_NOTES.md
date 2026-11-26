@@ -798,3 +798,106 @@ arm, pi served by this engine — every boot carried `9216 of its 9216 profiled 
 `"drafting": "dflash2"` beats the batch blocker ("the engine serves them with a drafter per request"), and per-slot
 DFlash2 drafts are on by default for a split whose slots run as one group. Booting that arm unloads the engine serving
 this session (hard rule 1), so it needs either pi pointed elsewhere or a session that does not live in the arm.
+
+## 2026-11-26 — **the silent upgrade cost this arm ~8-14 %: `--pull newer` + `STRATA_ROUTE_TAIL_SKIP` default removed. FIXED, live** (era 357834, engine 0.1.69)
+
+Symptom: "1slot feels slower". Nothing in this tree changed since Nov 19 (`git diff` on the preset: only
+`last_used`), so the regression was searched for outside the config. It is two upstream facts arriving through
+`--pull newer` in the llama-swap entry: **the image, and with it the engine binary, upgraded itself between boots**
+— `0.1.62` (Nov 19) → `0.1.66` (Nov 23) → `0.1.67` (Nov 24) → `0.1.69` (Nov 25) — and somewhere in that window the
+**route-tail-skip default was removed**, which is exactly the knob `aac2939` (§ route-tail-sweep, Nov 19) chose to
+leave alone *because it was ON by default at rank 7*. Read the register shipped in the current image
+(`podman cp <engine>:/opt/strata/terminal/data/settings-register.json`):
+
+    STRATA_TAIL_SKIP_MAX_CACHED — "Retired in 0.1.63: code removed, the setting is no longer read. It moved the
+      cached-percent line of the default tail-skip rule, and the tail skip is off when STRATA_ROUTE_TAIL_SKIP is
+      not set (owner decision 2026-11-19) … STRATA_ROUTE_TAIL_SKIP=7 turns the skip on whatever the cached share is."
+    serve/server.py:4134 — "0.2.17 (owner 11-19): the route tail skip is Off unless the person turned it on…
+      an unset one is set to 0 here, for a config made before 0.2.17 too."
+
+Proof it was off here: the running engine's own environment had **`STRATA_ROUTE_TAIL_SKIP=0`** (not from any tree
+file — `child_env` injects it), and the `route tail skip: N missed experts skipped` counter appears in every era up
+to `0.1.62` and **zero times in 0.1.65/66/67/69** (last one at log line 297524 = era 297074, Nov 19 22:33, the last
+boot of the Nov-19 sweep). Mechanism column (in-era, `decode expert cache` lines, big requests): routed lookups
+served **over PCIe / from the other GPU went 0.30-0.40 % → 0.70 % median** (4.2-4.8 % on short requests).
+
+### Two independent instruments agree on the size
+
+Engine-log pools (this arm's own traffic, `gen>=150`, binned by prompt size, argv family identical — the
+self-labelling trick, no bench involved):
+
+| prompt bin | 0.1.62 | 0.1.66 | 0.1.67 | 0.1.69 |
+|---|---|---|---|---|
+| <10k | 144.1 (n=37) | 139.6 (22) | 146.2 (4) | **127.0 (35)** |
+| 10-40k | 151.4 (17) | 135.7 (54) | 154.1 (46) | 148.4 (23) |
+| 40-90k | 141.3 (21) | 136.9 (62) | 134.4 (19) | **126.6 (6)** |
+| 90k+ | 136.1 (63) | 130.6 (86) | 130.4 (91) | **120.3 (11)** |
+
+Acceptance ratio across the same cut was **flat** (0.746 → 0.748) — this is not drafting. Ruled out, with data:
+concurrency (`samples.csv` from the strata-logs archives: **maxConc = 1 on every day** since Oct 29, so the Nov 24
+"alias → solo + preload solo" pin did not create queueing), RAM (MemAvailable is *better* now, 14 GiB, vs 3-6 GiB
+during Nov 19-22), KV residency (99+ % hit), and the parallel tree's Nov-19 ctx change (different arm, exited since
+Nov 23).
+
+`bench-1slot.py 2` (greedy, engine accounting) on the live boot, against the § route-tail-sweep controls on 0.1.62:
+
+| stage | 0.1.62 controls (Nov 19) | 0.1.69 skip OFF (control, era 357024) | **0.1.69 skip ON (arm, era 357834)** |
+|---|---|---|---|
+| A <40K decode | 167.7-182.6 (5 runs) | 162.2 | **165.6** |
+| B ~83K decode | 133.4 · 143.6 | 123.3 | **127.0** (+3.0 %) |
+| C ~170K decode | 124.1 · 131.7 | 120.7 | **126.9** (+5.1 %) |
+| D cold read (**±1 % control**) | 4777 · 5002 · 4976 | 4716.0 | **4686.8** (control flat ⇒ the box/prompt path is unchanged) |
+
+In-era mechanism, arm (`tail-stats.py 357834`): `skip=ON rank 7`, `171157/178263` entries skipped (**96.0 %**),
+**skip/1k gen 22 242** — inside the Nov-19 keeper's 21 751-23 783 band. So the mechanism is back exactly as the
+Nov-19 sweep left it.
+
+### Applied (live)
+
+Preset `extra` (same layer as the tree's other `STRATA_*` pins, lands in the run-config `env` map that
+`serve/server.py child_env` applies *before* `speed_switches.engine_env_defaults`, which only fills unset keys):
+
+    "STRATA_ROUTE_TAIL_SKIP": "7"
+
+Boot line that confirms it (`STRATA_ROUTE_TAIL_SKIP` is env-only — there is no CLI flag):
+
+    strata serve: STRATA_ROUTE_TAIL_SKIP=7 is ON: a missed expert that every token of a verify window routes at
+      rank 7 or lower is skipped (answers differ slightly); it is off when STRATA_ROUTE_TAIL_SKIP is not set or is 0
+
+Everything else byte-identical: `engine/0.1.69`, `--max-context 262144 --prompt-cache-spread --kv-resident 32768
+--layer-split 30 --pcie-frac 0.20 --pipeline-windows 2`, `9140 of its 9216 profiled pairs`, 60 % resident,
+`1213 / 1273 MiB free`, no `LOW`/`WARNING`. The engine binary is unchanged across the control/arm pair (same image
+ID `46b5ee925b60`) — the pin below is what guarantees that stays true.
+
+**And the governance fix: `--pull newer` -> `--pull never`** in both strata entries of
+`~/.config/nixos/homepc/configuration.nix` (switched, gen `4r7260l81d9dqlfm1m5wwzfq20fkkral`). Upgrades are now a
+deliberate act: `podman pull ghcr.io/niko1221/strata:latest-cuda13`, then re-bench before keeping. Whisper keeps
+`--pull newer` (it is not a tuned baseline). A tuned tree must not sit behind a moving image tag — this cost a week
+of unattributed 8-14 %.
+
+### What is still missing vs Nov 19 (do not call this closed)
+
+The skip recovered +3.0 / +5.1 % (B/C) but B is still below both Nov-19 controls (127.0 vs 133.4 · 143.6) and A is
+below the 167.7-182.6 band, while C is back inside. Boot-to-boot spread is 7.6 % control-to-control (§ route-tail
+sweep), so one pair cannot resolve a 4 % residual — but the same upgrade also changed these, all unmeasured here:
+
+- launcher now **adds** `--prompt-cache-spread` (runner.py ~795, #6469) unless the run config carries
+  `prompt_cache_spread: false` — the 1slot argv carries it since 0.1.6x and no tree file ever asked for it;
+- `--prefill auto` is capped at 8192 chunks on NVIDIA now ("NVIDIA (15.6 GiB): --prefill auto stays at 8192 so
+  prompt loans do not cannibalize hot expert slots (#5199; `STRATA_NV_CHUNK=16|1` raises it)"; 0.1.62 printed
+  "may take chunks up to N");
+- CUDA0 expert cache **5836 → 5694 slots**, CUDA1 `9215 of 9216` → `9140 of 9216` pairs, resident 61 → 60 %;
+- new `strata prefill: warmed the BF16 and FP8 GEMM libraries on GPU0` line (`STRATA_PREFILL_WARM=0` skips).
+
+Next arm if it matters: `prompt_cache_spread: false` (run-config top-level key, survives `derive_config`) as a
+single knob, bracketed pairs, n>=2 boots/arm — and expect `--pull never` to be the only thing keeping the baseline
+comparable while it runs.
+
+**Applies to the other two trees too**: neither `parallel` nor `coder` sets `STRATA_ROUTE_TAIL_SKIP`, so both boot
+with the skip off (they miss more experts than this arm — parallel runs 55 % resident). Not applied: each tree's
+keeper is its own A/B, and `--resident-experts` / `--batch` change what the skip costs. Do it deliberately, per tree.
+
+Backups: `strata/launch-presets/docker.json.bak-20261126-pre-tailskip-pin`,
+`~/.config/nixos/homepc/configuration.nix.bak-20261126-pre-tailskip-pin`.
+Artifacts: `/tmp/bench-tailskip.txt` (arm bench), `.tune/tailsweep-stats.json` (mechanism counters), era line
+357834 = the live boot.

@@ -552,6 +552,11 @@ in
           # config's "env"; serve/server.py child_env applies that on top of the container env, so the preset wins
           # if both name a key - keep one home. STRATA_SELECT_TWO_PASS is dropped, not moved: default-on in the
           # engine since 0.2.12 (data/settings-register.json). An A/B arm now clears the preset key, not a rebuild.
+          # --pull NEVER (2026-11-26): `--pull newer` let the image - and with it the engine binary - change under a
+          # tuned baseline with nobody deciding: 0.1.62 -> 0.1.66 -> 0.1.67 -> 0.1.69 between Nov 19 and Nov 25, and
+          # the 0.1.63 line retired the STRATA_ROUTE_TAIL_SKIP default (0.2.17 now injects =0 unless the config sets
+          # it), which cost this arm ~8-14% decode at equal context. Upgrades are deliberate now: `podman pull
+          # ghcr.io/niko1221/strata:latest-cuda13`, then re-bench. Evidence: 1slot/TUNING_NOTES.md § silent upgrade.
           cmd = ''
             podman run --replace --name ''${MODEL_ID}
             --network host
@@ -560,7 +565,7 @@ in
             --cgroup-conf memory.swap.max=0
             --shm-size 2g
             --stop-timeout 120
-            --pull newer
+            --pull never
             -v strata-data:/data
             -v /home/javi/.config/strata/1slot:/data/install
             -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf:ro
@@ -640,7 +645,7 @@ in
             --cgroup-conf memory.swap.max=0
             --shm-size 2g
             --stop-timeout 120
-            --pull newer
+            --pull never
             -v strata-data:/data
             -v /home/javi/.config/strata/parallel:/data/install
             -v /home/javi/.cache/huggingface/hub/models--ISTA-DASLab--Qwen3.8-Flash-Next-GSQ-RCO-GGUF/blobs/4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3:/data/gguf/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf:ro
