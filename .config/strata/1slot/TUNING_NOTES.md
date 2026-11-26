@@ -950,3 +950,61 @@ kv-resident 32768, pcie-frac 0.20, pipeline-windows 2, ctx 262144), `9140 of its
 `1213 / 1273 MiB free`, no `LOW`/`WARNING`. Artifacts: `/tmp/bench-{spread,l2pf,ctl2}.txt`. Backups:
 `strata-iq3_s.json.bak-20261126-pre-spreadarm` (and the preset is byte-identical to `*.bak-20261126-pre-tailskip-pin`
 plus the tail-skip key).
+
+## 2026-11-26 (third sweep) — `STRATA_PIPELINE_HIT_MIN=0.35`: **ACCEPTED, live** (era 360110, engine 0.1.69)
+
+The one register entry that matched this arm's shape: *"opt-in (off by default): the pipelined decode launches a
+speculative window when the share of such windows on the path … is at least this (0.35 measured best on 2x RTX
+3090); unset, the theta gate at 0.2 … Measured on 2x RTX A6000, UD-Q4_K_XL, **one client, --pipeline-windows 2**"* —
+which is this tree exactly (`--pipeline-windows 2`, no `--batch`, and § where the headroom actually is says ~40 % of
+the window is a *wait*, not runnable work). Env-only: preset `extra` key, no rebuild.
+
+Boots, each `edit -> podman stop -t 120 -> sleep 2 -> proxy curl -> gate -> bench-1slot.py 2` in one tool call
+(session served by the arm), reload 38.8-40.0 s. **Everything else byte-identical** (`9140 of its 9216` pairs,
+60 % resident, `1213 / 1273 MiB free`, no `LOW`/`WARNING`, tail skip ON).
+
+| boot | era | knob | A <40K | **B ~83K** | C ~170K | D cold read |
+|---|---|---|---|---|---|---|
+| ctl-1 | 357834 | — | 165.6 | 127.0 | 126.9 | 4686.8 |
+| (arm spread-off) | 358486 | `prompt_cache_spread:false` | 156.6 | 126.2 | 129.7 | 4878.6 |
+| (arm L2PF) | 358800 | + `STRATA_L2_PF=1` | 145.4 | 122.5 | 114.4 | 4887.6 |
+| ctl-2 | 359126 | — | 176.7 | 121.9 | 125.0 | 4903.4 |
+| **arm** | 359481 | **HIT_MIN=0.35** | 168.7 | **140.9** | **132.1** | 4881.3 |
+| ctl-3 | 359795 | — (removed) | 166.7 | 124.0 | 119.3 | 4860.1 |
+| **live** | 360110 | **HIT_MIN=0.35**, 1 round then 2 | 164.1 / 159.8 | 122.7 / **136.2** | 122.7 / 122.4 | 4856.3 |
+
+**Why the 1-round read nearly killed a real effect:** the first bench on the live boot was `bench-1slot.py 1` = **one
+sample per stage**, and it printed B 122.7 — control level. Re-benching the *same* boot with 2 rounds gave **136.2**.
+On this tree a stage median from one round is worthless; `bench-1slot.py` needs the 2 rounds it defaults to.
+
+Per-sample B-stage decode (every request with `gen>=400`), which is the only honest way to read this:
+
+    arm (0.35):   136, 146, 127, 165   |  130, 152, 122, 143      medians 140.9, 136.2
+    controls:    124, 130, 115, 138 | 130, 128, 125, 125 | 120, 117, 124, 165 | 120, 123, 125, 148
+                                                            medians 127.0, 126.2, 121.9, 124.0
+
+Two independent arm boots, both medians above all four control medians; means 140.1 (arm, n=8) vs 128.6 (control,
+n=16) = **+8.9 %**. The first read (+13.4 %) was optimistic — quote **+5…9 % at stage B** from now on. A is a wash
+(168.7 / 159.8 vs 165.6 / 176.7 / 166.7), C is **not** settled (132.1 then 122.4 vs controls 119.3-129.7), and D
+(cold read, the box control) is flat across all seven boots (4686.8-4903.4).
+
+**The mechanism is the pipeline, not the cache.** In-era counters (`tail-stats.py 359481 359795`) are identical on
+the arm and its bracketing control: `skip=ON rank 7`, 95.9 % vs 96.0 % of entries, `skip/1k gen` 22 348 vs 21 989,
+decode expert-cache hit **94.2 % vs 94.6 %** — while era decode medians were **134.5 vs 121.6**. Same expert
+behaviour, more tokens: the speculative-window gate, exactly as the register describes.
+
+**This closes the stage-B deficit** the § silent-upgrade entry left open: Nov-19 B was 133.4 / 143.6, and the arm now
+measures 140.9 / 136.2 (was 121.9-127.0 without it). Stage A was already back inside its band and C is unchanged, so
+the residual of the 0.1.62 -> 0.1.69 upgrade is no longer being chased.
+
+Live keeper is now: split 30 / kv-resident 32768 / pcie-frac 0.20 / pipeline-windows 2 / ctx 262144 /
+`STRATA_ROUTE_TAIL_SKIP=7` + **`STRATA_PIPELINE_HIT_MIN=0.35`**.
+
+Follow-ups, ranked, if this effect is worth more boots: a **0.30 / 0.50 sweep** with n>=2 boots per value (the gate
+is a threshold, so the response may be non-monotone and 0.35 is upstream's value, not this box's optimum); and
+`STRATA_PIPELINE_LAZY_CHAIN=1` (same PR, upstream gain was only 58.6 vs 58.1 tok/s — low prior). Stage C (>100K,
+where the real pi sessions actually live) did **not** move here — if C is the target, aim at the prompt/KV side
+(`STRATA_NV_CHUNK=16`, `STRATA_KV_COPY_RESIDENT=1`), not the pipeline.
+
+Backups: `strata/launch-presets/docker.json.bak-20261126-pre-tailskip-pin` (the pre-sweep preset).
+Artifacts: `/tmp/bench-{tailskip,spread,l2pf,ctl2,pipe,ctl3,ctl4}.txt`. Live era 360110.
