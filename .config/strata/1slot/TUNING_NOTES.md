@@ -901,3 +901,52 @@ Backups: `strata/launch-presets/docker.json.bak-20261126-pre-tailskip-pin`,
 `~/.config/nixos/homepc/configuration.nix.bak-20261126-pre-tailskip-pin`.
 Artifacts: `/tmp/bench-tailskip.txt` (arm bench), `.tune/tailsweep-stats.json` (mechanism counters), era line
 357834 = the live boot.
+
+## 2026-11-26 (second sweep) — `prompt_cache_spread: false` and `STRATA_L2_PF=1`: **both REJECTED** (four boots, bracketed, engine 0.1.69)
+
+Follow-up to the tail-skip fix: the residual stage-B deficit, plus the newest off-by-default switch that fits this
+box. Four boots, each: edit -> `podman stop -t 120` -> `sleep 2` -> proxy-id curl -> gate -> `bench-1slot.py 2`, all
+in one tool call (this session is served by the arm). Reload 36.8-37.8 s every time. `bench-1slot.py` reads the
+engine's own accounting, so the columns are comparable across eras.
+
+| boot | era | config (everything else byte-identical) | A <40K | B ~83K | C ~170K | D cold read |
+|---|---|---|---|---|---|---|
+| ctl-1 | 357834 | keeper: tail skip 7, spread as launcher gives it | 165.6 | 127.0 | 126.9 | 4686.8 |
+| arm-1 | 358486 | **+ `prompt_cache_spread: false`** (run-config key; `--prompt-cache-spread` gone from argv) | 156.6 | 126.2 | 129.7 | 4878.6 |
+| arm-2 | 358800 | + `STRATA_L2_PF=1` (child env confirmed) | 145.4 | 122.5 | **114.4** | 4887.6 |
+| ctl-2 | 359126 | keeper restored (**live**) | **176.7** | 121.9 | 125.0 | 4903.4 |
+
+**Control-to-control spread today: A 165.6 -> 176.7 (+6.7 %), B 127.0 -> 121.9 (−4.0 %), C 126.9 -> 125.0 (−1.5 %),
+D 4686.8 -> 4903.4 (+4.6 %).** That matches this tree's historical 7.6 % control-to-control figure, and it is the
+yardstick for everything below — nothing in this sweep moves more than the drift except L2_PF at stage C.
+
+- **`prompt_cache_spread: false` — reject, a wash.** A −5.4 %, B −0.6 %, C +2.2 %: all inside the drift, no stage
+  improved enough to matter. The flag the launcher adds since 0.1.6x (#6469) is **not** the source of the residual
+  gap; stop chasing it. Mechanism was never visible either: no boot line distinguishes the two states, so assert the
+  **argv** (`--prompt-cache-spread` present or absent) — the run-config key is silently inert otherwise.
+- **`STRATA_L2_PF=1` — reject, and on C it is not close: 114.4 vs 129.7 (−11.8 %), A −7.2 %, B −2.9 %.** The
+  register says it is "on for compute capability 12.0 cards, off elsewhere; bit-exact, window −1.7 %, decode +1.4 %
+  (RESULTS-BW-C.md)". This box is mixed: the 5070 Ti is sm_120 (already on) and the 3090 Ti is **cc 8.6 (off by
+  design)**. Forcing it globally puts the prefetch on the cc 8.6 stage and it loses — the engine's own default is
+  right for this pair. `=1` is confirmed delivered (child env showed `STRATA_L2_PF=1`), so this is a real negative,
+  not a no-op. Sub-switches `STRATA_L2_PF_BLOCKS` (8) / `STRATA_L2_PF_MIB` (0) not worth trying: the master switch
+  already lost by more than the drift.
+
+**Correction to the § silent-upgrade entry:** stage A is *not* still short. ctl-2 measured **A 176.7**, inside the
+Nov-19 band 167.7-182.6 — the A "gap" was drift, not residue. What remains genuinely below Nov-19 is **stage B
+(~83K ctx)**: 121.9 / 127.0 now vs **133.4 / 143.6** then, i.e. ~10 %. A is at the keeper's band, C is back inside
+it (125.0-129.7 vs 124.1-131.7). Anything still chasing this upgrade should aim at B alone.
+
+Still untried after this sweep (ranked, all env/CLI-only, no rebuild): `STRATA_PIPELINE_HIT_MIN=0.35` (upstream's
+best on 2x RTX 3090 / 2x A6000 with `--pipeline-windows 2` — this arm's exact shape, and it attacks the
+`GPU-reach wait` that is ~40 % of the window), `STRATA_PIPELINE_LAZY_CHAIN` (same PR, upstream gain was only
+58.6 vs 58.1 tok/s — low prior), `STRATA_NV_CHUNK=16` (the `--prefill auto` 8192-chunk cap; price it on the cold
+read, the one ±1-4 % instrument), `STRATA_KV_COPY_RESIDENT=1` ("Not measured here" in the register).
+**Dead on this box, do not spend a boot:** anything `--peer-device` / `STRATA_P2P_*` / `STRATA_PF_PEER_*` —
+`nvidia-smi topo -p2p r` = **NS** (topology is PHB, GeForce P2P over PCIe is not enabled).
+
+Live state after the sweep: keeper (`--prompt-cache-spread` as the launcher gives it, tail skip 7, split 30,
+kv-resident 32768, pcie-frac 0.20, pipeline-windows 2, ctx 262144), `9140 of its 9216` pairs, 60 % resident,
+`1213 / 1273 MiB free`, no `LOW`/`WARNING`. Artifacts: `/tmp/bench-{spread,l2pf,ctl2}.txt`. Backups:
+`strata-iq3_s.json.bak-20261126-pre-spreadarm` (and the preset is byte-identical to `*.bak-20261126-pre-tailskip-pin`
+plus the tail-skip key).
