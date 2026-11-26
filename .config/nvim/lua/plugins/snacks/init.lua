@@ -38,6 +38,7 @@ return {
     picker = {
       sources = {
         explorer = {
+          jump = { close = true },
           win = {
             input = { keys = { ["<C-t>"] = { "tab", mode = { "n", "i" } }, }, },
             list = { keys = { ["<C-t>"] = { "tab", mode = { "n", "i" } }, }, },
